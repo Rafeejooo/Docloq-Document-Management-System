@@ -11,6 +11,7 @@ import RoleManagement from "@/features/roles/RoleManagement";
 import OSINTTracker from "@/features/osint-tracker/OSINTTracker";
 import Forms from "@/features/forms/Forms";
 import Tasks from "@/features/tasks/Tasks";
+import AIDocumentAnalysis from "@/features/ai-analysis/AIDocumentAnalysis";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <Login /> },
@@ -22,6 +23,7 @@ export const router = createBrowserRouter([
   { path: "/folders", element: <FolderHierarchy /> },
   { path: "/trash", element: <Trash /> },
   { path: "/verification", element: <Verification /> },
+  { path: "/ai-analysis", element: <AIDocumentAnalysis /> },
   { path: "/chatbot", element: <Chatbot /> },
   { path: "/roles", element: <RoleManagement /> },
   { path: "/osint-tracker", element: <OSINTTracker /> },
