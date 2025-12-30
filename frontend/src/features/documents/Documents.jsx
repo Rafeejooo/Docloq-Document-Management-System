@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Card from "@/components/ui/Card";
@@ -43,6 +43,19 @@ export default function Documents() {
   const [verifyingDocument, setVerifyingDocument] = useState(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState(null);
+
+  // Lock body scroll when any modal is open
+  useEffect(() => {
+    const isModalOpen = showUploadModal || showCreateFolderModal || showDocumentModal || showEditModal || showShareModal || showVerifyModal;
+    if (isModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showUploadModal, showCreateFolderModal, showDocumentModal, showEditModal, showShareModal, showVerifyModal]);
 
   // Mock users for sharing
   const availableUsers = [
@@ -1045,11 +1058,11 @@ export default function Documents() {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden"
+              className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Header */}
-              <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800">
+              {/* Header - Fixed at top */}
+              <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 shrink-0">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
@@ -1102,8 +1115,8 @@ export default function Documents() {
                 </div>
               </div>
 
-              {/* Content */}
-              <div className="p-6">
+              {/* Content - Scrollable */}
+              <div className="p-6 flex-1 overflow-y-auto">
                 <AnimatePresence mode="wait">
                   {/* Step 0: File Selection */}
                   {uploadStep === 0 && (
@@ -1505,8 +1518,8 @@ export default function Documents() {
                 </AnimatePresence>
               </div>
 
-              {/* Footer */}
-              <div className="px-6 py-5 border-t border-slate-100 dark:border-slate-800 flex gap-3">
+              {/* Footer - Fixed at bottom */}
+              <div className="px-6 py-5 border-t border-slate-100 dark:border-slate-800 flex gap-3 shrink-0">
                 {uploadStep === 0 && (
                   <>
                     <button
