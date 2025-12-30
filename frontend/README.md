@@ -102,13 +102,13 @@ Before you begin, ensure you have the following installed:
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/docloq.git
+git clone https://github.com/Rafeejooo/Docloq-Document-Management-System.git
 cd docloq/document/frontend
 ```
 
 Or if you received the project as a zip file:
 ```bash
-unzip docloq.zip
+unzip /Docloq-Document-Management-System.zip
 cd docloq/document/frontend
 ```
 
