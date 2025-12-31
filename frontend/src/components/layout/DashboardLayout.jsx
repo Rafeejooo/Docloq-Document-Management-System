@@ -72,10 +72,18 @@ export default function DashboardLayout({ children }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 transition-colors duration-200">
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 transition-colors duration-200 overflow-x-hidden">
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 z-40 h-screen transition-transform duration-200 ${
+        className={`fixed top-0 left-0 z-40 h-screen transition-transform duration-300 ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0`}
       >
@@ -148,18 +156,26 @@ export default function DashboardLayout({ children }) {
       </aside>
 
       {/* Mobile sidebar toggle */}
-      <button
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="fixed top-4 left-4 z-50 lg:hidden p-2.5 rounded-xl bg-slate-900 shadow-lg"
-      >
-        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-      </button>
+      <div className="fixed top-0 left-0 right-0 z-30 lg:hidden bg-slate-900 px-4 py-3 flex items-center gap-3 shadow-lg">
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors"
+        >
+          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-black text-sm">
+            D
+          </div>
+          <span className="text-lg font-bold text-white">DocLoq</span>
+        </div>
+      </div>
 
       {/* Main content */}
-      <main className="lg:ml-64 min-h-screen">
-        <div className="max-w-6xl mx-auto px-6 py-8">{children}</div>
+      <main className="lg:ml-64 min-h-screen pt-16 lg:pt-0">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 overflow-x-hidden">{children}</div>
       </main>
 
       {/* Logout Modal */}

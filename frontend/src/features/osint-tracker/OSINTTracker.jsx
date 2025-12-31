@@ -63,15 +63,15 @@ export default function OSINTTracker() {
         <motion.h1 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-2xl font-semibold text-slate-900 dark:text-white mb-1"
+          className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white mb-1"
         >
           OSINT Tracker
         </motion.h1>
-        <p className="text-slate-500 dark:text-slate-400 text-sm">Monitor document leaks with honeytoken technology</p>
+        <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm">Monitor document leaks with honeytoken technology</p>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
         {stats.map((stat, index) => (
           <motion.div
             key={stat.label}
@@ -79,9 +79,9 @@ export default function OSINTTracker() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
           >
-            <Card className="p-4" hover>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{stat.label}</p>
-              <p className={`text-2xl font-semibold ${stat.alert ? "text-red-600 dark:text-red-400" : "text-slate-900 dark:text-white"}`}>
+            <Card className="p-3 sm:p-4" hover>
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1 truncate">{stat.label}</p>
+              <p className={`text-xl sm:text-2xl font-semibold ${stat.alert ? "text-red-600 dark:text-red-400" : "text-slate-900 dark:text-white"}`}>
                 {stat.value}
               </p>
             </Card>
@@ -139,45 +139,71 @@ export default function OSINTTracker() {
                 </div>
               </div>
             </div>
-            <table className="w-full">
-              <thead className="bg-slate-50 dark:bg-slate-800/50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Document</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Honeytokens</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Last Checked</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {filteredTrackedDocs.map((doc) => (
-                  <tr key={doc.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-sm">📄</div>
-                        <div>
-                          <p className="text-sm font-medium text-slate-900 dark:text-white">{doc.name}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">Uploaded {doc.uploadedOn}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                        Safe
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-sm font-medium text-slate-900 dark:text-white">{doc.honeytokens}</span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{doc.lastChecked}</td>
-                    <td className="px-4 py-3">
-                      <Button variant="ghost" size="sm">Details</Button>
-                    </td>
+            {/* Desktop Table */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50 dark:bg-slate-800/50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Document</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Honeytokens</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Last Checked</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {filteredTrackedDocs.map((doc) => (
+                    <tr key={doc.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-sm">📄</div>
+                          <div>
+                            <p className="text-sm font-medium text-slate-900 dark:text-white">{doc.name}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Uploaded {doc.uploadedOn}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                          Safe
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-sm font-medium text-slate-900 dark:text-white">{doc.honeytokens}</span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{doc.lastChecked}</td>
+                      <td className="px-4 py-3">
+                        <Button variant="ghost" size="sm">Details</Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card View */}
+            <div className="sm:hidden divide-y divide-slate-100 dark:divide-slate-800">
+              {filteredTrackedDocs.map((doc) => (
+                <div key={doc.id} className="p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-lg">📄</div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{doc.name}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">Uploaded {doc.uploadedOn}</p>
+                    </div>
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-1 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      Safe
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                    <span>{doc.honeytokens} honeytokens • Checked {doc.lastChecked}</span>
+                    <Button variant="ghost" size="sm">Details</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </Card>
 
           {/* Monitored Sources */}

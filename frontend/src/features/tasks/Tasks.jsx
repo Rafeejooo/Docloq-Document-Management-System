@@ -223,44 +223,44 @@ export default function Tasks() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8">
+      <div className="space-y-6 sm:space-y-8">
         {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+        <div className="flex flex-col gap-4 sm:gap-6">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                 </svg>
               </div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">My Tasks</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">My Tasks</h1>
             </div>
-            <p className="text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Manage your assigned tasks, signatures, and form submissions
             </p>
           </div>
 
           {/* Stats Cards */}
           <div className="flex gap-3">
-            <div className="px-5 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{pendingCount}</p>
+            <div className="flex-1 sm:flex-none px-4 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{pendingCount}</p>
               <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Pending</p>
             </div>
-            <div className="px-5 py-3 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20">
-              <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{completedCount}</p>
+            <div className="flex-1 sm:flex-none px-4 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20">
+              <p className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">{completedCount}</p>
               <p className="text-xs font-medium text-indigo-600/70 dark:text-indigo-400/70">Completed</p>
             </div>
           </div>
         </div>
 
         {/* Main Content - Two Columns */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 xl:gap-8">
           {/* Tasks List Column */}
-          <div className="xl:col-span-2 space-y-6">
+          <div className="xl:col-span-2 space-y-4 sm:space-y-6">
             {/* Filters Bar */}
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <div className="flex flex-col gap-3 sm:gap-4">
               {/* Tabs */}
-              <div className="inline-flex p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-800/50 shadow-inner">
+              <div className="inline-flex p-1 sm:p-1.5 rounded-xl sm:rounded-2xl bg-slate-100 dark:bg-slate-800/50 shadow-inner w-full sm:w-auto">
                 {[
                   { key: "pending", label: "Pending", count: pendingCount },
                   { key: "completed", label: "Completed", count: completedCount },
@@ -268,14 +268,14 @@ export default function Tasks() {
                   <button
                     key={tab.key}
                     onClick={() => setActiveTab(tab.key)}
-                    className={`relative px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${
+                    className={`flex-1 sm:flex-none relative px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-sm font-semibold transition-all duration-200 ${
                       activeTab === tab.key
                         ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-md"
                         : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                     }`}
                   >
                     {tab.label}
-                    <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+                    <span className={`ml-1.5 sm:ml-2 px-1.5 sm:px-2 py-0.5 rounded-full text-xs ${
                       activeTab === tab.key
                         ? "bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400"
                         : "bg-slate-200 dark:bg-slate-600 text-slate-500 dark:text-slate-400"
@@ -287,14 +287,14 @@ export default function Tasks() {
               </div>
 
               {/* Filters */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                 {/* Date Filter Indicator */}
                 {selectedCalendarDate && (
                   <button
                     onClick={() => setSelectedCalendarDate(null)}
                     className="flex items-center gap-2 px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 text-sm text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors"
                   >
-                    <span>{formatDisplayDate(selectedCalendarDate)}</span>
+                    <span className="text-xs sm:text-sm">{formatDisplayDate(selectedCalendarDate)}</span>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>

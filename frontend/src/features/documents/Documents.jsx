@@ -483,34 +483,35 @@ export default function Documents() {
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center gap-2 sm:gap-3 mb-2">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Documents</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Documents</h1>
             </div>
-            <p className="text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Manage, organize, and edit your files securely
             </p>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-2 sm:gap-3">
             <button
               onClick={() => setShowCreateFolderModal(true)}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-all"
+              className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-50 dark:hover:bg-slate-700 transition-all text-sm"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
               </svg>
-              New Folder
+              <span className="hidden sm:inline">New Folder</span>
+              <span className="sm:hidden">Folder</span>
             </button>
             <button
               onClick={() => setShowUploadModal(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:-translate-y-0.5 transition-all"
+              className="inline-flex items-center gap-1.5 sm:gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:-translate-y-0.5 transition-all text-sm"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
               </svg>
               Upload
@@ -913,7 +914,7 @@ export default function Documents() {
               {/* Modal Content */}
               <div className="px-6 py-5 max-h-[60vh] overflow-y-auto space-y-6">
                 {/* Document Info */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
                     <p className="text-xs text-slate-400 mb-1">Status</p>
                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-sm font-medium ${
@@ -1007,7 +1008,7 @@ export default function Documents() {
               </div>
 
               {/* Modal Footer */}
-              <div className="px-6 py-5 border-t border-slate-100 dark:border-slate-800 flex gap-3">
+              <div className="px-4 sm:px-6 py-4 sm:py-5 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row gap-2 sm:gap-3">
                 <button
                   onClick={() => setShowDocumentModal(false)}
                   className="px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"

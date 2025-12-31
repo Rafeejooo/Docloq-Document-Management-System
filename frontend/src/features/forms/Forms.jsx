@@ -335,19 +335,19 @@ export default function Forms() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-8">
+      <div className="space-y-6 sm:space-y-8">
         {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+        <div className="flex flex-col gap-4 sm:gap-6">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/25">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Forms</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Forms</h1>
             </div>
-            <p className="text-slate-500 dark:text-slate-400">
+            <p className="text-sm text-slate-500 dark:text-slate-400">
               Create reusable form templates and manage form workflows
             </p>
           </div>
@@ -364,15 +364,15 @@ export default function Forms() {
         </div>
 
         {/* Section Tabs */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-none">
           {[
-            { key: "templates", label: "Form Templates", count: templates.length },
-            { key: "created", label: "Created Forms", count: createdForms.length },
+            { key: "templates", label: "Templates", count: templates.length },
+            { key: "created", label: "Created", count: createdForms.length },
           ].map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveSection(tab.key)}
-              className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-medium transition-all ${
+              className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-3 rounded-xl sm:rounded-2xl font-medium transition-all whitespace-nowrap text-sm sm:text-base ${
                 activeSection === tab.key
                   ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-lg"
                   : "bg-slate-100 dark:bg-slate-800/50 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"

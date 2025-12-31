@@ -7,7 +7,7 @@ export default function AIAssistant() {
     {
       id: 1,
       type: "bot",
-      content: "👋 Hello! I'm your DocLoq AI Assistant. I can help you with:\n\n• Document management & search\n• Creating and managing forms\n• Task assignments & tracking\n• General questions about the system\n\nHow can I assist you today?",
+      content: "Hello! I'm your DocLoq AI Assistant. I can help you with document management, forms, tasks, and more. How can I assist you today?",
       timestamp: new Date(),
     },
   ]);
@@ -15,6 +15,18 @@ export default function AIAssistant() {
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+
+  // Lock body scroll when chat is open on mobile
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -31,10 +43,10 @@ export default function AIAssistant() {
   }, [isOpen]);
 
   const quickActions = [
-    { label: "📄 Find a document", query: "Help me find a document" },
-    { label: "📝 Create a form", query: "How do I create a new form template?" },
-    { label: "✅ View my tasks", query: "Show me my pending tasks" },
-    { label: "❓ How to use", query: "How do I use this system?" },
+    { label: "Find document", icon: "📄", query: "Help me find a document" },
+    { label: "Create form", icon: "📝", query: "How do I create a new form template?" },
+    { label: "My tasks", icon: "✅", query: "Show me my pending tasks" },
+    { label: "Help", icon: "❓", query: "How do I use this system?" },
   ];
 
   const handleSend = (e) => {
@@ -92,17 +104,28 @@ export default function AIAssistant() {
 
   return (
     <>
+      {/* Backdrop for mobile */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+          />
+        )}
+      </AnimatePresence>
+
       {/* Floating AI Button */}
       <motion.button
         onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white shadow-2xl shadow-purple-500/30 flex items-center justify-center hover:scale-110 transition-transform duration-200"
-        whileHover={{ scale: 1.1 }}
+        className={`fixed z-50 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 ${
+          isOpen 
+            ? "bottom-4 right-4 w-12 h-12 md:bottom-6 md:right-6 md:w-14 md:h-14 bg-slate-800 dark:bg-slate-700" 
+            : "bottom-6 right-6 w-14 h-14 bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-600 hover:scale-110 shadow-purple-500/40"
+        }`}
         whileTap={{ scale: 0.95 }}
-        animate={{ 
-          boxShadow: isOpen 
-            ? "0 0 0 4px rgba(139, 92, 246, 0.3)" 
-            : "0 10px 40px -10px rgba(139, 92, 246, 0.5)"
-        }}
       >
         <AnimatePresence mode="wait">
           {isOpen ? (
@@ -111,7 +134,7 @@ export default function AIAssistant() {
               initial={{ rotate: -90, opacity: 0 }}
               animate={{ rotate: 0, opacity: 1 }}
               exit={{ rotate: 90, opacity: 0 }}
-              className="w-6 h-6"
+              className="w-5 h-5 md:w-6 md:h-6 text-white"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -119,66 +142,92 @@ export default function AIAssistant() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </motion.svg>
           ) : (
-            <motion.svg
+            <motion.div
               key="chat"
               initial={{ scale: 0, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0, opacity: 0 }}
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+              className="relative"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-            </motion.svg>
+              <svg
+                className="w-6 h-6 text-white"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </motion.div>
           )}
         </AnimatePresence>
         
         {/* Pulse animation when closed */}
         {!isOpen && (
-          <span className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 animate-ping opacity-30" />
+          <span className="absolute inset-0 rounded-full bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-600 animate-ping opacity-20" />
         )}
       </motion.button>
 
-      {/* Chat Window */}
+      {/* Chat Window - Full screen on mobile, floating on desktop */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            initial={{ opacity: 0, y: 100, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="fixed bottom-24 right-6 z-50 w-96 h-[32rem] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden"
+            exit={{ opacity: 0, y: 100, scale: 0.9 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="fixed z-50 
+              inset-0 md:inset-auto
+              md:bottom-24 md:right-6 
+              md:w-[380px] md:h-[520px] 
+              bg-white dark:bg-slate-900 
+              md:rounded-3xl 
+              shadow-2xl 
+              md:border md:border-slate-200 md:dark:border-slate-800 
+              flex flex-col overflow-hidden"
           >
             {/* Header */}
-            <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 px-4 py-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            <div className="relative bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 px-5 py-5 md:py-4">
+              {/* Decorative elements */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+              
+              <div className="relative flex items-center gap-4">
+                {/* Mobile close button */}
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="md:hidden p-2 -ml-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                
+                <div className="w-12 h-12 md:w-10 md:h-10 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <svg className="w-6 h-6 md:w-5 md:h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-white font-semibold">DocLoq AI Assistant</h3>
-                  <p className="text-white/70 text-xs flex items-center gap-1">
-                    <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                    Online & ready to help
+                  <h3 className="text-white font-semibold text-lg md:text-base">AI Assistant</h3>
+                  <p className="text-white/70 text-sm md:text-xs flex items-center gap-1.5">
+                    <span className="w-2 h-2 bg-emerald-400 rounded-full" />
+                    Online • Ready to help
                   </p>
                 </div>
                 <button
                   onClick={() => setMessages([messages[0]])}
-                  className="text-white/70 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg"
+                  className="text-white/60 hover:text-white transition-colors p-2.5 hover:bg-white/10 rounded-xl"
                   title="Clear chat"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
                   </svg>
                 </button>
               </div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto px-4 py-5 space-y-4 bg-slate-50 dark:bg-slate-950">
               {messages.map((message) => (
                 <motion.div
                   key={message.id}
@@ -186,15 +235,22 @@ export default function AIAssistant() {
                   animate={{ opacity: 1, y: 0 }}
                   className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}
                 >
+                  {message.type === "bot" && (
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mr-2 mt-1 shrink-0">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                      </svg>
+                    </div>
+                  )}
                   <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-3 ${
+                    className={`max-w-[75%] ${
                       message.type === "user"
-                        ? "bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-br-md"
-                        : "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-bl-md"
-                    }`}
+                        ? "bg-gradient-to-br from-violet-600 to-purple-600 text-white rounded-2xl rounded-br-md shadow-lg shadow-purple-500/20"
+                        : "bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-2xl rounded-bl-md shadow-sm border border-slate-100 dark:border-slate-700"
+                    } px-4 py-3`}
                   >
-                    <p className="text-sm whitespace-pre-line">{message.content}</p>
-                    <p className={`text-xs mt-1.5 ${message.type === "user" ? "text-white/60" : "text-slate-400"}`}>
+                    <p className="text-sm leading-relaxed whitespace-pre-line">{message.content}</p>
+                    <p className={`text-[10px] mt-2 ${message.type === "user" ? "text-white/50" : "text-slate-400"}`}>
                       {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </p>
                   </div>
@@ -207,11 +263,16 @@ export default function AIAssistant() {
                   animate={{ opacity: 1 }}
                   className="flex justify-start"
                 >
-                  <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl rounded-bl-md px-4 py-3">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mr-2 shrink-0">
+                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                    </svg>
+                  </div>
+                  <div className="bg-white dark:bg-slate-800 rounded-2xl rounded-bl-md px-4 py-3 shadow-sm border border-slate-100 dark:border-slate-700">
                     <div className="flex gap-1.5">
-                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                      <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                     </div>
                   </div>
                 </motion.div>
@@ -222,16 +283,17 @@ export default function AIAssistant() {
 
             {/* Quick Actions */}
             {messages.length <= 1 && (
-              <div className="px-4 pb-2">
-                <p className="text-xs text-slate-400 mb-2">Quick actions:</p>
-                <div className="flex flex-wrap gap-2">
+              <div className="px-4 py-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800">
+                <p className="text-xs text-slate-400 mb-2.5 font-medium">Quick actions</p>
+                <div className="grid grid-cols-2 gap-2">
                   {quickActions.map((action, index) => (
                     <button
                       key={index}
                       onClick={() => handleQuickAction(action.query)}
-                      className="text-xs px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                      className="flex items-center gap-2 text-sm px-3 py-2.5 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:text-purple-600 dark:hover:text-purple-400 transition-all border border-transparent hover:border-purple-200 dark:hover:border-purple-800"
                     >
-                      {action.label}
+                      <span className="text-base">{action.icon}</span>
+                      <span className="text-xs font-medium">{action.label}</span>
                     </button>
                   ))}
                 </div>
@@ -239,23 +301,25 @@ export default function AIAssistant() {
             )}
 
             {/* Input */}
-            <form id="ai-chat-form" onSubmit={handleSend} className="p-4 border-t border-slate-200 dark:border-slate-800">
-              <div className="flex gap-2">
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask me anything..."
-                  className="flex-1 px-4 py-2.5 text-sm rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-shadow"
-                />
+            <form id="ai-chat-form" onSubmit={handleSend} className="p-4 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex gap-2 items-center">
+                <div className="flex-1 relative">
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Type your message..."
+                    className="w-full pl-4 pr-4 py-3.5 md:py-3 text-sm rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500/30 focus:bg-white dark:focus:bg-slate-800 border border-transparent focus:border-purple-300 dark:focus:border-purple-700 transition-all"
+                  />
+                </div>
                 <button
                   type="submit"
                   disabled={!input.trim() || isTyping}
-                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium text-sm hover:shadow-lg hover:shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  className="w-12 h-12 md:w-11 md:h-11 rounded-2xl bg-gradient-to-br from-violet-600 to-purple-600 text-white flex items-center justify-center hover:shadow-lg hover:shadow-purple-500/30 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none transition-all active:scale-95"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
                   </svg>
                 </button>
               </div>

@@ -610,11 +610,11 @@ export default function FolderHierarchy() {
         <motion.h1 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-2xl font-semibold text-slate-900 dark:text-white mb-1"
+          className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white mb-1"
         >
           Folder Hierarchy
         </motion.h1>
-        <p className="text-slate-500 dark:text-slate-400 text-sm">
+        <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm">
           Organize and manage your folder structure
         </p>
       </div>
