@@ -153,9 +153,63 @@ export default function Forms() {
   };
 
   const stepStatusConfig = {
-    completed: { icon: "✓", color: "text-white bg-indigo-600" },
-    "in-progress": { icon: "●", color: "text-white bg-indigo-400" },
-    pending: { icon: "", color: "bg-slate-200 dark:bg-slate-700" },
+    completed: { 
+      icon: (
+        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+        </svg>
+      ), 
+      badge: "bg-emerald-500 text-white",
+      ring: "ring-2 ring-emerald-500/30",
+      bg: "bg-emerald-50 dark:bg-emerald-500/10",
+      border: "border-emerald-200 dark:border-emerald-500/30",
+      text: "text-emerald-600 dark:text-emerald-400"
+    },
+    "in-progress": { 
+      icon: (
+        <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      ), 
+      badge: "bg-indigo-500 text-white",
+      ring: "ring-2 ring-indigo-500/30",
+      bg: "bg-indigo-50 dark:bg-indigo-500/10",
+      border: "border-indigo-200 dark:border-indigo-500/30",
+      text: "text-indigo-600 dark:text-indigo-400"
+    },
+    pending: { 
+      icon: null, 
+      badge: "bg-slate-300 dark:bg-slate-600 text-slate-500 dark:text-slate-400",
+      ring: "",
+      bg: "bg-slate-50 dark:bg-slate-800/50",
+      border: "border-slate-200 dark:border-slate-700",
+      text: "text-slate-400 dark:text-slate-500"
+    },
+  };
+
+  const workflowIcons = {
+    fill: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+      </svg>
+    ),
+    review: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+      </svg>
+    ),
+    approve: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    sign: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+      </svg>
+    ),
   };
 
   const addWorkflowStep = () => {
@@ -469,30 +523,48 @@ export default function Forms() {
                         </div>
 
                         {/* Workflow Steps */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                           {form.workflow.map((step, i) => {
                             const stepStatus = stepStatusConfig[step.status];
+                            const stepIcon = workflowIcons[step.action] || workflowIcons.fill;
                             return (
-                              <div key={i} className="flex items-center gap-2">
+                              <div key={i} className="flex items-center">
                                 <div className="relative group">
-                                  <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center">
-                                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-400 capitalize">
-                                      {step.action?.charAt(0).toUpperCase() || "?"}
+                                  {/* Step bubble */}
+                                  <div className={`w-10 h-10 rounded-full ${stepStatus.bg} ${stepStatus.ring} border ${stepStatus.border} flex items-center justify-center transition-all duration-200 hover:scale-110`}>
+                                    <span className={stepStatus.text}>
+                                      {stepIcon}
                                     </span>
                                   </div>
-                                  <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full ${stepStatus.color} flex items-center justify-center text-[9px] font-bold`}>
-                                    {stepStatus.icon || step.step}
-                                  </div>
+                                  
+                                  {/* Status indicator */}
+                                  {step.status !== "pending" && (
+                                    <div className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full ${stepStatus.badge} flex items-center justify-center shadow-sm`}>
+                                      {stepStatus.icon}
+                                    </div>
+                                  )}
                                   
                                   {/* Tooltip */}
-                                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-3 py-2 rounded-lg bg-slate-900 text-white text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                    <div className="font-medium">{step.user}</div>
-                                    <div className="text-slate-400 capitalize">{step.action}</div>
-                                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-2 h-2 rotate-45 bg-slate-900"></div>
+                                  <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 px-3 py-2 rounded-xl bg-slate-900 dark:bg-slate-700 text-white text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-10 shadow-xl">
+                                    <div className="font-semibold">{step.user}</div>
+                                    <div className="text-slate-400 capitalize flex items-center gap-1.5 mt-0.5">
+                                      <span className={`w-1.5 h-1.5 rounded-full ${step.status === 'completed' ? 'bg-emerald-400' : step.status === 'in-progress' ? 'bg-indigo-400' : 'bg-slate-400'}`}></span>
+                                      {step.action} • {step.status.replace('-', ' ')}
+                                    </div>
+                                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-2 h-2 rotate-45 bg-slate-900 dark:bg-slate-700"></div>
                                   </div>
                                 </div>
+                                
+                                {/* Connector line */}
                                 {i < form.workflow.length - 1 && (
-                                  <div className={`w-6 h-0.5 ${step.status === "completed" ? "bg-indigo-500" : "bg-slate-200 dark:bg-slate-700"}`}></div>
+                                  <div className="relative w-8 h-[2px] mx-0.5">
+                                    <div className="absolute inset-0 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
+                                    <div 
+                                      className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ${
+                                        step.status === "completed" ? "bg-emerald-500 w-full" : step.status === "in-progress" ? "bg-indigo-500 w-1/2" : "w-0"
+                                      }`}
+                                    ></div>
+                                  </div>
                                 )}
                               </div>
                             );
