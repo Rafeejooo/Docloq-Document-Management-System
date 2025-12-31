@@ -398,39 +398,39 @@ export default function Tasks() {
                       onClick={() => openTaskModal(task)}
                       className="cursor-pointer group"
                     >
-                      <Card className={`p-5 hover:shadow-xl transition-all duration-300 border-l-4 ${
+                      <Card className={`p-3.5 sm:p-5 hover:shadow-xl transition-all duration-300 border-l-4 ${
                         isOverdue 
                           ? "border-l-rose-500 bg-rose-50/30 dark:bg-rose-500/5" 
                           : isDueSoon 
                           ? "border-l-amber-500 bg-amber-50/30 dark:bg-amber-500/5" 
                           : "border-l-transparent hover:border-l-indigo-500"
                       }`}>
-                        <div className="flex items-start gap-5">
+                        <div className="flex items-start gap-3 sm:gap-5">
                           {/* Task Type Icon */}
-                          <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center flex-shrink-0">
+                          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center flex-shrink-0">
                             {config.icon}
                           </div>
 
                           {/* Task Info */}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-4 mb-2">
-                              <div className="flex items-center gap-3">
-                                <h3 className="font-semibold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-4 mb-2">
+                              <div className="flex items-center gap-2 sm:gap-3">
+                                <h3 className="font-semibold text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-1">
                                   {task.title}
                                 </h3>
-                                <span className={`w-2.5 h-2.5 rounded-full ring-4 ${priorityConfig[task.priority].color} ${priorityConfig[task.priority].ring}`}></span>
+                                <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ring-2 sm:ring-4 flex-shrink-0 ${priorityConfig[task.priority].color} ${priorityConfig[task.priority].ring}`}></span>
                               </div>
-                              <span className="px-3 py-1 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
+                              <span className="hidden sm:inline-block px-3 py-1 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                                 {config.label}
                               </span>
                             </div>
                             
-                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4 line-clamp-1">{task.description}</p>
+                            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-3 sm:mb-4 line-clamp-1 sm:line-clamp-2">{task.description}</p>
 
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-4">
-                                {/* Assigned By */}
-                                <div className="flex items-center gap-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+                              <div className="flex items-center gap-3 sm:gap-4">
+                                {/* Assigned By - hidden on mobile */}
+                                <div className="hidden sm:flex items-center gap-2">
                                   <div className="w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
                                     <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
                                       {task.assignedBy.avatar}
@@ -440,14 +440,19 @@ export default function Tasks() {
                                 </div>
                                 
                                 {/* Due Date */}
-                                <div className={`flex items-center gap-1.5 text-sm ${isOverdue ? "text-rose-600 dark:text-rose-400" : isDueSoon ? "text-amber-600 dark:text-amber-400" : "text-slate-400"}`}>
-                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div className={`flex items-center gap-1.5 text-xs sm:text-sm ${isOverdue ? "text-rose-600 dark:text-rose-400" : isDueSoon ? "text-amber-600 dark:text-amber-400" : "text-slate-400"}`}>
+                                  <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                   </svg>
                                   <span className="font-medium">
                                     {task.status === "completed" ? task.completedAt : formatDisplayDate(task.dueDate)}
                                   </span>
                                 </div>
+
+                                {/* Type Badge - visible on mobile */}
+                                <span className="sm:hidden px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                                  {config.label}
+                                </span>
                               </div>
                               
                               {/* Action Button */}
@@ -457,16 +462,16 @@ export default function Tasks() {
                                     e.stopPropagation();
                                     handleCompleteTask(task.id);
                                   }}
-                                  className="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:-translate-y-0.5 transition-all"
+                                  className="w-full sm:w-auto px-4 sm:px-5 py-2 rounded-lg sm:rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:-translate-y-0.5 transition-all"
                                 >
                                   {config.action}
                                 </button>
                               ) : (
-                                <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20">
-                                  <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div className="w-full sm:w-auto flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20">
+                                  <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                   </svg>
-                                  <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">Done</span>
+                                  <span className="text-xs sm:text-sm font-medium text-indigo-600 dark:text-indigo-400">Done</span>
                                 </div>
                               )}
                             </div>
@@ -480,8 +485,8 @@ export default function Tasks() {
             </div>
           </div>
 
-          {/* Calendar Column */}
-          <div className="xl:col-span-1">
+          {/* Calendar Column - Hidden on mobile */}
+          <div className="hidden xl:block xl:col-span-1">
             <Card className="p-5 sticky top-6">
               {/* Calendar Header */}
               <div className="flex items-center justify-between mb-5">

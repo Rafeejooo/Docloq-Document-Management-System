@@ -178,10 +178,10 @@ function SortableFolderItem({
             </svg>
           </button>
 
-          {/* Add Subfolder */}
+          {/* Add Subfolder - Hidden on mobile */}
           <button
             onClick={() => onAddSubfolder(folder.id)}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-green-600 dark:hover:text-green-400 transition-colors"
+            className="hidden sm:block p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-green-600 dark:hover:text-green-400 transition-colors"
             title="Add subfolder"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -189,8 +189,8 @@ function SortableFolderItem({
             </svg>
           </button>
 
-          {/* Move to Folder */}
-          <div className="relative" ref={moveMenuRef}>
+          {/* Move to Folder - Hidden on mobile */}
+          <div className="hidden sm:block relative" ref={moveMenuRef}>
             <button
               onClick={() => setShowMoveMenu(!showMoveMenu)}
               className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
@@ -666,12 +666,16 @@ export default function FolderHierarchy() {
           />
         </div>
 
-        <Button onClick={() => { setSelectedParent(null); setShowAddFolderModal(true); }}>
-          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        <button 
+          onClick={() => { setSelectedParent(null); setShowAddFolderModal(true); }}
+          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-700 hover:via-purple-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+        >
+          <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
           </svg>
-          Add Root Folder
-        </Button>
+          <span className="hidden sm:inline">Add Root Folder</span>
+          <span className="sm:hidden">Add Folder</span>
+        </button>
       </motion.div>
 
       {/* Info Banner */}
