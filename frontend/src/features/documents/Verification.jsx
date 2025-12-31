@@ -130,7 +130,7 @@ export default function Verification() {
             <motion.h1 
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="text-2xl font-semibold text-slate-900 dark:text-white"
+              className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white"
             >
               Document Verification
             </motion.h1>
@@ -153,7 +153,7 @@ export default function Verification() {
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
             >
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Soft File Option */}
                 <motion.button
                   whileHover={{ scale: 1.02 }}

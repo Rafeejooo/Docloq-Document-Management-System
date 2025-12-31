@@ -141,32 +141,32 @@ export default function AIDocumentAnalysis() {
 
   return (
     <DashboardLayout>
-      <div className="h-[calc(100vh-2rem)] flex flex-col">
+      <div className="min-h-[calc(100vh-8rem)] lg:h-[calc(100vh-2rem)] flex flex-col">
         {/* Header */}
         <div className="mb-4">
           <motion.h1
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-2xl font-semibold text-slate-900 dark:text-white mb-1"
+            className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white mb-1"
           >
             AI Document Analysis
           </motion.h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">
+          <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm">
             Select a document and ask AI to analyze its contents
           </p>
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex gap-4 min-h-0">
+        <div className="flex-1 flex flex-col lg:flex-row gap-4 min-h-0">
           {/* Left Panel - Document List */}
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="w-72 flex-shrink-0"
+            className="w-full lg:w-72 flex-shrink-0"
           >
-            <Card className="h-full flex flex-col">
-              <div className="p-4 border-b border-slate-100 dark:border-slate-800">
-                <h2 className="font-semibold text-slate-900 dark:text-white">Select Document</h2>
+            <Card className="h-full flex flex-col max-h-[280px] lg:max-h-full">
+              <div className="p-3 sm:p-4 border-b border-slate-100 dark:border-slate-800">
+                <h2 className="font-semibold text-slate-900 dark:text-white text-sm sm:text-base">Select Document</h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Choose a document to analyze</p>
               </div>
               
@@ -310,19 +310,19 @@ export default function AIDocumentAnalysis() {
                     {/* Key Metrics */}
                     <div>
                       <h3 className="font-semibold text-slate-900 dark:text-white mb-3">Key Metrics</h3>
-                      <div className="grid grid-cols-4 gap-3">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                         {analysisResult.keyMetrics.map((metric, idx) => (
-                          <div key={idx} className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center">
-                            <span className="text-2xl mb-1 block">{metric.icon}</span>
-                            <p className="text-xl font-bold text-slate-900 dark:text-white">{metric.value}</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">{metric.label}</p>
+                          <div key={idx} className="p-3 sm:p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-center">
+                            <span className="text-xl sm:text-2xl mb-1 block">{metric.icon}</span>
+                            <p className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">{metric.value}</p>
+                            <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">{metric.label}</p>
                           </div>
                         ))}
                       </div>
                     </div>
 
                     {/* Sentiment & Readability */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       {/* Sentiment Chart */}
                       <div className="p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                         <h3 className="font-semibold text-slate-900 dark:text-white mb-3">Sentiment Analysis</h3>

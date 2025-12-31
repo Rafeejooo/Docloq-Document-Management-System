@@ -40,11 +40,11 @@ export default function Trash() {
         <motion.h1 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-2xl font-semibold text-slate-900 dark:text-white mb-1"
+          className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white mb-1"
         >
           Trash
         </motion.h1>
-        <p className="text-slate-500 dark:text-slate-400 text-sm">
+        <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm">
           Documents are permanently deleted after 30 days
         </p>
       </div>
@@ -73,7 +73,7 @@ export default function Trash() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.15 }}
-        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5"
+        className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5"
       >
         <div className="relative">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -84,13 +84,13 @@ export default function Trash() {
             placeholder="Search trash..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 pr-4 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white w-56"
+            className="pl-9 pr-4 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white w-full sm:w-56"
           />
         </div>
 
         {selectedItems.length > 0 && (
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
               {selectedItems.length} selected
             </span>
             <Button variant="outline" size="sm">Restore</Button>
@@ -113,66 +113,115 @@ export default function Trash() {
               <p className="text-sm text-slate-500 dark:text-slate-400">No deleted documents found</p>
             </div>
           ) : (
-            <table className="w-full">
-              <thead className="bg-slate-50 dark:bg-slate-800/50">
-                <tr>
-                  <th className="px-4 py-3 text-left">
-                    <input
-                      type="checkbox"
-                      checked={selectedItems.length === filteredDocs.length && filteredDocs.length > 0}
-                      onChange={toggleSelectAll}
-                      className="w-4 h-4 rounded border-slate-300 dark:border-slate-600"
-                    />
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Size</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Deleted By</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Deleted</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Expires</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <>
+              {/* Desktop Table */}
+              <div className="hidden sm:block overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-slate-50 dark:bg-slate-800/50">
+                    <tr>
+                      <th className="px-4 py-3 text-left">
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.length === filteredDocs.length && filteredDocs.length > 0}
+                          onChange={toggleSelectAll}
+                          className="w-4 h-4 rounded border-slate-300 dark:border-slate-600"
+                        />
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Name</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Size</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Deleted By</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Deleted</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Expires</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {filteredDocs.map((doc, index) => (
+                      <motion.tr 
+                        key={doc.id} 
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                      >
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedItems.includes(doc.id)}
+                            onChange={() => toggleSelect(doc.id)}
+                            className="w-4 h-4 rounded border-slate-300 dark:border-slate-600"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-sm">📄</div>
+                            <span className="text-sm font-medium text-slate-900 dark:text-white">{doc.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{doc.size}</td>
+                        <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{doc.deletedBy}</td>
+                        <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{doc.deletedOn}</td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs font-medium px-2 py-1 rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
+                            {doc.expiresIn}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex gap-2">
+                            <Button variant="ghost" size="sm">Restore</Button>
+                            <Button variant="danger" size="sm">Delete</Button>
+                          </div>
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="sm:hidden divide-y divide-slate-100 dark:divide-slate-800">
                 {filteredDocs.map((doc, index) => (
-                  <motion.tr 
-                    key={doc.id} 
+                  <motion.div
+                    key={doc.id}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.05 }}
-                    className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                    className="p-4"
                   >
-                    <td className="px-4 py-3">
+                    <div className="flex items-start gap-3">
                       <input
                         type="checkbox"
                         checked={selectedItems.includes(doc.id)}
                         onChange={() => toggleSelect(doc.id)}
-                        className="w-4 h-4 rounded border-slate-300 dark:border-slate-600"
+                        className="w-4 h-4 mt-1 rounded border-slate-300 dark:border-slate-600"
                       />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-sm">📄</div>
-                        <span className="text-sm font-medium text-slate-900 dark:text-white">{doc.name}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-sm flex-shrink-0">📄</div>
+                          <span className="text-sm font-medium text-slate-900 dark:text-white truncate">{doc.name}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2 text-xs text-slate-500 dark:text-slate-400 mb-3">
+                          <span>{doc.size}</span>
+                          <span>•</span>
+                          <span>by {doc.deletedBy}</span>
+                          <span>•</span>
+                          <span>{doc.deletedOn}</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-medium px-2 py-1 rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
+                            Expires in {doc.expiresIn}
+                          </span>
+                          <div className="flex gap-2">
+                            <Button variant="ghost" size="sm">Restore</Button>
+                            <Button variant="danger" size="sm">Delete</Button>
+                          </div>
+                        </div>
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{doc.size}</td>
-                    <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{doc.deletedBy}</td>
-                    <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{doc.deletedOn}</td>
-                    <td className="px-4 py-3">
-                      <span className="text-xs font-medium px-2 py-1 rounded-full bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400">
-                        {doc.expiresIn}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="sm">Restore</Button>
-                        <Button variant="danger" size="sm">Delete</Button>
-                      </div>
-                    </td>
-                  </motion.tr>
+                    </div>
+                  </motion.div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </>
           )}
         </Card>
       </motion.div>

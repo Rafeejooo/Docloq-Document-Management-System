@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
@@ -12,6 +12,8 @@ export default function Chatbot() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [mobileView, setMobileView] = useState("documents"); // "documents" | "chat"
+  const [showAnalysis, setShowAnalysis] = useState(true);
   const messagesEndRef = useRef(null);
 
   const documents = [
@@ -38,6 +40,7 @@ export default function Chatbot() {
   const handleSelectDocument = (doc) => {
     setSelectedDocument(doc);
     setAnalysisResult(null);
+    setMobileView("chat"); // Switch to chat view on mobile when document is selected
     setMessages([
       {
         id: 1,
@@ -100,214 +103,301 @@ export default function Chatbot() {
 
   return (
     <DashboardLayout>
-      <div className="h-[calc(100vh-100px)] flex flex-col">
+      {/* Mobile Full-Screen Container */}
+      <div className="h-[calc(100vh-100px)] md:h-[calc(100vh-100px)] flex flex-col fixed inset-0 md:static md:inset-auto bg-slate-50 dark:bg-slate-950 z-40 md:z-auto pt-16 md:pt-0">
         {/* Header */}
-        <div className="mb-4">
-          <motion.h1 
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-2xl font-semibold text-slate-900 dark:text-white mb-1"
-          >
-            AI Document Analyzer
-          </motion.h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">
-            Select a document to analyze and ask questions
-          </p>
+        <div className="px-4 md:px-0 py-3 md:mb-4 bg-white dark:bg-slate-900 md:bg-transparent border-b border-slate-200 dark:border-slate-800 md:border-0">
+          <div className="flex items-center justify-between">
+            <div>
+              <motion.h1 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-xl md:text-2xl font-semibold text-slate-900 dark:text-white"
+              >
+                AI Document Analyzer
+              </motion.h1>
+              <p className="text-slate-500 dark:text-slate-400 text-xs md:text-sm">
+                {selectedDocument ? selectedDocument.name : "Select a document to analyze"}
+              </p>
+            </div>
+            {/* Mobile Back Button */}
+            {mobileView === "chat" && (
+              <button 
+                onClick={() => setMobileView("documents")}
+                className="md:hidden p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Mobile Tab Navigation */}
+          <div className="flex md:hidden mt-3 gap-2">
+            <button
+              onClick={() => setMobileView("documents")}
+              className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-medium transition-all ${
+                mobileView === "documents"
+                  ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+              }`}
+            >
+              📄 Documents
+            </button>
+            <button
+              onClick={() => setMobileView("chat")}
+              className={`flex-1 py-2.5 px-4 rounded-xl text-sm font-medium transition-all ${
+                mobileView === "chat"
+                  ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+              }`}
+            >
+              💬 Chat
+            </button>
+          </div>
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 grid grid-cols-12 gap-4 min-h-0">
+        <div className="flex-1 md:grid md:grid-cols-12 md:gap-4 min-h-0 overflow-hidden px-4 md:px-0 pb-4">
           {/* Left Panel - Document List */}
-          <div className="col-span-3 flex flex-col min-h-0">
-            <Card className="flex-1 flex flex-col overflow-hidden">
-              <div className="p-4 border-b border-slate-100 dark:border-slate-800">
-                <h2 className="text-sm font-medium text-slate-900 dark:text-white mb-3">Documents</h2>
-                <div className="relative">
-                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  <input
-                    type="text"
-                    placeholder="Search..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white"
-                  />
-                </div>
-              </div>
-              
-              <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                {filteredDocuments.map((doc, index) => (
-                  <motion.button
-                    key={doc.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    onClick={() => handleSelectDocument(doc)}
-                    className={`w-full p-3 rounded-xl text-left transition-all ${
-                      selectedDocument?.id === doc.id
-                        ? "bg-slate-900 dark:bg-white"
-                        : "hover:bg-slate-50 dark:hover:bg-slate-800"
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-sm ${
-                        selectedDocument?.id === doc.id
-                          ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
-                          : "bg-slate-100 dark:bg-slate-800"
-                      }`}>
-                        📄
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`font-medium truncate text-sm ${
-                          selectedDocument?.id === doc.id
-                            ? "text-white dark:text-slate-900"
-                            : "text-slate-900 dark:text-white"
-                        }`}>
-                          {doc.name}
-                        </p>
-                        <p className={`text-xs ${
-                          selectedDocument?.id === doc.id
-                            ? "text-slate-300 dark:text-slate-600"
-                            : "text-slate-500 dark:text-slate-400"
-                        }`}>{doc.size} • {doc.date}</p>
-                      </div>
+          <AnimatePresence mode="wait">
+            {(mobileView === "documents" || window.innerWidth >= 768) && (
+              <motion.div 
+                key="documents"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className={`${mobileView === "documents" ? "flex" : "hidden"} md:flex col-span-3 flex-col min-h-0 h-full`}
+              >
+                <Card className="flex-1 flex flex-col overflow-hidden">
+                  <div className="p-4 border-b border-slate-100 dark:border-slate-800">
+                    <h2 className="text-sm font-medium text-slate-900 dark:text-white mb-3">Documents</h2>
+                    <div className="relative">
+                      <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <input
+                        type="text"
+                        placeholder="Search..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2.5 md:py-2 text-sm rounded-xl md:rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white"
+                      />
                     </div>
-                  </motion.button>
-                ))}
-                {filteredDocuments.length === 0 && (
-                  <div className="text-center py-8">
-                    <p className="text-sm text-slate-500 dark:text-slate-400">No documents found</p>
                   </div>
-                )}
-              </div>
-            </Card>
-          </div>
+                  
+                  <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                    {filteredDocuments.map((doc, index) => (
+                      <motion.button
+                        key={doc.id}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        onClick={() => handleSelectDocument(doc)}
+                        className={`w-full p-3 md:p-3 rounded-xl text-left transition-all active:scale-[0.98] ${
+                          selectedDocument?.id === doc.id
+                            ? "bg-slate-900 dark:bg-white"
+                            : "hover:bg-slate-50 dark:hover:bg-slate-800"
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`w-10 h-10 md:w-9 md:h-9 rounded-xl md:rounded-lg flex items-center justify-center text-base md:text-sm ${
+                            selectedDocument?.id === doc.id
+                              ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
+                              : "bg-slate-100 dark:bg-slate-800"
+                          }`}>
+                            📄
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`font-medium truncate text-sm ${
+                              selectedDocument?.id === doc.id
+                                ? "text-white dark:text-slate-900"
+                                : "text-slate-900 dark:text-white"
+                            }`}>
+                              {doc.name}
+                            </p>
+                            <p className={`text-xs mt-0.5 ${
+                              selectedDocument?.id === doc.id
+                                ? "text-slate-300 dark:text-slate-600"
+                                : "text-slate-500 dark:text-slate-400"
+                            }`}>{doc.size} • {doc.date}</p>
+                          </div>
+                          {/* Mobile arrow indicator */}
+                          <div className={`md:hidden flex items-center ${
+                            selectedDocument?.id === doc.id
+                              ? "text-white dark:text-slate-900"
+                              : "text-slate-400"
+                          }`}>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </div>
+                        </div>
+                      </motion.button>
+                    ))}
+                    {filteredDocuments.length === 0 && (
+                      <div className="text-center py-8">
+                        <p className="text-sm text-slate-500 dark:text-slate-400">No documents found</p>
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Center Panel - Analysis & Chat */}
-          <div className="col-span-9 flex flex-col min-h-0 gap-4">
-            {/* Analysis Result */}
-            <Card className="flex-1 flex flex-col overflow-hidden min-h-[200px]">
-              <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-medium text-slate-900 dark:text-white">Document Analysis</h2>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {selectedDocument ? selectedDocument.name : "Select a document to analyze"}
-                  </p>
-                </div>
-                {selectedDocument && (
-                  <Button size="sm" onClick={handleAnalyze} disabled={isAnalyzing}>
-                    {isAnalyzing ? "Analyzing..." : "Analyze"}
-                  </Button>
-                )}
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-4">
-                {!selectedDocument ? (
-                  <div className="h-full flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3 text-xl">📄</div>
-                      <p className="text-slate-500 dark:text-slate-400 text-sm">Select a document from the left panel</p>
-                    </div>
-                  </div>
-                ) : isAnalyzing ? (
-                  <div className="h-full flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="w-12 h-12 rounded-xl bg-slate-900 dark:bg-white flex items-center justify-center mx-auto mb-3 animate-pulse">
-                        <svg className="w-6 h-6 text-white dark:text-slate-900 animate-spin" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          <AnimatePresence mode="wait">
+            {(mobileView === "chat" || window.innerWidth >= 768) && (
+              <motion.div 
+                key="chat"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                className={`${mobileView === "chat" ? "flex" : "hidden"} md:flex col-span-9 flex-col min-h-0 gap-3 md:gap-4 h-full`}
+              >
+                {/* Analysis Result - Collapsible on mobile */}
+                <Card className={`${showAnalysis ? "flex-1 min-h-[180px] md:min-h-[200px]" : "shrink-0"} flex flex-col overflow-hidden transition-all`}>
+                  <div 
+                    className="p-3 md:p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between cursor-pointer md:cursor-default"
+                    onClick={() => setShowAnalysis(!showAnalysis)}
+                  >
+                    <div className="flex items-center gap-2">
+                      {/* Mobile collapse indicator */}
+                      <button className="md:hidden text-slate-400">
+                        <svg className={`w-4 h-4 transition-transform ${showAnalysis ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
+                      </button>
+                      <div>
+                        <h2 className="text-sm font-medium text-slate-900 dark:text-white">Document Analysis</h2>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 hidden md:block">
+                          {selectedDocument ? selectedDocument.name : "Select a document to analyze"}
+                        </p>
                       </div>
-                      <p className="text-slate-600 dark:text-slate-400 text-sm">Analyzing document...</p>
                     </div>
+                    {selectedDocument && (
+                      <Button size="sm" onClick={(e) => { e.stopPropagation(); handleAnalyze(); }} disabled={isAnalyzing}>
+                        {isAnalyzing ? "Analyzing..." : "Analyze"}
+                      </Button>
+                    )}
                   </div>
-                ) : analysisResult ? (
-                  <motion.div 
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="space-y-4"
-                  >
-                    {/* Summary */}
-                    <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800">
-                      <h3 className="text-sm font-medium text-slate-900 dark:text-white mb-2">Summary</h3>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">{analysisResult.summary}</p>
-                    </div>
 
-                    {/* Stats Grid */}
-                    <div className="grid grid-cols-4 gap-3">
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 text-center">
-                        <p className="text-xl font-semibold text-slate-900 dark:text-white">{analysisResult.pages}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Pages</p>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 text-center">
-                        <p className="text-xl font-semibold text-slate-900 dark:text-white">{analysisResult.wordCount.toLocaleString()}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Words</p>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 text-center">
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{analysisResult.language}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Language</p>
-                      </div>
-                      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 text-center">
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{analysisResult.sentiment}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">Tone</p>
-                      </div>
-                    </div>
-
-                    {/* Key Points */}
-                    <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-700">
-                      <h3 className="text-sm font-medium text-slate-900 dark:text-white mb-3">Key Points</h3>
-                      <div className="grid grid-cols-2 gap-2">
-                        {analysisResult.keyPoints.map((point, idx) => (
-                          <div key={idx} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800">
-                            <span className="text-emerald-500 text-xs">✓</span>
-                            <span className="text-xs text-slate-600 dark:text-slate-400">{point}</span>
+                  {showAnalysis && (
+                    <div className="flex-1 overflow-y-auto p-3 md:p-4">
+                      {!selectedDocument ? (
+                        <div className="h-full flex items-center justify-center">
+                          <div className="text-center">
+                            <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3 text-xl">📄</div>
+                            <p className="text-slate-500 dark:text-slate-400 text-sm">Select a document from the left panel</p>
                           </div>
-                        ))}
+                        </div>
+                      ) : isAnalyzing ? (
+                        <div className="h-full flex items-center justify-center">
+                          <div className="text-center">
+                            <div className="w-12 h-12 rounded-xl bg-slate-900 dark:bg-white flex items-center justify-center mx-auto mb-3 animate-pulse">
+                              <svg className="w-6 h-6 text-white dark:text-slate-900 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                            </div>
+                            <p className="text-slate-600 dark:text-slate-400 text-sm">Analyzing document...</p>
+                          </div>
+                        </div>
+                      ) : analysisResult ? (
+                        <motion.div 
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="space-y-3 md:space-y-4"
+                        >
+                          {/* Summary */}
+                          <div className="p-3 md:p-4 rounded-xl bg-slate-50 dark:bg-slate-800">
+                            <h3 className="text-sm font-medium text-slate-900 dark:text-white mb-2">Summary</h3>
+                            <p className="text-xs md:text-sm text-slate-600 dark:text-slate-400">{analysisResult.summary}</p>
+                          </div>
+
+                          {/* Stats Grid - 2 cols on mobile, 4 on desktop */}
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
+                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 text-center">
+                              <p className="text-lg md:text-xl font-semibold text-slate-900 dark:text-white">{analysisResult.pages}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">Pages</p>
+                            </div>
+                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 text-center">
+                              <p className="text-lg md:text-xl font-semibold text-slate-900 dark:text-white">{analysisResult.wordCount.toLocaleString()}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">Words</p>
+                            </div>
+                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 text-center">
+                              <p className="text-xs md:text-sm font-semibold text-slate-900 dark:text-white">{analysisResult.language}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">Language</p>
+                            </div>
+                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800 text-center">
+                              <p className="text-xs md:text-sm font-semibold text-slate-900 dark:text-white">{analysisResult.sentiment}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">Tone</p>
+                            </div>
+                          </div>
+
+                          {/* Key Points - Single column on mobile */}
+                          <div className="p-3 md:p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                            <h3 className="text-sm font-medium text-slate-900 dark:text-white mb-3">Key Points</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {analysisResult.keyPoints.map((point, idx) => (
+                                <div key={idx} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-800">
+                                  <span className="text-emerald-500 text-xs">✓</span>
+                                  <span className="text-xs text-slate-600 dark:text-slate-400">{point}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </motion.div>
+                      ) : (
+                        <div className="h-full flex items-center justify-center">
+                          <div className="text-center">
+                            <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3 text-xl">🔍</div>
+                            <p className="text-slate-500 dark:text-slate-400 text-sm">Click "Analyze" to get insights</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </Card>
+
+                {/* Chat */}
+                <Card className={`${showAnalysis ? "h-[200px] md:h-[280px]" : "flex-1"} flex flex-col overflow-hidden`}>
+                  <div className="p-3 border-b border-slate-100 dark:border-slate-800">
+                    <h2 className="text-sm font-medium text-slate-900 dark:text-white">Ask AI Assistant</h2>
+                  </div>
+
+                  {/* Messages */}
+                  <div className="flex-1 overflow-y-auto p-3 space-y-3">
+                    {messages.length === 0 && selectedDocument && (
+                      <div className="text-center py-4">
+                        <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400">Ask me anything about {selectedDocument.name}</p>
                       </div>
-                    </div>
-                  </motion.div>
-                ) : (
-                  <div className="h-full flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3 text-xl">🔍</div>
-                      <p className="text-slate-500 dark:text-slate-400 text-sm">Click "Analyze" to get insights</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </Card>
-
-            {/* Chat */}
-            <Card className="h-[280px] flex flex-col overflow-hidden">
-              <div className="p-3 border-b border-slate-100 dark:border-slate-800">
-                <h2 className="text-sm font-medium text-slate-900 dark:text-white">Ask AI Assistant</h2>
-              </div>
-
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-3 space-y-3">
-                {messages.length === 0 && selectedDocument && (
-                  <div className="text-center py-4">
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Ask me anything about {selectedDocument.name}</p>
-                  </div>
-                )}
-                {messages.map((message) => (
-                  <motion.div
-                    key={message.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}
-                  >
+                    )}
+                    {messages.length === 0 && !selectedDocument && (
+                      <div className="text-center py-4">
+                        <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3 text-xl">💬</div>
+                        <p className="text-xs md:text-sm text-slate-500 dark:text-slate-400">Select a document to start chatting</p>
+                      </div>
+                    )}
+                    {messages.map((message) => (
+                      <motion.div
+                        key={message.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex ${message.type === "user" ? "justify-end" : "justify-start"}`}
+                      >
                     <div
-                      className={`max-w-[80%] ${
+                      className={`max-w-[85%] md:max-w-[80%] ${
                         message.type === "user"
                           ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900"
                           : "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white"
-                      } rounded-2xl px-4 py-2 text-sm`}
+                      } rounded-2xl px-4 py-2.5 md:py-2 text-sm`}
                     >
                       {message.type === "bot" && (
                         <div className="flex items-center gap-1 mb-1 text-xs text-slate-500 dark:text-slate-400">
-                          <span>AI</span>
+                          <span>🤖 AI</span>
                         </div>
                       )}
                       <p className="whitespace-pre-wrap">{message.content}</p>
@@ -316,7 +406,7 @@ export default function Chatbot() {
                 ))}
                 {isTyping && (
                   <div className="flex justify-start">
-                    <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl px-4 py-2">
+                    <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl px-4 py-3">
                       <div className="flex gap-1">
                         <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span>
                         <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></span>
@@ -328,8 +418,8 @@ export default function Chatbot() {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Input */}
-              <form onSubmit={handleSend} className="p-3 border-t border-slate-100 dark:border-slate-800">
+              {/* Input - Sticky at bottom on mobile */}
+              <form onSubmit={handleSend} className="p-3 md:p-3 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -337,15 +427,20 @@ export default function Chatbot() {
                     onChange={(e) => setInput(e.target.value)}
                     placeholder={selectedDocument ? `Ask about ${selectedDocument.name}...` : "Select a document first..."}
                     disabled={!selectedDocument}
-                    className="flex-1 px-4 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 px-4 py-3 md:py-2 text-sm rounded-xl md:rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-white disabled:opacity-50 disabled:cursor-not-allowed"
                   />
-                  <Button type="submit" disabled={!selectedDocument || !input.trim()}>
-                    Send
+                  <Button type="submit" disabled={!selectedDocument || !input.trim()} className="px-4 md:px-4">
+                    <span className="hidden md:inline">Send</span>
+                    <svg className="w-5 h-5 md:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
                   </Button>
                 </div>
               </form>
             </Card>
-          </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </DashboardLayout>
