@@ -273,7 +273,7 @@ export default function Forms() {
   };
 
   // Custom Select Component
-  const CustomSelect = ({ value, options, onChange, placeholder, dropdownId, renderOption, renderValue }) => {
+  const CustomSelect = ({ value, options, onChange, placeholder, dropdownId, renderOption, renderValue, dropUp = false }) => {
     const isOpen = openDropdown === dropdownId;
 
     return (
@@ -281,17 +281,17 @@ export default function Forms() {
         <button
           type="button"
           onClick={() => setOpenDropdown(isOpen ? null : dropdownId)}
-          className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border bg-white dark:bg-slate-800 transition-all ${
+          className={`w-full flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border bg-white dark:bg-slate-800 transition-all text-sm ${
             isOpen
               ? "border-indigo-500 ring-2 ring-indigo-500/20"
               : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
           }`}
         >
-          <span className={value ? "text-slate-900 dark:text-white" : "text-slate-400"}>
+          <span className={`truncate ${value ? "text-slate-900 dark:text-white" : "text-slate-400"}`}>
             {value ? renderValue(value) : placeholder}
           </span>
           <svg
-            className={`w-5 h-5 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+            className={`w-4 h-4 sm:w-5 sm:h-5 text-slate-400 transition-transform shrink-0 ml-1 ${isOpen ? "rotate-180" : ""}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -305,11 +305,11 @@ export default function Forms() {
             <>
               <div className="fixed inset-0 z-10" onClick={() => setOpenDropdown(null)} />
               <motion.div
-                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                initial={{ opacity: 0, y: dropUp ? 10 : -10, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                exit={{ opacity: 0, y: dropUp ? 10 : -10, scale: 0.95 }}
                 transition={{ duration: 0.15 }}
-                className="absolute left-0 right-0 top-full mt-2 max-h-60 overflow-auto rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl z-20"
+                className={`absolute left-0 right-0 ${dropUp ? 'bottom-full mb-2' : 'top-full mt-2'} max-h-48 sm:max-h-60 overflow-auto rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl z-20`}
               >
                 {options.map((option, index) => (
                   <button
@@ -607,11 +607,11 @@ export default function Forms() {
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden"
+              className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
-              <div className="relative px-6 py-5 border-b border-slate-100 dark:border-slate-800">
+              <div className="relative px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-100 dark:border-slate-800 shrink-0">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg">
@@ -639,10 +639,10 @@ export default function Forms() {
               </div>
 
               {/* Modal Content */}
-              <div className="px-6 py-5 space-y-5 max-h-[60vh] overflow-y-auto">
+              <div className="px-4 sm:px-6 py-4 sm:py-5 space-y-4 sm:space-y-5 flex-1 overflow-y-auto">
                 {/* Form Name */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 sm:mb-2">
                     Form Name
                   </label>
                   <input
@@ -650,13 +650,13 @@ export default function Forms() {
                     value={newForm.name}
                     onChange={(e) => setNewForm({ ...newForm, name: e.target.value })}
                     placeholder="Enter form name..."
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none"
+                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none text-sm sm:text-base"
                   />
                 </div>
 
                 {/* Template Selection */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 sm:mb-2">
                     Template
                   </label>
                   <CustomSelect
@@ -666,18 +666,18 @@ export default function Forms() {
                     placeholder="Select a template..."
                     dropdownId="template-select"
                     renderValue={(template) => (
-                      <span className="flex items-center gap-2">
+                      <span className="flex items-center gap-2 text-sm">
                         <span className="w-3 h-3 rounded-full bg-indigo-500"></span>
-                        {template.name}
+                        <span className="truncate">{template.name}</span>
                       </span>
                     )}
                     renderOption={(template) => (
                       <>
-                        <span className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 flex-shrink-0">
+                        <span className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
                           {templateIcons[template.icon]}
                         </span>
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium text-slate-900 dark:text-white">{template.name}</div>
+                          <div className="font-medium text-slate-900 dark:text-white text-sm">{template.name}</div>
                           <div className="text-xs text-slate-500 truncate">{template.description}</div>
                         </div>
                       </>
@@ -687,49 +687,49 @@ export default function Forms() {
 
                 {/* Due Date */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 sm:mb-2">
                     Due Date
                   </label>
                   <input
                     type="date"
                     value={newForm.dueDate}
                     onChange={(e) => setNewForm({ ...newForm, dueDate: e.target.value })}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none"
+                    className="w-full px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none text-sm sm:text-base"
                   />
                 </div>
 
                 {/* Workflow Steps */}
                 <div>
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center justify-between mb-2 sm:mb-3">
                     <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                       Workflow Steps
                     </label>
                     <button
                       type="button"
                       onClick={addWorkflowStep}
-                      className="text-sm text-indigo-600 dark:text-indigo-400 font-medium hover:text-indigo-700 transition-colors flex items-center gap-1"
+                      className="text-xs sm:text-sm text-indigo-600 dark:text-indigo-400 font-medium hover:text-indigo-700 transition-colors flex items-center gap-1"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                       </svg>
                       Add Step
                     </button>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-2 sm:space-y-3">
                     {newForm.workflowSteps.map((step, index) => (
                       <motion.div
                         key={step.id}
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: 20 }}
-                        className="flex items-start gap-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700"
+                        className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700"
                       >
-                        <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 shadow">
+                        <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-indigo-600 flex items-center justify-center text-white text-xs sm:text-sm font-bold shrink-0 shadow">
                           {index + 1}
                         </div>
 
-                        <div className="flex-1 grid grid-cols-2 gap-3">
+                        <div className="flex-1 grid grid-cols-2 gap-2 sm:gap-3">
                           {/* User Select */}
                           <CustomSelect
                             value={step.user}
@@ -737,21 +737,22 @@ export default function Forms() {
                             onChange={(user) => updateWorkflowStep(step.id, "user", user)}
                             placeholder="Select user..."
                             dropdownId={`user-select-${step.id}`}
+                            dropUp={true}
                             renderValue={(user) => (
-                              <span className="flex items-center gap-2">
-                                <span className="w-6 h-6 rounded-md bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                              <span className="flex items-center gap-1 sm:gap-2">
+                                <span className="w-5 h-5 sm:w-6 sm:h-6 rounded-md bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[8px] sm:text-[10px] font-bold text-slate-600 dark:text-slate-300 shrink-0">
                                   {user.avatar}
                                 </span>
-                                <span className="truncate">{user.name}</span>
+                                <span className="truncate text-xs sm:text-sm">{user.name}</span>
                               </span>
                             )}
                             renderOption={(user) => (
                               <>
-                                <span className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300 flex-shrink-0">
+                                <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[10px] sm:text-xs font-bold text-slate-600 dark:text-slate-300 shrink-0">
                                   {user.avatar}
                                 </span>
                                 <div className="flex-1 min-w-0">
-                                  <div className="font-medium text-slate-900 dark:text-white">{user.name}</div>
+                                  <div className="font-medium text-slate-900 dark:text-white text-sm">{user.name}</div>
                                   <div className="text-xs text-slate-500">{user.role}</div>
                                 </div>
                               </>
@@ -765,11 +766,12 @@ export default function Forms() {
                             onChange={(action) => updateWorkflowStep(step.id, "action", action)}
                             placeholder="Select action..."
                             dropdownId={`action-select-${step.id}`}
+                            dropUp={true}
                             renderValue={(action) => (
-                              <span>{action.label}</span>
+                              <span className="text-xs sm:text-sm">{action.label}</span>
                             )}
                             renderOption={(action) => (
-                              <span className="font-medium text-slate-700 dark:text-slate-200">{action.label}</span>
+                              <span className="font-medium text-slate-700 dark:text-slate-200 text-sm">{action.label}</span>
                             )}
                           />
                         </div>
@@ -793,20 +795,20 @@ export default function Forms() {
               </div>
 
               {/* Modal Footer */}
-              <div className="px-6 py-5 border-t border-slate-100 dark:border-slate-800 flex gap-3">
+              <div className="px-4 sm:px-6 py-4 sm:py-5 border-t border-slate-100 dark:border-slate-800 flex gap-2 sm:gap-3 shrink-0">
                 <button
                   onClick={() => {
                     setShowCreateModal(false);
                     setOpenDropdown(null);
                   }}
-                  className="flex-1 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                  className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm sm:text-base"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleCreateForm}
                   disabled={!newForm.name || !newForm.templateId}
-                  className="flex-1 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                 >
                   Create Form
                 </button>
