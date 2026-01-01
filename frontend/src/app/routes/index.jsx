@@ -12,6 +12,7 @@ import OSINTTracker from "@/features/osint-tracker/OSINTTracker";
 import Forms from "@/features/forms/Forms";
 import Tasks from "@/features/tasks/Tasks";
 import AIDocumentAnalysis from "@/features/ai-analysis/AIDocumentAnalysis";
+import Settings from "@/features/settings/Settings";
 
 export const router = createBrowserRouter([
   { path: "/login", element: <Login /> },
@@ -27,4 +28,5 @@ export const router = createBrowserRouter([
   { path: "/chatbot", element: <Chatbot /> },
   { path: "/roles", element: <RoleManagement /> },
   { path: "/osint-tracker", element: <OSINTTracker /> },
+  { path: "/settings", element: <Settings /> },
 ]);
