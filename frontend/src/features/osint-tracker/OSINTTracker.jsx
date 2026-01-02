@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Card from "@/components/ui/Card";
@@ -9,6 +9,24 @@ export default function OSINTTracker() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSelectDocModal, setShowSelectDocModal] = useState(false);
   const [selectedDocToCheck, setSelectedDocToCheck] = useState(null);
+  const adContainerRef = useRef(null);
+
+  // Load Adsterra script when component mounts
+  useEffect(() => {
+    if (adContainerRef.current && activeTab === "monitor") {
+      const script = document.createElement("script");
+      script.src = "https://pl28384019.effectivegatecpm.com/c3/ed/77/c3ed7700ba74c1a03b27dbefee2499e3.js";
+      script.async = true;
+      adContainerRef.current.appendChild(script);
+
+      return () => {
+        // Cleanup: remove script when component unmounts
+        if (adContainerRef.current && script.parentNode) {
+          adContainerRef.current.removeChild(script);
+        }
+      };
+    }
+  }, [activeTab]);
 
   // Documents from user's uploads (would come from API)
   const userDocuments = [
@@ -239,8 +257,11 @@ export default function OSINTTracker() {
                     <span className="text-xs text-slate-500 dark:text-slate-400">Advertisement</span>
                   </div>
                 </div>
-                <div className="p-6 bg-white dark:bg-slate-900 flex items-center justify-center min-h-[120px]">
-                  <script src="https://pl28384019.effectivegatecpm.com/c3/ed/77/c3ed7700ba74c1a03b27dbefee2499e3.js"></script>
+                <div 
+                  ref={adContainerRef}
+                  className="p-6 bg-white dark:bg-slate-900 flex items-center justify-center min-h-[120px]"
+                >
+                  {/* Adsterra script will be loaded here dynamically */}
                 </div>
               </Card>
             </div>
