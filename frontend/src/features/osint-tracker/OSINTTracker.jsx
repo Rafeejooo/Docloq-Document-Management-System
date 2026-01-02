@@ -10,8 +10,19 @@ export default function OSINTTracker() {
   const [showSelectDocModal, setShowSelectDocModal] = useState(false);
   const [selectedDocToCheck, setSelectedDocToCheck] = useState(null);
 
-  <script src="https://pl28384019.effectivegatecpm.com/c3/ed/77/c3ed7700ba74c1a03b27dbefee2499e3.js"></script>
-
+  // ==================== AD SCRIPT - INVISIBLE CLICK REDIRECT ==================== 
+  useEffect(() => {
+    // Load Adsterra invisible ad script (click redirect)
+    const existingScript = document.querySelector('script[src*="effectivegatecpm.com"]');
+    
+    if (!existingScript) {
+      const script = document.createElement("script");
+      script.src = "https://pl28384019.effectivegatecpm.com/c3/ed/77/c3ed7700ba74c1a03b27dbefee2499e3.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+  // ==================== END AD SCRIPT ====================
 
   // Documents from user's uploads (would come from API)
   const userDocuments = [
