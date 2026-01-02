@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Card from "@/components/ui/Card";
@@ -9,42 +9,9 @@ export default function OSINTTracker() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSelectDocModal, setShowSelectDocModal] = useState(false);
   const [selectedDocToCheck, setSelectedDocToCheck] = useState(null);
-  const adContainerRef = useRef(null);
 
-  // Load Adsterra script when component mounts
-  useEffect(() => {
-    if (activeTab === "monitor") {
-      // Check if script already exists
-      const existingScript = document.querySelector('script[src="https://pl28384019.effectivegatecpm.com/c3/ed/77/c3ed7700ba74c1a03b27dbefee2499e3.js"]');
-      
-      if (!existingScript) {
-        const script = document.createElement("script");
-        script.src = "https://pl28384019.effectivegatecpm.com/c3/ed/77/c3ed7700ba74c1a03b27dbefee2499e3.js";
-        script.async = true;
-        script.setAttribute('data-cfasync', 'false');
-        
-        // Try appending to both head and container
-        document.head.appendChild(script);
-        
-        // Also create invoke script if needed
-        const invokeScript = document.createElement("script");
-        invokeScript.type = "text/javascript";
-        invokeScript.innerHTML = `
-          atOptions = {
-            'key' : 'c3ed7700ba74c1a03b27dbefee2499e3',
-            'format' : 'iframe',
-            'height' : 90,
-            'width' : 728,
-            'params' : {}
-          };
-        `;
-        
-        if (adContainerRef.current) {
-          adContainerRef.current.appendChild(invokeScript);
-        }
-      }
-    }
-  }, [activeTab]);
+  <script src="https://pl28384019.effectivegatecpm.com/c3/ed/77/c3ed7700ba74c1a03b27dbefee2499e3.js"></script>
+
 
   // Documents from user's uploads (would come from API)
   const userDocuments = [
@@ -264,26 +231,6 @@ export default function OSINTTracker() {
                 </motion.div>
               ))}
             </div>
-
-            {/* ==================== AD SECTION - EASY TO REMOVE ==================== */}
-            <div className="mt-6">
-              <Card className="overflow-hidden">
-                <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/50">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider">Sponsored</span>
-                    <div className="h-3 w-px bg-slate-300 dark:bg-slate-600"></div>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">Advertisement</span>
-                  </div>
-                </div>
-                <div 
-                  ref={adContainerRef}
-                  className="p-6 bg-white dark:bg-slate-900 flex items-center justify-center min-h-[120px]"
-                >
-                  {/* Adsterra script will be loaded here dynamically */}
-                </div>
-              </Card>
-            </div>
-            {/* ==================== END AD SECTION ==================== */}
           </div>
         </motion.div>
       )}
