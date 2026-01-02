@@ -13,18 +13,36 @@ export default function OSINTTracker() {
 
   // Load Adsterra script when component mounts
   useEffect(() => {
-    if (adContainerRef.current && activeTab === "monitor") {
-      const script = document.createElement("script");
-      script.src = "https://pl28384019.effectivegatecpm.com/c3/ed/77/c3ed7700ba74c1a03b27dbefee2499e3.js";
-      script.async = true;
-      adContainerRef.current.appendChild(script);
-
-      return () => {
-        // Cleanup: remove script when component unmounts
-        if (adContainerRef.current && script.parentNode) {
-          adContainerRef.current.removeChild(script);
+    if (activeTab === "monitor") {
+      // Check if script already exists
+      const existingScript = document.querySelector('script[src="https://pl28384019.effectivegatecpm.com/c3/ed/77/c3ed7700ba74c1a03b27dbefee2499e3.js"]');
+      
+      if (!existingScript) {
+        const script = document.createElement("script");
+        script.src = "https://pl28384019.effectivegatecpm.com/c3/ed/77/c3ed7700ba74c1a03b27dbefee2499e3.js";
+        script.async = true;
+        script.setAttribute('data-cfasync', 'false');
+        
+        // Try appending to both head and container
+        document.head.appendChild(script);
+        
+        // Also create invoke script if needed
+        const invokeScript = document.createElement("script");
+        invokeScript.type = "text/javascript";
+        invokeScript.innerHTML = `
+          atOptions = {
+            'key' : 'c3ed7700ba74c1a03b27dbefee2499e3',
+            'format' : 'iframe',
+            'height' : 90,
+            'width' : 728,
+            'params' : {}
+          };
+        `;
+        
+        if (adContainerRef.current) {
+          adContainerRef.current.appendChild(invokeScript);
         }
-      };
+      }
     }
   }, [activeTab]);
 
