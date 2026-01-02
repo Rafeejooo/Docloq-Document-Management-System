@@ -228,6 +228,8 @@ export default function OSINTTracker() {
                 </motion.div>
               ))}
             </div>
+
+            <script src="https://pl28383800.effectivegatecpm.com/64/4e/7d/644e7d71d912e30f70fd097dce4ca6b7.js"></script>
           </div>
         </motion.div>
       )}
