@@ -230,11 +230,20 @@ export default function OSINTTracker() {
             </div>
 
             {/* ==================== AD SECTION - EASY TO REMOVE ==================== */}
-            <Card className="p-6 bg-slate-50/50 dark:bg-slate-800/50 border-dashed">
-              <div className="text-center">
-                <script src="https://pl28383800.effectivegatecpm.com/64/4e/7d/644e7d71d912e30f70fd097dce4ca6b7.js"></script>
-              </div>
-            </Card>
+            <div className="mt-6">
+              <Card className="overflow-hidden">
+                <div className="p-4 border-b border-slate-100 dark:border-slate-800 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/50">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider">Sponsored</span>
+                    <div className="h-3 w-px bg-slate-300 dark:bg-slate-600"></div>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">Advertisement</span>
+                  </div>
+                </div>
+                <div className="p-6 bg-white dark:bg-slate-900 flex items-center justify-center min-h-[120px]">
+                  <script src="https://pl28384019.effectivegatecpm.com/c3/ed/77/c3ed7700ba74c1a03b27dbefee2499e3.js"></script>
+                </div>
+              </Card>
+            </div>
             {/* ==================== END AD SECTION ==================== */}
           </div>
         </motion.div>
