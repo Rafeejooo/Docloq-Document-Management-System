@@ -33,7 +33,7 @@ export default function Register() {
     setIsLoading(true);
     await new Promise((resolve) => setTimeout(resolve, 1200));
     setIsLoading(false);
-    navigate("/");
+    navigate("/dashboard");
   };
 
   // Animation variants

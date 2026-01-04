@@ -1,4 +1,6 @@
 import { createBrowserRouter } from "react-router-dom";
+import LandingPage from "@/features/landing/LandingPage";
+import Contact from "@/features/contact/Contact";
 import Login from "@/features/auth/login";
 import Register from "@/features/auth/register";
 import Dashboard from "@/features/dashboard/Dashboard";
@@ -15,9 +17,11 @@ import AIDocumentAnalysis from "@/features/ai-analysis/AIDocumentAnalysis";
 import Settings from "@/features/settings/Settings";
 
 export const router = createBrowserRouter([
+  { path: "/", element: <LandingPage /> },
+  { path: "/contact", element: <Contact /> },
   { path: "/login", element: <Login /> },
   { path: "/register", element: <Register /> },
-  { path: "/", element: <Dashboard /> },
+  { path: "/dashboard", element: <Dashboard /> },
   { path: "/tasks", element: <Tasks /> },
   { path: "/forms", element: <Forms /> },
   { path: "/documents", element: <Documents /> },
