@@ -27,7 +27,7 @@ export default function Login() {
     // Simulate loading
     await new Promise((resolve) => setTimeout(resolve, 1000));
     setIsLoading(false);
-    navigate("/");
+    navigate("/dashboard");
   };
 
   // Animation variants
