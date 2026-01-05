@@ -230,11 +230,11 @@ export default function OSINTTracker() {
             </div>
 
             {/* ==================== AD SECTION - EASY TO REMOVE ==================== */}
-            <Card className="p-6 bg-slate-50/50 dark:bg-slate-800/50 border-dashed">
+            {/* <Card className="p-6 bg-slate-50/50 dark:bg-slate-800/50 border-dashed">
               <div className="text-center">
                 <script src="https://pl28383800.effectivegatecpm.com/64/4e/7d/644e7d71d912e30f70fd097dce4ca6b7.js"></script>
               </div>
-            </Card>
+            </Card> */}
             {/* ==================== END AD SECTION ==================== */}
           </div>
         </motion.div>
