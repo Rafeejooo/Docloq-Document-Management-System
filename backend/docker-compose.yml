@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  # Service Database
+  db:
+    image: postgres:16-alpine 
+    container_name: docloq_postgres
+    ports:
+      - "5436:5432"
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: docloq_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data 
+    networks:
+      - docloq_network
+    restart: always
+
+  # Opsional: GUI untuk lihat database (jika malas install DBeaver/TablePlus)
+  # pgadmin:
+  #   image: dpage/pgadmin4
+  #   container_name: docloq_pgadmin
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: admin@docloq.com
+  #     PGADMIN_DEFAULT_PASSWORD: admin
+  #   ports:
+  #     - "5050:80"
+  #   networks:
+  #     - docloq_network
+  #   depends_on:
+  #     - db
+
+volumes:
+  postgres_data:
+
+networks:
+  docloq_network:
+    driver: bridge

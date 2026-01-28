@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "@/app/providers/ThemeProvider";
 import { motion, AnimatePresence } from "framer-motion";
 import AIAssistant from "@/components/ai-assistant/AIAssistant";
+import { useAuthStore } from "@/app/store/auth.store";
 
 export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -12,6 +13,12 @@ export default function DashboardLayout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const { user } = useAuthStore();
+
+  // Get user display name and initials
+  const displayName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email : 'User';
+  const userEmail = user?.email || 'user@example.com';
+  const userInitials = user ? `${user.firstName?.[0] || ''}${user.lastName?.[0] || ''}`.toUpperCase() || user.email?.[0]?.toUpperCase() : 'U';
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -154,11 +161,11 @@ export default function DashboardLayout({ children }) {
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 transition-all duration-200"
                 >
                   <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-700 to-slate-600 flex items-center justify-center text-sm font-bold text-white">
-                    U
+                    {userInitials}
                   </div>
                   <div className="flex-1 min-w-0 text-left">
-                    <p className="text-sm font-semibold text-white truncate">User Name</p>
-                    <p className="text-xs text-slate-500 truncate">user@company.com</p>
+                    <p className="text-sm font-semibold text-white truncate">{displayName}</p>
+                    <p className="text-xs text-slate-500 truncate">{userEmail}</p>
                   </div>
                   <svg className={`w-5 h-5 text-slate-500 transition-transform duration-200 ${showProfileDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />

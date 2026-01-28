@@ -1,0 +1,127 @@
+// Authentication Middleware
+
+import jwt from 'jsonwebtoken';
+import { db } from '../db/index.js';
+import { users, userSessions } from '../db/schema.js';
+import { eq, and, gt } from 'drizzle-orm';
+import authConfig from '../config/auth.config.js';
+
+// Verifikasi JWT Token
+export const authenticate = async (req, res, next) => {
+  try {
+    // Get token from header
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        success: false,
+        message: 'No token provided',
+      });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+
+    // Verify token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, authConfig.jwt.secret);
+    } catch (err) {
+      if (err.name === 'TokenExpiredError') {
+        return res.status(401).json({
+          success: false,
+          message: 'Token expired',
+          code: 'TOKEN_EXPIRED',
+        });
+      }
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid token',
+      });
+    }
+
+    // Check if session exists and is not expired
+    const [session] = await db
+      .select()
+      .from(userSessions)
+      .where(
+        and(
+          eq(userSessions.token, token),
+          gt(userSessions.expiresAt, new Date())
+        )
+      )
+      .limit(1);
+
+    if (!session) {
+      return res.status(401).json({
+        success: false,
+        message: 'Session expired or invalid',
+        code: 'SESSION_INVALID',
+      });
+    }
+
+    // Attach user info to request
+    req.user = decoded;
+    req.sessionId = session.id;
+
+    next();
+  } catch (error) {
+    console.error('Auth middleware error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+};
+
+// Cek Role Permission
+export const authorize = (allowedRoles) => {
+  const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
+  
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authenticated',
+      });
+    }
+
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. Insufficient permissions.',
+      });
+    }
+
+    next();
+  };
+};
+
+// Optional Auth - attach user jika ada token
+export const optionalAuth = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return next();
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+
+    try {
+      const decoded = jwt.verify(token, authConfig.jwt.secret);
+      req.user = decoded;
+    } catch (err) {
+      // Token invalid, continue without user
+    }
+
+    next();
+  } catch (error) {
+    next();
+  }
+};
+
+export default {
+  authenticate,
+  authorize,
+  optionalAuth,
+};

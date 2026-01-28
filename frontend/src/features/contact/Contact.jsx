@@ -139,18 +139,18 @@ export default function Contact() {
               >
                 Sign In
               </Link>
-              <Link
-                to="/register"
+              <a
+                href="#request-access"
                 className="relative group"
               >
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-600 to-cyan-600 rounded-lg blur opacity-60 group-hover:opacity-100 transition duration-300" />
                 <span className="relative flex items-center px-6 py-2.5 bg-slate-950 rounded-lg font-medium text-white group-hover:bg-slate-900 transition-colors">
-                  Get Started
+                  Request Access
                   <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                   </svg>
                 </span>
-              </Link>
+              </a>
             </motion.div>
 
             {/* Mobile Menu Button */}
@@ -185,7 +185,7 @@ export default function Contact() {
                 <span className="block text-violet-400 py-2 font-medium">Contact</span>
                 <div className="pt-4 space-y-3">
                   <Link to="/login" className="block text-center py-3 text-white border border-white/20 rounded-lg">Sign In</Link>
-                  <Link to="/register" className="block text-center py-3 bg-gradient-to-r from-violet-600 to-cyan-600 text-white rounded-lg">Get Started</Link>
+                  <a href="#request-access" className="block text-center py-3 bg-gradient-to-r from-violet-600 to-cyan-600 text-white rounded-lg">Request Access</a>
                 </div>
               </div>
             </motion.div>
@@ -258,8 +258,87 @@ export default function Contact() {
         </div>
       </section>
 
+      {/* Request Access Banner */}
+      <section id="request-access" className="relative py-12 px-4 sm:px-6 lg:px-8">
+        <div className="relative z-10 max-w-4xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+            className="relative overflow-hidden"
+          >
+            <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-600 to-cyan-600 rounded-2xl blur opacity-30" />
+            <div className="relative p-8 md:p-10 bg-slate-900/90 backdrop-blur-sm rounded-2xl border border-white/10">
+              <div className="flex flex-col md:flex-row md:items-center gap-6">
+                <div className="flex-shrink-0">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-500 flex items-center justify-center">
+                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="flex-grow">
+                  <h3 className="text-xl md:text-2xl font-bold text-white mb-2">Need an Account?</h3>
+                  <p className="text-slate-400">
+                    Docloq is an enterprise solution with invitation-only access. Contact us to request an account 
+                    and our team will review your application within 24-48 hours.
+                  </p>
+                </div>
+                <div className="flex-shrink-0">
+                  <a
+                    href="#contact-form"
+                    onClick={() => {
+                      const subjectSelect = document.querySelector('select[name="subject"]');
+                      if (subjectSelect) {
+                        subjectSelect.value = 'account-request';
+                        setFormData(prev => ({ ...prev, subject: 'account-request' }));
+                      }
+                    }}
+                    className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-violet-600 to-cyan-600 rounded-xl text-white font-medium hover:from-violet-500 hover:to-cyan-500 transition-all"
+                  >
+                    Request Access
+                    <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </a>
+                </div>
+              </div>
+              
+              {/* Access info */}
+              <div className="mt-6 pt-6 border-t border-white/10 grid sm:grid-cols-3 gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <span className="text-sm text-slate-300">Verified organizations</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <span className="text-sm text-slate-300">Enterprise security</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                  <span className="text-sm text-slate-300">24-48h response time</span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
       {/* Main Content */}
-      <section className="relative py-20 px-4 sm:px-6 lg:px-8">
+      <section id="contact-form" className="relative py-20 px-4 sm:px-6 lg:px-8">
         <div className="relative z-10 max-w-7xl mx-auto">
           <div className="grid lg:grid-cols-2 gap-16">
             {/* Contact Form */}
@@ -363,6 +442,7 @@ export default function Contact() {
                         className="w-full px-4 py-3 bg-slate-900/80 border border-white/10 rounded-xl text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 transition-all appearance-none cursor-pointer [&>option]:bg-slate-900 [&>option]:text-white"
                       >
                         <option value="" className="bg-slate-900 text-slate-400">Select a topic</option>
+                        <option value="account-request" className="bg-slate-900">🔐 Request Account Access</option>
                         <option value="sales" className="bg-slate-900">Sales Inquiry</option>
                         <option value="support" className="bg-slate-900">Technical Support</option>
                         <option value="partnership" className="bg-slate-900">Partnership Opportunities</option>

@@ -1,11 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Card from "@/components/ui/Card";
+import { useDebounce } from "@/hooks/useDebounce";
 
 export default function Documents() {
   const [view, setView] = useState("grid");
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [selectedFolder, setSelectedFolder] = useState(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
@@ -182,18 +184,22 @@ export default function Documents() {
     }
   };
 
-  const filteredDocuments = documents.filter(doc => {
-    const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          doc.folder.toLowerCase().includes(searchQuery.toLowerCase());
+  const filteredDocuments = useMemo(() => documents.filter(doc => {
+    const matchesSearch = doc.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+                          doc.folder.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
     const matchesFolder = !selectedFolder || doc.folder === selectedFolder;
     const matchesType = filterType === "all" || doc.type === filterType;
     return matchesSearch && matchesFolder && matchesType;
-  });
+  }), [documents, debouncedSearchQuery, selectedFolder, filterType]);
 
-  const openDocument = (doc) => {
+  const handleSearchChange = useCallback((e) => {
+    setSearchQuery(e.target.value);
+  }, []);
+
+  const openDocument = useCallback((doc) => {
     setSelectedDocument(doc);
     setShowDocumentModal(true);
-  };
+  }, []);
 
   // Generate a random hash for demo purposes
   const generateHash = () => {
@@ -531,7 +537,7 @@ export default function Documents() {
                 type="text"
                 placeholder="Search documents..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={handleSearchChange}
                 className="w-full pl-12 pr-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none"
               />
             </div>
@@ -702,20 +708,10 @@ export default function Documents() {
                       {doc.name}
                     </h3>
 
-                    <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mb-2">
+                    <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mb-4">
                       <span>{doc.size}</span>
                       <span>•</span>
                       <span>{doc.modified}</span>
-                    </div>
-
-                    {/* Hash Display */}
-                    <div className="flex items-center gap-2 mb-4">
-                      <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
-                      </svg>
-                      <code className="text-[10px] font-mono text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">
-                        {doc.hash}
-                      </code>
                     </div>
 
                     {/* Uploader Info */}
@@ -776,7 +772,6 @@ export default function Documents() {
                     <tr>
                       <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Name</th>
                       <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Folder</th>
-                      <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Hash</th>
                       <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Size</th>
                       <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Modified</th>
                       <th className="px-5 py-4 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
@@ -804,11 +799,6 @@ export default function Documents() {
                           </div>
                         </td>
                         <td className="px-5 py-4 text-sm text-slate-500 dark:text-slate-400">{doc.folder}</td>
-                        <td className="px-5 py-4">
-                          <code className="text-xs font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
-                            {doc.hash.slice(0, 10)}...
-                          </code>
-                        </td>
                         <td className="px-5 py-4 text-sm text-slate-500 dark:text-slate-400">{doc.size}</td>
                         <td className="px-5 py-4 text-sm text-slate-500 dark:text-slate-400">{doc.modified}</td>
                         <td className="px-5 py-4">
@@ -914,7 +904,7 @@ export default function Documents() {
               {/* Modal Content - Scrollable */}
               <div className="px-4 sm:px-6 py-4 sm:py-5 flex-1 overflow-y-auto space-y-4 sm:space-y-6">
                 {/* Document Info */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-4">
                   <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-800/50">
                     <p className="text-[10px] sm:text-xs text-slate-400 mb-1">Status</p>
                     <span className={`inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md sm:rounded-lg text-xs sm:text-sm font-medium ${
@@ -926,10 +916,16 @@ export default function Documents() {
                     </span>
                   </div>
                   <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-800/50">
-                    <p className="text-[10px] sm:text-xs text-slate-400 mb-1">Current Hash</p>
-                    <code className="text-[10px] sm:text-sm font-mono text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded break-all">
-                      {selectedDocument.hash}
-                    </code>
+                    <p className="text-[10px] sm:text-xs text-slate-400 mb-1">Size</p>
+                    <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">
+                      {selectedDocument.size}
+                    </span>
+                  </div>
+                  <div className="p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50 dark:bg-slate-800/50 col-span-2 sm:col-span-1">
+                    <p className="text-[10px] sm:text-xs text-slate-400 mb-1">Last Modified</p>
+                    <span className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">
+                      {selectedDocument.modified}
+                    </span>
                   </div>
                 </div>
 
@@ -993,11 +989,8 @@ export default function Documents() {
                               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 mb-1.5 sm:mb-2 italic">"{entry.changes}"</p>
                             )}
                             
-                            <div className="flex items-center justify-between text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 gap-2">
-                              <span className="truncate">{entry.date} at {entry.time}</span>
-                              <code className="font-mono bg-slate-100 dark:bg-slate-800 px-1.5 sm:px-2 py-0.5 rounded text-slate-600 dark:text-slate-400 shrink-0">
-                                #{entry.hash.slice(0, 8)}
-                              </code>
+                            <div className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">
+                              <span>{entry.date} at {entry.time}</span>
                             </div>
                           </div>
                         </div>

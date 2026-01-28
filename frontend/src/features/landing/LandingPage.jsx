@@ -1,8 +1,20 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
+
+// Throttle helper for performance
+const throttle = (func, limit) => {
+  let inThrottle;
+  return function(...args) {
+    if (!inThrottle) {
+      func.apply(this, args);
+      inThrottle = true;
+      setTimeout(() => inThrottle = false, limit);
+    }
+  }
+};
 
 export default function LandingPage() {
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -14,24 +26,26 @@ export default function LandingPage() {
   const scale = useTransform(scrollYProgress, [0, 0.2], [1, 0.8]);
 
   useEffect(() => {
-    // Intro animation timer
+    // Reduced intro animation timer (800ms instead of 2500ms)
     const loadingTimer = setTimeout(() => {
       setIsLoading(false);
-    }, 2500);
+    }, 800);
 
     AOS.init({
-      duration: 1200,
+      duration: 600, // Reduced from 1200ms
       once: true,
       easing: 'ease-out-cubic',
     });
 
-    const handleMouseMove = (e) => {
+    // Throttled mouse move handler (every 50ms instead of every frame)
+    const handleMouseMove = throttle((e) => {
       setMousePosition({
         x: (e.clientX / window.innerWidth - 0.5) * 30,
         y: (e.clientY / window.innerHeight - 0.5) * 30,
       });
-    };
-    window.addEventListener('mousemove', handleMouseMove);
+    }, 50);
+    
+    window.addEventListener('mousemove', handleMouseMove, { passive: true });
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
       clearTimeout(loadingTimer);
@@ -129,20 +143,20 @@ export default function LandingPage() {
 
   return (
     <>
-      {/* Intro Loading Animation */}
+      {/* Intro Loading Animation - Optimized */}
       <AnimatePresence>
         {isLoading && (
           <motion.div
             className="fixed inset-0 z-[100] bg-slate-950 flex items-center justify-center"
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.5, ease: "easeInOut" }}
+            transition={{ duration: 0.3, ease: "easeInOut" }}
           >
             <div className="relative flex flex-col items-center">
               {/* Animated Logo */}
               <motion.div
                 initial={{ scale: 0, rotate: -180 }}
                 animate={{ scale: 1, rotate: 0 }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
                 className="relative mb-8"
               >
                 {/* Outer ring */}
@@ -155,7 +169,7 @@ export default function LandingPage() {
                       "linear-gradient(360deg, rgba(139, 92, 246, 0.5), rgba(6, 182, 212, 0.5))",
                     ],
                   }}
-                  transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                   style={{ filter: "blur(20px)" }}
                 />
                 
@@ -164,7 +178,7 @@ export default function LandingPage() {
                   <motion.span
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ delay: 0.5 }}
+                    transition={{ delay: 0.2 }}
                     className="text-4xl font-bold text-white"
                   >
                     D
@@ -176,7 +190,7 @@ export default function LandingPage() {
               <motion.h1
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6, duration: 0.5 }}
+                transition={{ delay: 0.3, duration: 0.3 }}
                 className="text-3xl font-bold bg-gradient-to-r from-violet-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent mb-4"
               >
                 Docloq
@@ -186,14 +200,14 @@ export default function LandingPage() {
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.8 }}
+                transition={{ delay: 0.4 }}
                 className="w-48 h-1 bg-slate-800 rounded-full overflow-hidden"
               >
                 <motion.div
                   className="h-full bg-gradient-to-r from-violet-500 to-cyan-500 rounded-full"
                   initial={{ width: "0%" }}
                   animate={{ width: "100%" }}
-                  transition={{ duration: 1.5, delay: 0.9, ease: "easeInOut" }}
+                  transition={{ duration: 0.5, delay: 0.3, ease: "easeInOut" }}
                 />
               </motion.div>
 
@@ -201,36 +215,11 @@ export default function LandingPage() {
               <motion.p
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 1.2 }}
+                transition={{ delay: 0.5 }}
                 className="mt-4 text-slate-400 text-sm"
               >
                 Documents That Think & Prove
               </motion.p>
-
-              {/* Floating particles around logo */}
-              {[...Array(6)].map((_, i) => (
-                <motion.div
-                  key={i}
-                  className="absolute w-2 h-2 rounded-full"
-                  style={{
-                    background: i % 2 === 0 ? "#8b5cf6" : "#06b6d4",
-                    top: "50%",
-                    left: "50%",
-                  }}
-                  initial={{ x: 0, y: 0, opacity: 0 }}
-                  animate={{
-                    x: Math.cos((i * 60 * Math.PI) / 180) * 80,
-                    y: Math.sin((i * 60 * Math.PI) / 180) * 80,
-                    opacity: [0, 1, 0],
-                  }}
-                  transition={{
-                    duration: 2,
-                    delay: 0.5 + i * 0.1,
-                    repeat: Infinity,
-                    repeatDelay: 0.5,
-                  }}
-                />
-              ))}
             </div>
           </motion.div>
         )}
@@ -355,12 +344,12 @@ export default function LandingPage() {
                 Sign In
               </Link>
               <Link
-                to="/register"
+                to="/contact"
                 className="relative group"
               >
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-violet-600 to-cyan-600 rounded-lg blur opacity-60 group-hover:opacity-100 transition duration-300" />
                 <span className="relative flex items-center px-6 py-2.5 bg-slate-950 rounded-lg font-medium text-white group-hover:bg-slate-900 transition-colors">
-                  Get Started
+                  Request Access
                   <svg className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                   </svg>
@@ -400,7 +389,7 @@ export default function LandingPage() {
                 <Link to="/contact" className="block text-slate-300 hover:text-white py-2">Contact</Link>
                 <div className="pt-4 space-y-3">
                   <Link to="/login" className="block text-center py-3 text-white border border-white/20 rounded-lg">Sign In</Link>
-                  <Link to="/register" className="block text-center py-3 bg-gradient-to-r from-violet-600 to-cyan-600 text-white rounded-lg">Get Started</Link>
+                  <Link to="/contact" className="block text-center py-3 bg-gradient-to-r from-violet-600 to-cyan-600 text-white rounded-lg">Request Access</Link>
                 </div>
               </div>
             </motion.div>
@@ -472,12 +461,12 @@ export default function LandingPage() {
               className="flex flex-col sm:flex-row gap-4 justify-center items-center"
             >
               <Link
-                to="/register"
+                to="/contact"
                 className="group relative inline-flex items-center"
               >
                 <div className="absolute -inset-1 bg-gradient-to-r from-violet-600 via-purple-600 to-cyan-600 rounded-xl blur-lg opacity-70 group-hover:opacity-100 transition duration-300 group-hover:duration-200" />
                 <span className="relative flex items-center px-8 py-4 bg-gradient-to-r from-violet-600 via-purple-600 to-cyan-600 rounded-xl text-lg font-semibold text-white shadow-2xl">
-                  Start Free Trial
+                  Request Access
                   <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                   </svg>
@@ -572,10 +561,10 @@ export default function LandingPage() {
                   </div>
 
                   <Link
-                    to="/register"
+                    to="/contact"
                     className="mt-8 inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-xl text-white font-semibold hover:from-emerald-400 hover:to-cyan-400 transition-all"
                   >
-                    Get Started — It's Free
+                    Request Access
                     <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                     </svg>
@@ -825,7 +814,7 @@ export default function LandingPage() {
               </div>
 
               <Link
-                to="/register"
+                to="/contact"
                 className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-xl text-white font-semibold hover:from-violet-500 hover:to-fuchsia-500 transition-all"
               >
                 Try AI Analysis
@@ -1101,7 +1090,7 @@ export default function LandingPage() {
                 className="mt-8"
               >
                 <Link
-                  to="/register"
+                  to="/contact"
                   className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-600 to-cyan-600 rounded-xl text-white font-semibold hover:from-emerald-500 hover:to-cyan-500 transition-all"
                 >
                   Start Verifying Documents
@@ -1237,17 +1226,17 @@ export default function LandingPage() {
               </span>
             </h2>
             <p className="text-xl text-slate-400 mb-10 max-w-2xl mx-auto">
-              Join thousands of teams who have already revolutionized their document management. 
-              Start your free trial today.
+              Join organizations who have revolutionized their document management. 
+              Contact us to request access.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
-                to="/register"
+                to="/contact"
                 className="group relative inline-flex items-center justify-center"
               >
                 <div className="absolute -inset-1 bg-gradient-to-r from-violet-600 via-purple-600 to-cyan-600 rounded-xl blur-lg opacity-70 group-hover:opacity-100 transition duration-300" />
                 <span className="relative flex items-center px-10 py-5 bg-gradient-to-r from-violet-600 via-purple-600 to-cyan-600 rounded-xl text-lg font-semibold text-white">
-                  Start Free Trial
+                  Request Access
                   <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                   </svg>
@@ -1261,7 +1250,7 @@ export default function LandingPage() {
               </Link>
             </div>
             <p className="mt-6 text-sm text-slate-500">
-              No credit card required • 14-day free trial • Cancel anytime
+              Enterprise-grade security • Invitation-only access • 24/7 support
             </p>
           </motion.div>
         </div>

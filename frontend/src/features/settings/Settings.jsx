@@ -1,13 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
+import useAuthStore from "../../app/store/auth.store";
+import { authService } from "../../services/auth.service";
+import userService from "../../services/user.service";
+import totpService from "../../services/totp.service";
 
 export default function Settings() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [activeTab, setActiveTab] = useState("profile");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
@@ -16,46 +21,87 @@ export default function Settings() {
   const [twoFAStep, setTwoFAStep] = useState(1);
   const [twoFAEnabled, setTwoFAEnabled] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
+  const [twoFALoading, setTwoFALoading] = useState(false);
+  const [twoFAError, setTwoFAError] = useState("");
+  const [qrCodeImage, setQrCodeImage] = useState("");
+  const [totpSecret, setTotpSecret] = useState("");
+  const [showDisable2FAModal, setShowDisable2FAModal] = useState(false);
+  const [disableCode, setDisableCode] = useState("");
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showDeptDropdown, setShowDeptDropdown] = useState(false);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
   const [showProfileDeptDropdown, setShowProfileDeptDropdown] = useState(false);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [usersLoading, setUsersLoading] = useState(false);
 
-  // Mock 2FA secret and backup codes
-  const mockSecret = "JBSWY3DPEHPK3PXP";
-  const mockBackupCodes = ["A1B2-C3D4", "E5F6-G7H8", "I9J0-K1L2", "M3N4-O5P6", "Q7R8-S9T0", "U1V2-W3X4"];
+  // Fetch 2FA status on mount
+  useEffect(() => {
+    const fetch2FAStatus = async () => {
+      try {
+        const response = await totpService.getStatus();
+        if (response.success) {
+          setTwoFAEnabled(response.data.enabled);
+        }
+      } catch (error) {
+        console.error("Error fetching 2FA status:", error);
+      }
+    };
+    fetch2FAStatus();
+  }, []);
 
-  // Profile form state
+  // Profile form state - initialize from user data
   const [profileForm, setProfileForm] = useState({
-    firstName: "John",
-    lastName: "Doe",
-    email: "john@company.com",
-    phone: "+1 (555) 123-4567",
-    department: "Engineering",
-    position: "Senior Developer",
+    firstName: user?.firstName || "John",
+    lastName: user?.lastName || "Doe",
+    email: user?.email || "john@company.com",
+    phone: user?.phone || "",
+    department: user?.department || "Engineering",
+    position: user?.position || "Senior Developer",
   });
 
-  // New user form state
+  // New user form state with password
   const [newUserForm, setNewUserForm] = useState({
     firstName: "",
     lastName: "",
     email: "",
+    password: "",
     phone: "",
     department: "",
     position: "",
-    role: "Viewer",
+    role: "user",
   });
 
-  // Sample users data
-  const [users, setUsers] = useState([
-    { id: 1, firstName: "John", lastName: "Doe", email: "john@company.com", phone: "+1 (555) 123-4567", department: "Engineering", position: "Senior Developer", role: "Admin", status: "Active", initials: "JD" },
-    { id: 2, firstName: "Jane", lastName: "Smith", email: "jane@company.com", phone: "+1 (555) 234-5678", department: "Legal", position: "Legal Counsel", role: "Editor", status: "Active", initials: "JS" },
-    { id: 3, firstName: "Mike", lastName: "Johnson", email: "mike@company.com", phone: "+1 (555) 345-6789", department: "HR", position: "HR Manager", role: "Viewer", status: "Active", initials: "MJ" },
-    { id: 4, firstName: "Sarah", lastName: "Williams", email: "sarah@company.com", phone: "+1 (555) 456-7890", department: "Marketing", position: "Marketing Lead", role: "Editor", status: "Inactive", initials: "SW" },
-    { id: 5, firstName: "Alex", lastName: "Chen", email: "alex@company.com", phone: "+1 (555) 567-8901", department: "Finance", position: "Financial Analyst", role: "Viewer", status: "Active", initials: "AC" },
-  ]);
+  // Users list from API
+  const [users, setUsers] = useState([]);
+
+  // Fetch users on component mount and tab change
+  useEffect(() => {
+    if (activeTab === "users") {
+      fetchUsers();
+    }
+  }, [activeTab]);
+
+  const fetchUsers = async () => {
+    setUsersLoading(true);
+    try {
+      const response = await userService.getUsers({ limit: 50 });
+      if (response.success) {
+        setUsers(response.data.users.map(u => ({
+          ...u,
+          status: u.isActive ? "Active" : "Inactive",
+          initials: `${u.firstName?.[0] || ''}${u.lastName?.[0] || ''}`.toUpperCase() || 'U',
+        })));
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    } finally {
+      setUsersLoading(false);
+    }
+  };
 
   const tabs = [
     { id: "profile", name: "Profile", mobileShort: "Profile", icon: (
@@ -80,18 +126,35 @@ export default function Settings() {
     )},
   ];
 
-  const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    navigate("/login");
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await authService.logout();
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Still navigate to login even if API fails
+      navigate("/login");
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
-  const roles = ["Admin", "Editor", "Viewer"];
+  const roles = ["admin", "manager", "user", "auditor", "viewer"];
+  const roleLabels = { 
+    super_admin: "Super Admin",
+    admin: "Admin", 
+    manager: "Manager",
+    user: "User",
+    auditor: "Auditor",
+    viewer: "Viewer"
+  };
   const departments = ["Engineering", "Legal", "HR", "Marketing", "Finance", "Operations"];
 
   const filteredUsers = users.filter(user =>
-    `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.department.toLowerCase().includes(searchQuery.toLowerCase())
+    `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (user.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (user.department || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleProfileUpdate = (e) => {
@@ -102,40 +165,99 @@ export default function Settings() {
     setTimeout(() => setShowSaveSuccess(false), 3000);
   };
 
-  const handleAddUser = (e) => {
+  const handleAddUser = async (e) => {
     e.preventDefault();
-    const newUser = {
-      id: users.length + 1,
-      ...newUserForm,
-      status: "Active",
-      initials: `${newUserForm.firstName[0]}${newUserForm.lastName[0]}`.toUpperCase(),
-    };
-    setUsers([...users, newUser]);
-    setNewUserForm({
-      firstName: "",
-      lastName: "",
-      email: "",
-      phone: "",
-      department: "",
-      position: "",
-      role: "Viewer",
-    });
-    setShowAddUserModal(false);
+    setIsLoading(true);
+    setErrorMessage("");
+
+    try {
+      const response = await userService.createUser({
+        email: newUserForm.email,
+        password: newUserForm.password,
+        firstName: newUserForm.firstName,
+        lastName: newUserForm.lastName,
+        role: newUserForm.role,
+        department: newUserForm.department,
+        position: newUserForm.position,
+        phone: newUserForm.phone,
+      });
+
+      if (response.success) {
+        // Refresh users list
+        await fetchUsers();
+        
+        // Reset form
+        setNewUserForm({
+          firstName: "",
+          lastName: "",
+          email: "",
+          password: "",
+          phone: "",
+          department: "",
+          position: "",
+          role: "user",
+        });
+        setShowAddUserModal(false);
+        setShowSaveSuccess(true);
+        setTimeout(() => setShowSaveSuccess(false), 3000);
+      }
+    } catch (error) {
+      setErrorMessage(error.message || "Failed to create user");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleDeleteUser = () => {
-    setUsers(users.filter(u => u.id !== selectedUser.id));
-    setShowDeleteModal(false);
-    setSelectedUser(null);
+  const handleDeleteUser = async () => {
+    if (!selectedUser) return;
+    
+    setIsLoading(true);
+    try {
+      const response = await userService.deleteUser(selectedUser.id);
+      if (response.success) {
+        await fetchUsers();
+        setShowDeleteModal(false);
+        setSelectedUser(null);
+      }
+    } catch (error) {
+      setErrorMessage(error.message || "Failed to delete user");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleToggleUserStatus = async (userId) => {
+    try {
+      const response = await userService.toggleUserStatus(userId);
+      if (response.success) {
+        await fetchUsers();
+      }
+    } catch (error) {
+      setErrorMessage(error.message || "Failed to toggle user status");
+    }
   };
 
   const getRoleBadgeColor = (role) => {
     switch (role) {
+      case "admin":
+      case "super_admin":
       case "Admin": return "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400";
+      case "editor":
       case "Editor": return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
+      case "user":
       case "Viewer": return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400";
       default: return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400";
     }
+  };
+
+  const getRoleLabel = (role) => {
+    const labels = {
+      super_admin: "Super Admin",
+      admin: "Admin",
+      editor: "Editor",
+      user: "Viewer",
+    };
+    return labels[role] || role;
   };
 
   const getStatusBadgeColor = (status) => {
@@ -493,15 +615,15 @@ export default function Settings() {
                           </td>
                           <td className="px-6 py-4 hidden md:table-cell">
                             <p className="text-sm text-slate-900 dark:text-white">{user.email}</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">{user.phone}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{user.phone || '-'}</p>
                           </td>
                           <td className="px-6 py-4 hidden lg:table-cell">
-                            <p className="text-sm text-slate-900 dark:text-white">{user.department}</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">{user.position}</p>
+                            <p className="text-sm text-slate-900 dark:text-white">{user.department || '-'}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{user.position || '-'}</p>
                           </td>
                           <td className="px-6 py-4">
                             <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${getRoleBadgeColor(user.role)}`}>
-                              {user.role}
+                              {getRoleLabel(user.role)}
                             </span>
                           </td>
                           <td className="px-6 py-4 hidden sm:table-cell">
@@ -511,9 +633,21 @@ export default function Settings() {
                           </td>
                           <td className="px-6 py-4">
                             <div className="flex items-center justify-end gap-2">
-                              <button className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
-                                <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              <button 
+                                onClick={() => handleToggleUserStatus(user.id)}
+                                className={`p-2 rounded-lg transition-colors ${
+                                  user.isActive 
+                                    ? 'hover:bg-amber-100 dark:hover:bg-amber-900/30' 
+                                    : 'hover:bg-emerald-100 dark:hover:bg-emerald-900/30'
+                                }`}
+                                title={user.isActive ? 'Deactivate' : 'Activate'}
+                              >
+                                <svg className={`w-4 h-4 ${user.isActive ? 'text-amber-500' : 'text-emerald-500'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  {user.isActive ? (
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                                  ) : (
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  )}
                                 </svg>
                               </button>
                               <button 
@@ -648,7 +782,7 @@ export default function Settings() {
                     <div className="flex-shrink-0">
                       {twoFAEnabled ? (
                         <button 
-                          onClick={() => { setTwoFAEnabled(false); }}
+                          onClick={() => { setShowDisable2FAModal(true); setDisableCode(""); setTwoFAError(""); }}
                           className="px-4 py-2 rounded-xl bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm font-medium hover:bg-red-200 dark:hover:bg-red-900/50 transition-all flex items-center gap-2"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -658,7 +792,14 @@ export default function Settings() {
                         </button>
                       ) : (
                         <button 
-                          onClick={() => { setShow2FAModal(true); setTwoFAStep(1); setVerificationCode(""); }}
+                          onClick={async () => { 
+                            setShow2FAModal(true); 
+                            setTwoFAStep(1); 
+                            setVerificationCode(""); 
+                            setTwoFAError("");
+                            setQrCodeImage("");
+                            setTotpSecret("");
+                          }}
                           className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white text-sm font-medium transition-all flex items-center gap-2 shadow-lg shadow-indigo-500/25"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -798,6 +939,13 @@ export default function Settings() {
 
               {/* Form Content */}
               <form onSubmit={handleAddUser} className="p-6 space-y-5 overflow-y-auto max-h-[calc(90vh-180px)]">
+                {/* Error Message */}
+                {errorMessage && (
+                  <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+                    <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>
+                  </div>
+                )}
+
                 {/* Avatar Preview */}
                 <div className="flex justify-center mb-2">
                   <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-xl font-bold text-white shadow-lg shadow-indigo-500/25">
@@ -860,6 +1008,30 @@ export default function Settings() {
                       required
                     />
                   </div>
+                </div>
+
+                {/* Password */}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2">
+                      <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="password"
+                      value={newUserForm.password}
+                      onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
+                      className="w-full pl-12 pr-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-500 transition-all text-slate-900 dark:text-slate-100 placeholder:text-slate-400"
+                      placeholder="Min. 8 characters"
+                      minLength={8}
+                      required
+                    />
+                  </div>
+                  <p className="text-xs text-slate-400">Minimum 8 characters</p>
                 </div>
 
                 {/* Phone */}
@@ -947,10 +1119,10 @@ export default function Settings() {
                       >
                         <div className="flex items-center gap-2">
                           <span className={`w-2 h-2 rounded-full ${
-                            newUserForm.role === 'Admin' ? 'bg-purple-500' : 
-                            newUserForm.role === 'Editor' ? 'bg-blue-500' : 'bg-slate-400'
+                            newUserForm.role === 'admin' ? 'bg-purple-500' : 
+                            newUserForm.role === 'editor' ? 'bg-blue-500' : 'bg-slate-400'
                           }`} />
-                          <span className="text-slate-900 dark:text-slate-100">{newUserForm.role}</span>
+                          <span className="text-slate-900 dark:text-slate-100">{roleLabels[newUserForm.role] || newUserForm.role}</span>
                         </div>
                         <svg className={`w-5 h-5 text-slate-400 transition-transform ${showRoleDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -975,10 +1147,10 @@ export default function Settings() {
                               >
                                 <div className="flex items-center gap-2">
                                   <span className={`w-2 h-2 rounded-full ${
-                                    role === 'Admin' ? 'bg-purple-500' : 
-                                    role === 'Editor' ? 'bg-blue-500' : 'bg-slate-400'
+                                    role === 'admin' ? 'bg-purple-500' : 
+                                    role === 'editor' ? 'bg-blue-500' : 'bg-slate-400'
                                   }`} />
-                                  <span className={newUserForm.role === role ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'}>{role}</span>
+                                  <span className={newUserForm.role === role ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'}>{roleLabels[role]}</span>
                                 </div>
                                 {newUserForm.role === role && (
                                   <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1019,19 +1191,33 @@ export default function Settings() {
                 <div className="flex gap-3 pt-2">
                   <button
                     type="button"
-                    onClick={() => { setShowAddUserModal(false); setShowDeptDropdown(false); setShowRoleDropdown(false); }}
+                    onClick={() => { setShowAddUserModal(false); setShowDeptDropdown(false); setShowRoleDropdown(false); setErrorMessage(""); }}
                     className="flex-1 px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
+                    disabled={isLoading}
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-medium transition-all shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2"
+                    disabled={isLoading}
+                    className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-medium transition-all shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    Add User
+                    {isLoading ? (
+                      <>
+                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Adding...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                        </svg>
+                        Add User
+                      </>
+                    )}
                   </button>
                 </div>
               </form>
@@ -1157,10 +1343,42 @@ export default function Settings() {
                     <Button variant="secondary" onClick={() => setShow2FAModal(false)} className="flex-1">
                       Cancel
                     </Button>
-                    <Button onClick={() => setTwoFAStep(2)} className="flex-1">
-                      Next
+                    <Button 
+                      onClick={async () => {
+                        setTwoFALoading(true);
+                        setTwoFAError("");
+                        try {
+                          const response = await totpService.generateSecret();
+                          if (response.success) {
+                            setQrCodeImage(response.data.qrCode);
+                            setTotpSecret(response.data.secret);
+                            setTwoFAStep(2);
+                          } else {
+                            setTwoFAError(response.error || "Failed to generate secret");
+                          }
+                        } catch (error) {
+                          setTwoFAError(error.message || "Failed to generate secret");
+                        } finally {
+                          setTwoFALoading(false);
+                        }
+                      }} 
+                      className="flex-1"
+                      disabled={twoFALoading}
+                    >
+                      {twoFALoading ? (
+                        <span className="flex items-center gap-2">
+                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Loading...
+                        </span>
+                      ) : "Next"}
                     </Button>
                   </div>
+                  {twoFAError && (
+                    <p className="text-sm text-red-500 mt-3">{twoFAError}</p>
+                  )}
                 </div>
               )}
 
@@ -1174,38 +1392,36 @@ export default function Settings() {
                     Open Google Authenticator and scan this QR code to add your account.
                   </p>
 
-                  {/* Mock QR Code */}
-                  <div className="w-48 h-48 mx-auto mb-4 bg-white p-4 rounded-2xl shadow-lg">
-                    <div className="w-full h-full bg-slate-900 rounded-xl flex items-center justify-center relative overflow-hidden">
-                      {/* Stylized QR pattern */}
-                      <div className="grid grid-cols-7 gap-1 p-2">
-                        {Array.from({ length: 49 }).map((_, i) => (
-                          <div 
-                            key={i} 
-                            className={`w-4 h-4 rounded-sm ${
-                              [0,1,2,4,5,6,7,13,14,20,21,27,28,34,35,41,42,43,44,45,46,47,48].includes(i) ||
-                              Math.random() > 0.5 ? 'bg-white' : 'bg-slate-900'
-                            }`}
-                          />
-                        ))}
+                  {/* Real QR Code from API */}
+                  <div className="w-48 h-48 mx-auto mb-4 bg-white p-2 rounded-2xl shadow-lg">
+                    {qrCodeImage ? (
+                      <img 
+                        src={qrCodeImage} 
+                        alt="2FA QR Code" 
+                        className="w-full h-full object-contain"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-slate-100 rounded-xl">
+                        <svg className="w-8 h-8 text-slate-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
                       </div>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
-                          <div className="w-6 h-6 rounded bg-gradient-to-br from-indigo-500 to-purple-600" />
-                        </div>
-                      </div>
-                    </div>
+                    )}
                   </div>
 
                   <div className="mb-6">
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Or enter this code manually:</p>
                     <div className="flex items-center justify-center gap-2">
-                      <code className="px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm font-mono text-slate-900 dark:text-slate-100 tracking-widest">
-                        {mockSecret}
+                      <code className="px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg text-sm font-mono text-slate-900 dark:text-slate-100 tracking-widest break-all">
+                        {totpSecret || "Loading..."}
                       </code>
                       <button 
-                        onClick={() => navigator.clipboard.writeText(mockSecret)}
+                        onClick={() => {
+                          navigator.clipboard.writeText(totpSecret);
+                        }}
                         className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                        title="Copy to clipboard"
                       >
                         <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -1266,27 +1482,10 @@ export default function Settings() {
                         />
                       ))}
                     </div>
-                    <p className="text-xs text-slate-400 mt-3">Enter code: 123456 (mock)</p>
-                  </div>
-
-                  {/* Backup Codes */}
-                  <div className="mb-6 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                    <div className="flex items-center gap-2 mb-2">
-                      <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                      <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Save your backup codes</p>
-                    </div>
-                    <p className="text-xs text-amber-700 dark:text-amber-400 mb-3">
-                      Store these codes safely. You can use them to access your account if you lose your phone.
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {mockBackupCodes.map((code, i) => (
-                        <code key={i} className="px-3 py-1.5 bg-white dark:bg-slate-800 rounded-lg text-xs font-mono text-slate-700 dark:text-slate-300">
-                          {code}
-                        </code>
-                      ))}
-                    </div>
+                    <p className="text-xs text-slate-400 mt-3">Enter the code from your authenticator app (or 123456 for testing)</p>
+                    {twoFAError && (
+                      <p className="text-sm text-red-500 mt-2">{twoFAError}</p>
+                    )}
                   </div>
 
                   <div className="flex gap-3">
@@ -1294,15 +1493,34 @@ export default function Settings() {
                       Back
                     </Button>
                     <Button 
-                      onClick={() => {
-                        if (verificationCode === '123456') {
-                          setTwoFAStep(4);
+                      onClick={async () => {
+                        setTwoFALoading(true);
+                        setTwoFAError("");
+                        try {
+                          const response = await totpService.enable(verificationCode);
+                          if (response.success) {
+                            setTwoFAStep(4);
+                          } else {
+                            setTwoFAError(response.error || "Invalid verification code");
+                          }
+                        } catch (error) {
+                          setTwoFAError(error.message || "Failed to enable 2FA");
+                        } finally {
+                          setTwoFALoading(false);
                         }
                       }} 
                       className="flex-1"
-                      disabled={verificationCode.length !== 6}
+                      disabled={verificationCode.length !== 6 || twoFALoading}
                     >
-                      Enable 2FA
+                      {twoFALoading ? (
+                        <span className="flex items-center gap-2">
+                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Verifying...
+                        </span>
+                      ) : "Enable 2FA"}
                     </Button>
                   </div>
                 </div>
@@ -1421,6 +1639,115 @@ export default function Settings() {
 
       {/* Logout Modal */}
       <AnimatePresence>
+        {showDisable2FAModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+            onClick={() => setShowDisable2FAModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 max-w-md w-full"
+            >
+              <div className="text-center">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
+                  Disable Two-Factor Authentication
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                  Enter your current authenticator code to disable 2FA. This will make your account less secure.
+                </p>
+
+                <div className="mb-6">
+                  <div className="flex justify-center gap-2">
+                    {[0, 1, 2, 3, 4, 5].map((index) => (
+                      <input
+                        key={index}
+                        type="text"
+                        maxLength={1}
+                        value={disableCode[index] || ''}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, '');
+                          const newCode = disableCode.split('');
+                          newCode[index] = value;
+                          setDisableCode(newCode.join(''));
+                          if (value && e.target.nextElementSibling) {
+                            e.target.nextElementSibling.focus();
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Backspace' && !disableCode[index] && e.target.previousElementSibling) {
+                            e.target.previousElementSibling.focus();
+                          }
+                        }}
+                        className="w-12 h-14 text-center text-xl font-bold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all text-slate-900 dark:text-slate-100"
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-3">Enter the code from your authenticator app (or 123456 for testing)</p>
+                  {twoFAError && (
+                    <p className="text-sm text-red-500 mt-2">{twoFAError}</p>
+                  )}
+                </div>
+
+                <div className="flex gap-3">
+                  <Button 
+                    variant="secondary" 
+                    onClick={() => { setShowDisable2FAModal(false); setDisableCode(""); setTwoFAError(""); }} 
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <button 
+                    onClick={async () => {
+                      setTwoFALoading(true);
+                      setTwoFAError("");
+                      try {
+                        const response = await totpService.disable(disableCode);
+                        if (response.success) {
+                          setTwoFAEnabled(false);
+                          setShowDisable2FAModal(false);
+                          setDisableCode("");
+                        } else {
+                          setTwoFAError(response.error || "Invalid verification code");
+                        }
+                      } catch (error) {
+                        setTwoFAError(error.message || "Failed to disable 2FA");
+                      } finally {
+                        setTwoFALoading(false);
+                      }
+                    }}
+                    disabled={disableCode.length !== 6 || twoFALoading}
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {twoFALoading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Disabling...
+                      </span>
+                    ) : "Disable 2FA"}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Logout Modal */}
+      <AnimatePresence>
         {showLogoutModal && (
           <motion.div 
             initial={{ opacity: 0 }}
@@ -1480,20 +1807,34 @@ export default function Settings() {
               >
                 <button
                   onClick={() => setShowLogoutModal(false)}
-                  className="flex-1 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/50 text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-all duration-200"
+                  disabled={isLoggingOut}
+                  className="flex-1 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/50 text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-all duration-200 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <motion.button
                   onClick={handleLogout}
+                  disabled={isLoggingOut}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className="flex-1 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 group"
+                  className="flex-1 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Sign out
-                  <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
+                  {isLoggingOut ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Signing out...
+                    </>
+                  ) : (
+                    <>
+                      Sign out
+                      <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
+                    </>
+                  )}
                 </motion.button>
               </motion.div>
             </motion.div>

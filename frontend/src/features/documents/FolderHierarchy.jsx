@@ -52,6 +52,7 @@ function SortableFolderItem({
   onViewDocs,
   onMoveToFolder,
   allFolders,
+  globalIsDragging, // New prop to track if any drag is happening
 }) {
   const {
     attributes,
@@ -72,6 +73,13 @@ function SortableFolderItem({
   const hasChildren = folder.children && folder.children.length > 0;
   const [showMoveMenu, setShowMoveMenu] = useState(false);
   const moveMenuRef = useRef(null);
+
+  // Close move menu when global drag starts
+  useEffect(() => {
+    if (globalIsDragging) {
+      setShowMoveMenu(false);
+    }
+  }, [globalIsDragging]);
 
   // Close move menu when clicking outside
   useEffect(() => {
@@ -281,6 +289,7 @@ function SortableFolderItem({
                   onViewDocs={onViewDocs}
                   onMoveToFolder={onMoveToFolder}
                   allFolders={allFolders}
+                  globalIsDragging={globalIsDragging}
                 />
               ))}
             </SortableContext>
@@ -746,6 +755,7 @@ export default function FolderHierarchy() {
                     onViewDocs={handleViewDocs}
                     onMoveToFolder={handleMoveToFolder}
                     allFolders={folders}
+                    globalIsDragging={activeId !== null}
                   />
                 ))}
               </SortableContext>

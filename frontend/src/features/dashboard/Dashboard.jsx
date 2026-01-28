@@ -1,13 +1,14 @@
-import { useState } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
+import { useDebounce } from "@/hooks/useDebounce";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
 
   const recentDocuments = [
     { id: 1, name: "Contract_2025.pdf", type: "PDF", size: "2.4 MB", uploaded: "2 hours ago", status: "verified", user: "John Doe" },
@@ -77,22 +78,28 @@ export default function Dashboard() {
     { label: "Others", value: 46, percent: 4, color: "bg-slate-500" },
   ];
 
-  const filteredDocs = recentDocuments.filter(doc => 
-    doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    doc.user.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredDocs = useMemo(() => 
+    recentDocuments.filter(doc => 
+      doc.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+      doc.user.toLowerCase().includes(debouncedSearchQuery.toLowerCase())
+    ), [debouncedSearchQuery]
   );
+
+  const handleSearchChange = useCallback((e) => {
+    setSearchQuery(e.target.value);
+  }, []);
+
+  const handleNavigate = useCallback((href) => {
+    navigate(href);
+  }, [navigate]);
 
   return (
     <DashboardLayout>
       {/* Header */}
-      <div className="mb-6">
-        <motion.h1 
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white mb-1"
-        >
+      <div className="mb-6 animate-fade-in">
+        <h1 className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white mb-1">
           Welcome back 👋
-        </motion.h1>
+        </h1>
         <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm">
           Here's what's happening with your documents today.
         </p>
@@ -101,11 +108,10 @@ export default function Dashboard() {
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
         {stats.map((stat, index) => (
-          <motion.div
+          <div
             key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
+            className="animate-fade-in-up"
+            style={{ animationDelay: `${index * 50}ms` }}
           >
             <Card className="p-4 sm:p-5" hover>
               <div className="flex items-start justify-between mb-2 sm:mb-3">
@@ -125,26 +131,19 @@ export default function Dashboard() {
               <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white mb-1">{stat.value}</p>
               <p className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">{stat.label}</p>
             </Card>
-          </motion.div>
+          </div>
         ))}
       </div>
 
       {/* Quick Actions - Full Width Grid */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="mb-6"
-      >
+      <div className="mb-6 animate-fade-in-up" style={{ animationDelay: '100ms' }}>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {quickActions.map((action, index) => (
-            <motion.button
+            <button
               key={action.name}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 + index * 0.05 }}
-              onClick={() => navigate(action.href)}
-              className="group relative overflow-hidden rounded-xl sm:rounded-2xl p-4 sm:p-5 text-left transition-all hover:scale-[1.02] active:scale-[0.98]"
+              onClick={() => handleNavigate(action.href)}
+              className="group relative overflow-hidden rounded-xl sm:rounded-2xl p-4 sm:p-5 text-left transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98] animate-fade-in-up"
+              style={{ animationDelay: `${150 + index * 50}ms` }}
             >
               <div className={`absolute inset-0 bg-gradient-to-br ${action.color} opacity-90 group-hover:opacity-100 transition-opacity`}></div>
               <div className="relative z-10">
@@ -154,20 +153,15 @@ export default function Dashboard() {
                 <h3 className="text-sm sm:text-base font-bold text-white mb-0.5 sm:mb-1">{action.name}</h3>
                 <p className="text-xs sm:text-sm text-white/70 line-clamp-2">{action.desc}</p>
               </div>
-            </motion.button>
+            </button>
           ))}
         </div>
-      </motion.div>
+      </div>
 
       {/* Two Column Layout: Tasks & Doc Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-6">
         {/* Tasks Table */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="lg:col-span-2"
-        >
+        <div className="lg:col-span-2 animate-fade-in-up" style={{ animationDelay: '200ms' }}>
           <Card className="overflow-hidden h-full">
             <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <div>
@@ -272,14 +266,10 @@ export default function Dashboard() {
               ))}
             </div>
           </Card>
-        </motion.div>
+        </div>
 
         {/* Document Stats */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35 }}
-        >
+        <div className="animate-fade-in-up" style={{ animationDelay: '250ms' }}>
           <Card className="p-4 sm:p-5 h-full">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">Document Types</h2>
             <div className="space-y-4">
@@ -302,15 +292,11 @@ export default function Dashboard() {
               </div>
             </div>
           </Card>
-        </motion.div>
+        </div>
       </div>
 
       {/* Recent Documents */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-      >
+      <div className="animate-fade-in-up" style={{ animationDelay: '300ms' }}>
         <Card className="overflow-hidden">
           <div className="p-4 sm:p-5 border-b border-slate-100 dark:border-slate-800">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
@@ -327,7 +313,7 @@ export default function Dashboard() {
                     type="text"
                     placeholder="Search..."
                     value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onChange={handleSearchChange}
                     className="pl-9 pr-4 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-48"
                   />
                 </div>
@@ -430,7 +416,7 @@ export default function Dashboard() {
             )}
           </div>
         </Card>
-      </motion.div>
+      </div>
     </DashboardLayout>
   );
 }

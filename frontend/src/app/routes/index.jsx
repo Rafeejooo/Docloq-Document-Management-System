@@ -1,8 +1,10 @@
 import { createBrowserRouter } from "react-router-dom";
+
+// Direct imports for stability
 import LandingPage from "@/features/landing/LandingPage";
 import Contact from "@/features/contact/Contact";
 import Login from "@/features/auth/login";
-import Register from "@/features/auth/register";
+import OTPVerification from "@/features/auth/OTPVerification";
 import Dashboard from "@/features/dashboard/Dashboard";
 import Documents from "@/features/documents/Documents";
 import Trash from "@/features/documents/Trash";
@@ -20,7 +22,7 @@ export const router = createBrowserRouter([
   { path: "/", element: <LandingPage /> },
   { path: "/contact", element: <Contact /> },
   { path: "/login", element: <Login /> },
-  { path: "/register", element: <Register /> },
+  { path: "/verify-otp", element: <OTPVerification /> },
   { path: "/dashboard", element: <Dashboard /> },
   { path: "/tasks", element: <Tasks /> },
   { path: "/forms", element: <Forms /> },

@@ -8,9 +8,10 @@ import "aos/dist/aos.css";
 export default function App() {
   useEffect(() => {
     AOS.init({
-      duration: 1000,
+      duration: 500, // Reduced from 1000ms for snappier animations
       once: true,
       easing: "ease-out-cubic",
+      disable: window.innerWidth < 768, // Disable on mobile for better performance
     });
   }, []);
 
