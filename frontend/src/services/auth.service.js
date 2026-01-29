@@ -2,7 +2,39 @@
 import api from './api';
 import useAuthStore from '../app/store/auth.store';
 
+// Dev bypass user data - only works in development
+const DEV_BYPASS_USER = {
+  id: 'dev-user-001',
+  email: 'dev@docloq.local',
+  name: 'Developer',
+  role: 'super_admin',
+  avatar: null,
+  permissions: ['*'],
+  createdAt: new Date().toISOString(),
+};
+
 export const authService = {
+  /**
+   * Dev bypass login - only for development without backend
+   */
+  devBypassLogin() {
+    const { loginSuccess } = useAuthStore.getState();
+    
+    // Only allow in development mode
+    if (import.meta.env.PROD) {
+      console.warn('Dev bypass is disabled in production');
+      return { success: false, message: 'Not available in production' };
+    }
+
+    loginSuccess({
+      user: DEV_BYPASS_USER,
+      accessToken: 'dev-access-token-' + Date.now(),
+      refreshToken: 'dev-refresh-token-' + Date.now(),
+    });
+
+    return { success: true, data: { user: DEV_BYPASS_USER } };
+  },
+
   /**
    * Login user
    */

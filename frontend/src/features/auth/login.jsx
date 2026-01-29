@@ -9,6 +9,9 @@ import authService from "../../services/auth.service";
 const HCAPTCHA_SITE_KEY = import.meta.env.VITE_HCAPTCHA_SITE_KEY || "10000000-ffff-ffff-ffff-000000000001";
 const HCAPTCHA_ENABLED = import.meta.env.VITE_HCAPTCHA_ENABLED === "true";
 
+// Dev bypass key sequence: Ctrl+Shift+D (only in development)
+const DEV_BYPASS_ENABLED = import.meta.env.DEV;
+
 // Static animation variants - defined outside component to prevent recreation
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -54,6 +57,26 @@ export default function Login() {
   useEffect(() => {
     clearError();
   }, [clearError]);
+
+  // Dev bypass login with Ctrl+Shift+D (hidden, no UI)
+  useEffect(() => {
+    if (!DEV_BYPASS_ENABLED) return;
+
+    const handleKeyDown = (e) => {
+      // Ctrl+Shift+D for dev bypass
+      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        const result = authService.devBypassLogin();
+        if (result.success) {
+          console.log('%c🔓 Dev bypass login activated', 'color: #10b981; font-weight: bold;');
+          navigate("/dashboard");
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [navigate]);
 
   const validateForm = useCallback(() => {
     const errors = {};
