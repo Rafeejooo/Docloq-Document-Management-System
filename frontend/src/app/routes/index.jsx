@@ -7,6 +7,7 @@ import Login from "@/features/auth/login";
 import OTPVerification from "@/features/auth/OTPVerification";
 import Dashboard from "@/features/dashboard/Dashboard";
 import Documents from "@/features/documents/Documents";
+import DocumentsTest from "@/features/documents/DocumentsTest";
 import Trash from "@/features/documents/Trash";
 import Verification from "@/features/documents/Verification";
 import FolderHierarchy from "@/features/documents/FolderHierarchy";
@@ -27,6 +28,7 @@ export const router = createBrowserRouter([
   { path: "/tasks", element: <Tasks /> },
   { path: "/forms", element: <Forms /> },
   { path: "/documents", element: <Documents /> },
+  { path: "/documents-test", element: <DocumentsTest /> },
   { path: "/folders", element: <FolderHierarchy /> },
   { path: "/trash", element: <Trash /> },
   { path: "/verification", element: <Verification /> },

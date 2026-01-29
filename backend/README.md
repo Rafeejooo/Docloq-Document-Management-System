@@ -39,6 +39,7 @@ Backend REST API untuk DocLoq - Sistem Manajemen Dokumen yang aman dengan dukung
 - [Environment Variables](#-environment-variables)
 - [Database Schema](#-database-schema)
 - [Docker Setup](#-docker-setup)
+- [OnlyOffice Setup](#-onlyoffice-setup-document-editor)
 - [NPM Scripts](#-npm-scripts)
 - [Security Features](#-security-features)
 - [Development Guide](#-development-guide)
@@ -655,7 +656,141 @@ Akses PgAdmin di `http://localhost:5050`
 
 ---
 
-## 🛠 NPM Scripts
+## � OnlyOffice Setup (Document Editor)
+
+OnlyOffice Document Server digunakan untuk viewing dan editing dokumen (Word, Excel, PowerPoint, PDF) langsung di browser.
+
+### Prerequisites
+
+- ✅ Docker & Docker Compose
+- ✅ Minimum 4GB RAM untuk container OnlyOffice
+
+### Setup OnlyOffice
+
+#### 1. Masuk ke folder OnlyOffice
+
+```bash
+cd ../onlyoffice
+# atau dari root project:
+cd docloq/onlyoffice
+```
+
+#### 2. Start OnlyOffice Container
+
+```bash
+docker-compose up -d
+```
+
+#### 3. Tunggu OnlyOffice Ready
+
+OnlyOffice membutuhkan waktu 1-2 menit untuk startup. Cek status:
+
+```bash
+# Cek container berjalan
+docker ps
+
+# Cek logs
+docker-compose logs -f onlyoffice
+
+# Tunggu sampai muncul: "nginx entered RUNNING state"
+```
+
+#### 4. Verifikasi
+
+Buka browser dan akses:
+```
+http://localhost:8082
+```
+
+Jika muncul halaman "Document Server is running", OnlyOffice siap digunakan.
+
+### OnlyOffice Configuration
+
+File `docker-compose.yml`:
+
+```yaml
+version: '3'
+services:
+  onlyoffice:
+    image: onlyoffice/documentserver:latest
+    container_name: onlyoffice_ds
+    environment:
+      - JWT_ENABLED=false  # Disable JWT untuk development
+      - JWT_SECRET=secret  
+    ports:
+      - "8082:80"          # Akses via http://localhost:8082
+    volumes:
+      - ./logs:/var/log/onlyoffice
+      - ./data:/var/www/onlyoffice/Data
+      - ./lib:/var/lib/onlyoffice
+    restart: always
+```
+
+| Property | Value | Description |
+|----------|-------|-------------|
+| **Port** | `8082` | OnlyOffice Document Server |
+| **JWT** | Disabled | Untuk kemudahan development |
+| **Container** | `onlyoffice_ds` | Nama container |
+
+### Backend Configuration
+
+Backend menggunakan `host.docker.internal` agar OnlyOffice container bisa mengakses file dari backend:
+
+```javascript
+// Di document.controller.js
+const baseUrl = process.env.NODE_ENV === 'production'
+  ? process.env.BACKEND_URL
+  : 'http://host.docker.internal:3000';
+```
+
+> **Note for Mac/Windows**: `host.docker.internal` otomatis tersedia.
+> 
+> **Note for Linux**: Tambahkan `extra_hosts` di docker-compose:
+> ```yaml
+> extra_hosts:
+>   - "host.docker.internal:host-gateway"
+> ```
+
+### Perintah OnlyOffice
+
+```bash
+# Start OnlyOffice
+docker-compose up -d
+
+# Stop OnlyOffice
+docker-compose down
+
+# Restart OnlyOffice
+docker-compose restart
+
+# Lihat logs
+docker-compose logs -f
+
+# Masuk ke container
+docker exec -it onlyoffice_ds bash
+```
+
+### Troubleshooting OnlyOffice
+
+| Problem | Solution |
+|---------|----------|
+| "Download failed" di editor | Pastikan backend listen di `0.0.0.0` dan gunakan `host.docker.internal` |
+| Container tidak start | Pastikan port 8082 tidak digunakan aplikasi lain |
+| Lambat/hang saat startup | Normal, tunggu 1-2 menit. OnlyOffice butuh resource cukup besar |
+| Memory issue | Minimum 4GB RAM untuk OnlyOffice container |
+
+### Supported File Types
+
+| Type | Extensions |
+|------|------------|
+| **Word** | `.doc`, `.docx`, `.odt`, `.rtf`, `.txt` |
+| **Excel** | `.xls`, `.xlsx`, `.ods`, `.csv` |
+| **PowerPoint** | `.ppt`, `.pptx`, `.odp` |
+| **PDF** | `.pdf` (view only) |
+
+---
+
+## �🛠 NPM Scripts
 
 | Script | Command | Description |
 |--------|---------|-------------|

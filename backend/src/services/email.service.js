@@ -28,105 +28,196 @@ export const OTP_EXPIRY_MINUTES = 5;
 
 // Email template for OTP
 const generateOTPEmailHTML = (otp, userName) => {
+  // Split OTP into individual digits for better display
+  const otpDigits = otp.split('');
+  
   return `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>Your DocLoq Verification Code</title>
+  <!--[if mso]>
+  <noscript>
+    <xml>
+      <o:OfficeDocumentSettings>
+        <o:PixelsPerInch>96</o:PixelsPerInch>
+      </o:OfficeDocumentSettings>
+    </xml>
+  </noscript>
+  <![endif]-->
+  <style type="text/css">
+    /* Reset styles */
+    body, table, td, p, a, li, blockquote {
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+    }
+    table, td {
+      mso-table-lspace: 0pt;
+      mso-table-rspace: 0pt;
+    }
+    img {
+      -ms-interpolation-mode: bicubic;
+      border: 0;
+      height: auto;
+      line-height: 100%;
+      outline: none;
+      text-decoration: none;
+    }
+    body {
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 100% !important;
+    }
+    /* Responsive styles */
+    @media only screen and (max-width: 480px) {
+      .mobile-padding {
+        padding-left: 16px !important;
+        padding-right: 16px !important;
+      }
+      .otp-digit {
+        width: 40px !important;
+        height: 50px !important;
+        font-size: 24px !important;
+      }
+    }
+  </style>
 </head>
-<body style="margin: 0; padding: 0; background-color: #0f172a; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+<body style="margin: 0; padding: 0; background-color: #0f172a; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <!-- Wrapper Table -->
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #0f172a;">
     <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table role="presentation" style="width: 100%; max-width: 480px; border-collapse: collapse;">
+      <td align="center" style="padding: 40px 20px;" class="mobile-padding">
+        <!-- Content Container -->
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="500" style="max-width: 500px;">
+          
           <!-- Logo Header -->
           <tr>
-            <td align="center" style="padding-bottom: 32px;">
-              <div style="display: inline-flex; align-items: center; gap: 12px;">
-                <div style="width: 48px; height: 48px; background: linear-gradient(135deg, #6366f1, #a855f7); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
-                  <span style="color: white; font-size: 24px; font-weight: bold;">D</span>
-                </div>
-                <span style="font-size: 28px; font-weight: bold; color: white;">DocLoq</span>
-              </div>
+            <td align="center" style="padding-bottom: 30px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td valign="middle" style="padding-right: 12px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="48" height="48" style="background-color: #8b5cf6; border-radius: 12px;">
+                      <tr>
+                        <td align="center" valign="middle" style="font-size: 24px; font-weight: bold; color: #ffffff;">D</td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td valign="middle">
+                    <span style="font-size: 28px; font-weight: bold; color: #ffffff; letter-spacing: -0.5px;">DocLoq</span>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
           
           <!-- Main Card -->
           <tr>
-            <td style="background: linear-gradient(145deg, #1e293b, #0f172a); border-radius: 24px; border: 1px solid #334155; padding: 40px 32px;">
-              <!-- Icon -->
-              <table role="presentation" style="width: 100%; border-collapse: collapse;">
-                <tr>
-                  <td align="center" style="padding-bottom: 24px;">
-                    <div style="width: 72px; height: 72px; background: linear-gradient(135deg, #6366f1, #a855f7); border-radius: 20px; display: inline-flex; align-items: center; justify-content: center;">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                      </svg>
-                    </div>
-                  </td>
-                </tr>
+            <td style="background-color: #1e293b; border-radius: 20px; border: 1px solid #334155;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
                 
-                <!-- Title -->
+                <!-- Icon Section -->
                 <tr>
-                  <td align="center" style="padding-bottom: 8px;">
-                    <h1 style="margin: 0; color: white; font-size: 24px; font-weight: 600;">Verification Code</h1>
-                  </td>
-                </tr>
-                
-                <!-- Subtitle -->
-                <tr>
-                  <td align="center" style="padding-bottom: 32px;">
-                    <p style="margin: 0; color: #94a3b8; font-size: 15px;">
-                      Hi${userName ? ` ${userName}` : ''}, use this code to verify your login
-                    </p>
-                  </td>
-                </tr>
-                
-                <!-- OTP Code -->
-                <tr>
-                  <td align="center" style="padding-bottom: 32px;">
-                    <div style="background: linear-gradient(135deg, #312e81, #1e1b4b); border: 2px solid #4f46e5; border-radius: 16px; padding: 24px 32px; display: inline-block;">
-                      <span style="font-family: 'Courier New', monospace; font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #a5b4fc;">${otp}</span>
-                    </div>
-                  </td>
-                </tr>
-                
-                <!-- Timer Warning -->
-                <tr>
-                  <td align="center" style="padding-bottom: 24px;">
-                    <div style="display: inline-flex; align-items: center; gap: 8px; background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 12px; padding: 12px 20px;">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <polyline points="12 6 12 12 16 14"></polyline>
-                      </svg>
-                      <span style="color: #fbbf24; font-size: 14px; font-weight: 500;">This code expires in ${OTP_EXPIRY_MINUTES} minutes</span>
-                    </div>
-                  </td>
-                </tr>
-                
-                <!-- Security Note -->
-                <tr>
-                  <td style="background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 12px; padding: 16px;">
-                    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                  <td align="center" style="padding: 40px 32px 24px 32px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="80" height="80" style="background-color: #8b5cf6; border-radius: 20px;">
                       <tr>
-                        <td style="width: 24px; vertical-align: top; padding-right: 12px;">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                            <line x1="12" y1="9" x2="12" y2="13"></line>
-                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                          </svg>
-                        </td>
-                        <td>
-                          <p style="margin: 0; color: #f87171; font-size: 13px; font-weight: 500;">Security Notice</p>
-                          <p style="margin: 4px 0 0 0; color: #fca5a5; font-size: 12px;">Never share this code with anyone. DocLoq will never ask for your verification code via phone or email.</p>
+                        <td align="center" valign="middle">
+                          <!-- Shield/Lock Icon using HTML entities -->
+                          <span style="font-size: 36px;">🔐</span>
                         </td>
                       </tr>
                     </table>
                   </td>
                 </tr>
+                
+                <!-- Title -->
+                <tr>
+                  <td align="center" style="padding: 0 32px 8px 32px;">
+                    <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">Verification Code</h1>
+                  </td>
+                </tr>
+                
+                <!-- Subtitle -->
+                <tr>
+                  <td align="center" style="padding: 0 32px 28px 32px;">
+                    <p style="margin: 0; color: #94a3b8; font-size: 16px; line-height: 1.5;">
+                      Hi${userName ? ` <strong style="color: #e2e8f0;">${userName}</strong>` : ''}, use this code to verify your login
+                    </p>
+                  </td>
+                </tr>
+                
+                <!-- OTP Code Box -->
+                <tr>
+                  <td align="center" style="padding: 0 32px 28px 32px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="background-color: #312e81; border: 2px solid #6366f1; border-radius: 16px;">
+                      <tr>
+                        <td style="padding: 20px 24px;">
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              ${otpDigits.map(digit => `
+                              <td align="center" style="padding: 0 6px;">
+                                <table role="presentation" cellpadding="0" cellspacing="0" border="0" class="otp-digit" width="48" height="60" style="background-color: #1e1b4b; border-radius: 10px;">
+                                  <tr>
+                                    <td align="center" valign="middle" style="font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: bold; color: #c7d2fe;">${digit}</td>
+                                  </tr>
+                                </table>
+                              </td>
+                              `).join('')}
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                
+                <!-- Timer Warning -->
+                <tr>
+                  <td align="center" style="padding: 0 32px 24px 32px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="background-color: #422006; border: 1px solid #854d0e; border-radius: 12px;">
+                      <tr>
+                        <td style="padding: 14px 20px;">
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                              <td valign="middle" style="padding-right: 10px;">
+                                <span style="font-size: 18px;">⏱️</span>
+                              </td>
+                              <td valign="middle">
+                                <span style="color: #fbbf24; font-size: 14px; font-weight: 600;">This code expires in ${OTP_EXPIRY_MINUTES} minutes</span>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                
+                <!-- Security Notice -->
+                <tr>
+                  <td style="padding: 0 32px 32px 32px;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color: #450a0a; border: 1px solid #7f1d1d; border-radius: 12px;">
+                      <tr>
+                        <td style="padding: 16px 18px;">
+                          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+                            <tr>
+                              <td valign="top" width="32" style="padding-right: 12px;">
+                                <span style="font-size: 20px;">⚠️</span>
+                              </td>
+                              <td valign="top">
+                                <p style="margin: 0 0 4px 0; color: #fca5a5; font-size: 14px; font-weight: 600;">Security Notice</p>
+                                <p style="margin: 0; color: #f87171; font-size: 13px; line-height: 1.5;">Never share this code with anyone. DocLoq will never ask for your verification code via phone or email.</p>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                
               </table>
             </td>
           </tr>
@@ -134,14 +225,30 @@ const generateOTPEmailHTML = (otp, userName) => {
           <!-- Footer -->
           <tr>
             <td align="center" style="padding-top: 32px;">
-              <p style="margin: 0 0 8px 0; color: #64748b; font-size: 13px;">
+              <p style="margin: 0 0 8px 0; color: #64748b; font-size: 13px; line-height: 1.6;">
                 If you didn't request this code, please ignore this email<br>or contact our support team.
               </p>
-              <p style="margin: 0; color: #475569; font-size: 12px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top: 16px;">
+                <tr>
+                  <td style="padding: 0 8px;">
+                    <a href="#" style="color: #6366f1; text-decoration: none; font-size: 12px;">Help Center</a>
+                  </td>
+                  <td style="color: #475569;">•</td>
+                  <td style="padding: 0 8px;">
+                    <a href="#" style="color: #6366f1; text-decoration: none; font-size: 12px;">Privacy Policy</a>
+                  </td>
+                  <td style="color: #475569;">•</td>
+                  <td style="padding: 0 8px;">
+                    <a href="#" style="color: #6366f1; text-decoration: none; font-size: 12px;">Terms of Service</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin: 16px 0 0 0; color: #475569; font-size: 12px;">
                 © ${new Date().getFullYear()} DocLoq. All rights reserved.
               </p>
             </td>
           </tr>
+          
         </table>
       </td>
     </tr>
@@ -180,7 +287,7 @@ export const sendOTPEmail = async (email, otp, userName = null) => {
     const mailOptions = {
       from: `"${process.env.MAIL_FROM_NAME || 'DocLoq'}" <${process.env.MAIL_FROM_ADDRESS || 'no-reply@docloq.site'}>`,
       to: email,
-      subject: `${otp} is your DocLoq verification code`,
+      subject: `Your DocLoq verification code`,
       text: generateOTPEmailText(otp, userName),
       html: generateOTPEmailHTML(otp, userName),
     };

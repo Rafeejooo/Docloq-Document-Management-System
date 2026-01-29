@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Card from "@/components/ui/Card";
 import { useDebounce } from "@/hooks/useDebounce";
+import documentService from "@/services/document.service";
+import OnlyOfficeEditor from "@/components/onlyoffice/OnlyOfficeEditor";
 
 export default function Documents() {
   const [view, setView] = useState("grid");
@@ -21,7 +23,7 @@ export default function Documents() {
   const [isEditing, setIsEditing] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [sharingDocument, setSharingDocument] = useState(null);
-  const [shareMode, setShareMode] = useState("user"); // "user" or "link"
+  const [shareMode, setShareMode] = useState("user"); 
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [linkCopied, setLinkCopied] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
@@ -46,9 +48,95 @@ export default function Documents() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [verificationResult, setVerificationResult] = useState(null);
 
+  // upload states
+  const [isUploadingReal, setIsUploadingReal] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [realFiles, setRealFiles] = useState([]); // Actual File objects for upload
+  const [isLoadingDocs, setIsLoadingDocs] = useState(true);
+
+  // OnlyOffice states
+  const [showOnlyOffice, setShowOnlyOffice] = useState(false);
+  const [onlyOfficeConfig, setOnlyOfficeConfig] = useState(null);
+  const [onlyOfficeDoc, setOnlyOfficeDoc] = useState(null);
+
+  // Fetch documents from API on mount
+  useEffect(() => {
+    fetchDocumentsFromAPI();
+  }, []);
+
+  const fetchDocumentsFromAPI = async () => {
+    try {
+      setIsLoadingDocs(true);
+      const response = await documentService.getAllDocuments();
+      if (response.success && response.data) {
+        const apiDocs = response.data.map(doc => ({
+          id: doc.id,
+          name: doc.originalFilename,
+          type: getFileTypeFromMime(doc.mimeType),
+          size: formatFileSize(doc.fileSize),
+          modified: formatTimeAgo(doc.updatedAt || doc.createdAt),
+          status: doc.status === 'active' ? 'verified' : 'pending',
+          folder: 'Uploads',
+          hash: doc.contentHash || generateHash(),
+          mimeType: doc.mimeType,
+          isFromAPI: true, 
+          uploadedBy: { name: "Current User", avatar: "CU", date: formatDate(doc.createdAt) },
+          history: [
+            { id: 1, action: "uploaded", user: { name: "Current User", avatar: "CU" }, date: formatDate(doc.createdAt), time: formatTime(doc.createdAt), hash: doc.contentHash || generateHash() },
+          ]
+        }));
+        setDocuments(prev => {
+          const mockDocs = prev.filter(d => !d.isFromAPI);
+          return [...apiDocs, ...mockDocs];
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch documents:', error);
+    } finally {
+      setIsLoadingDocs(false);
+    }
+  };
+
+  const getFileTypeFromMime = (mimeType) => {
+    if (!mimeType) return 'document';
+    if (mimeType.includes('pdf')) return 'pdf';
+    if (mimeType.includes('word') || mimeType.includes('document')) return 'docx';
+    if (mimeType.includes('sheet') || mimeType.includes('excel')) return 'xlsx';
+    if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) return 'pptx';
+    if (mimeType.includes('image')) return 'image';
+    if (mimeType.includes('text')) return 'txt';
+    return 'document';
+  };
+
+  const formatTimeAgo = (dateString) => {
+    if (!dateString) return 'Unknown';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} minutes ago`;
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return formatDate(dateString);
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Unknown';
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const formatTime = (dateString) => {
+    if (!dateString) return '';
+    return new Date(dateString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  };
+
   // Lock body scroll when any modal is open
   useEffect(() => {
-    const isModalOpen = showUploadModal || showCreateFolderModal || showDocumentModal || showEditModal || showShareModal || showVerifyModal;
+    const isModalOpen = showUploadModal || showCreateFolderModal || showDocumentModal || showEditModal || showShareModal || showVerifyModal || showOnlyOffice;
     if (isModalOpen) {
       document.body.style.overflow = 'hidden';
     } else {
@@ -75,96 +163,7 @@ export default function Documents() {
     { id: 4, name: "Confidential", count: 12, icon: "🔒" },
   ];
 
-  const [documents, setDocuments] = useState([
-    { 
-      id: 1, 
-      name: "Contract_2025.pdf", 
-      type: "pdf",
-      size: "2.4 MB", 
-      modified: "2 hours ago", 
-      status: "verified", 
-      folder: "Contracts",
-      hash: "a1b2c3d4e5f6789",
-      uploadedBy: { name: "John Doe", avatar: "JD", date: "Dec 15, 2025" },
-      history: [
-        { id: 1, action: "uploaded", user: { name: "John Doe", avatar: "JD" }, date: "Dec 15, 2025", time: "10:30 AM", hash: "a1b2c3d4e5f6789" },
-      ]
-    },
-    { 
-      id: 2, 
-      name: "Invoice_001.pdf", 
-      type: "pdf",
-      size: "1.2 MB", 
-      modified: "1 day ago", 
-      status: "verified", 
-      folder: "Invoices",
-      hash: "b2c3d4e5f6g7890",
-      uploadedBy: { name: "Jane Smith", avatar: "JS", date: "Dec 20, 2025" },
-      history: [
-        { id: 1, action: "uploaded", user: { name: "Jane Smith", avatar: "JS" }, date: "Dec 20, 2025", time: "09:15 AM", hash: "x1y2z3a4b5c6789" },
-        { id: 2, action: "edited", user: { name: "Mike Johnson", avatar: "MJ" }, date: "Dec 22, 2025", time: "02:45 PM", hash: "b2c3d4e5f6g7890", changes: "Updated payment terms" },
-      ]
-    },
-    { 
-      id: 3, 
-      name: "Report_Q4.docx", 
-      type: "docx",
-      size: "5.8 MB", 
-      modified: "3 days ago", 
-      status: "pending", 
-      folder: "Reports",
-      hash: "c3d4e5f6g7h8901",
-      uploadedBy: { name: "Sarah Wilson", avatar: "SW", date: "Dec 18, 2025" },
-      history: [
-        { id: 1, action: "uploaded", user: { name: "Sarah Wilson", avatar: "SW" }, date: "Dec 18, 2025", time: "11:00 AM", hash: "m1n2o3p4q5r6789" },
-        { id: 2, action: "edited", user: { name: "Sarah Wilson", avatar: "SW" }, date: "Dec 20, 2025", time: "04:30 PM", hash: "s1t2u3v4w5x6789", changes: "Added Q4 financial summary" },
-        { id: 3, action: "edited", user: { name: "Tom Brown", avatar: "TB" }, date: "Dec 22, 2025", time: "10:15 AM", hash: "c3d4e5f6g7h8901", changes: "Reviewed and added comments" },
-      ]
-    },
-    { 
-      id: 4, 
-      name: "NDA_Template.pdf", 
-      type: "pdf",
-      size: "890 KB", 
-      modified: "1 week ago", 
-      status: "verified", 
-      folder: "Confidential",
-      hash: "d4e5f6g7h8i9012",
-      uploadedBy: { name: "John Doe", avatar: "JD", date: "Dec 10, 2025" },
-      history: [
-        { id: 1, action: "uploaded", user: { name: "John Doe", avatar: "JD" }, date: "Dec 10, 2025", time: "03:00 PM", hash: "d4e5f6g7h8i9012" },
-      ]
-    },
-    { 
-      id: 5, 
-      name: "Financial_Statement.xlsx", 
-      type: "xlsx",
-      size: "3.1 MB", 
-      modified: "5 days ago", 
-      status: "verified", 
-      folder: "Invoices",
-      hash: "e5f6g7h8i9j0123",
-      uploadedBy: { name: "Jane Smith", avatar: "JS", date: "Dec 12, 2025" },
-      history: [
-        { id: 1, action: "uploaded", user: { name: "Jane Smith", avatar: "JS" }, date: "Dec 12, 2025", time: "09:00 AM", hash: "a1a2a3a4a5a6789" },
-        { id: 2, action: "edited", user: { name: "Jane Smith", avatar: "JS" }, date: "Dec 15, 2025", time: "11:30 AM", hash: "e5f6g7h8i9j0123", changes: "Updated December figures" },
-      ]
-    },
-    { 
-      id: 6, 
-      name: "Meeting_Notes.docx", 
-      type: "docx",
-      size: "456 KB", 
-      modified: "1 hour ago", 
-      status: "pending", 
-      folder: "Reports",
-      hash: "f6g7h8i9j0k1234",
-      uploadedBy: { name: "Mike Johnson", avatar: "MJ", date: "Dec 28, 2025" },
-      history: [
-        { id: 1, action: "uploaded", user: { name: "Mike Johnson", avatar: "MJ" }, date: "Dec 28, 2025", time: "02:00 PM", hash: "f6g7h8i9j0k1234" },
-      ]
-    },
-  ]);
+  const [documents, setDocuments] = useState([]);
 
   const fileTypes = [
     { value: "all", label: "All Types" },
@@ -201,7 +200,7 @@ export default function Documents() {
     setShowDocumentModal(true);
   }, []);
 
-  // Generate a random hash for demo purposes
+  // Generate a random hash
   const generateHash = () => {
     const chars = 'abcdef0123456789';
     let hash = '';
@@ -285,18 +284,22 @@ export default function Documents() {
 
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
+    // Store actual File objects 
+    setRealFiles(prev => [...prev, ...files]);
+    
     const newFiles = files.map((file, index) => ({
       id: Date.now() + index,
       name: file.name,
       size: formatFileSize(file.size),
       type: file.name.split('.').pop().toLowerCase(),
-      status: 'ready'
+      status: 'ready',
+      file: file 
     }));
     setUploadedFiles(prev => [...prev, ...newFiles]);
   };
 
   const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
+    if (bytes === 0 || !bytes) return '0 Bytes';
     const k = 1024;
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -304,24 +307,43 @@ export default function Documents() {
   };
 
   const removeUploadFile = (fileId) => {
+    const fileToRemove = uploadedFiles.find(f => f.id === fileId);
+    if (fileToRemove) {
+      setRealFiles(prev => prev.filter(f => f.name !== fileToRemove.name));
+    }
     setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
   };
 
-  const handleUploadFiles = () => {
+  const handleUploadFiles = async () => {
     if (uploadedFiles.length === 0) return;
     
     // Start processing
     setUploadStep(1);
+    setIsUploadingReal(true);
     
     // Reset processing steps
     setProcessingSteps(prev => prev.map(step => ({ ...step, status: "pending" })));
     
-    // Simulate processing each step with delays
-    const processSteps = async () => {
+    try {
+      const uploadedDocs = [];
+      for (const uploadFile of uploadedFiles) {
+        if (uploadFile.file) {
+          try {
+            const response = await documentService.uploadDocument(uploadFile.file, (progress) => {
+              setUploadProgress(progress);
+            });
+            if (response.success) {
+              uploadedDocs.push(response.data);
+            }
+          } catch (err) {
+            console.error('Failed to upload file:', uploadFile.name, err);
+          }
+        }
+      }
+
       const stepDelays = [800, 1000, 900, 1200, 1000];
       
       for (let i = 0; i < 5; i++) {
-        // Set current step to processing
         setProcessingSteps(prev => prev.map((step, idx) => ({
           ...step,
           status: idx === i ? "processing" : idx < i ? "completed" : "pending"
@@ -358,19 +380,104 @@ export default function Documents() {
       });
       
       setUploadStep(2);
-    };
-    
-    processSteps();
+      
+      // Refresh documents list from API
+      await fetchDocumentsFromAPI();
+      
+    } catch (error) {
+      console.error('Upload error:', error);
+    } finally {
+      setIsUploadingReal(false);
+      setUploadProgress(0);
+    }
   };
 
   const resetUploadModal = () => {
     setShowUploadModal(false);
     setUploadedFiles([]);
+    setRealFiles([]);
     setUploadStep(0);
     setProcessingSteps(prev => prev.map(step => ({ ...step, status: "pending" })));
     setProcessedDocData(null);
     setBlockchainSaving(false);
     setBlockchainSaved(false);
+    setIsUploadingReal(false);
+    setUploadProgress(0);
+  };
+
+  // View document in OnlyOffice
+  const handleViewInOnlyOffice = async (doc) => {
+    if (!doc.isFromAPI) {
+      alert('This document cannot be opened in OnlyOffice (mock document)');
+      return;
+    }
+    try {
+      const response = await documentService.getOnlyOfficeConfig(doc.id, 'view');
+      if (response.success) {
+        setOnlyOfficeConfig(response.data.config);
+        setOnlyOfficeDoc(doc);
+        setShowOnlyOffice(true);
+      }
+    } catch (error) {
+      console.error('Failed to open document:', error);
+      alert('Failed to open document in viewer');
+    }
+  };
+
+  // Edit document in OnlyOffice
+  const handleEditInOnlyOffice = async (doc) => {
+    if (!doc.isFromAPI) {
+      // Fall back to existing edit modal for mock documents
+      handleEditDocument(doc);
+      return;
+    }
+    try {
+      const response = await documentService.getOnlyOfficeConfig(doc.id, 'edit');
+      if (response.success) {
+        setOnlyOfficeConfig(response.data.config);
+        setOnlyOfficeDoc(doc);
+        setShowOnlyOffice(true);
+      }
+    } catch (error) {
+      console.error('Failed to open document for editing:', error);
+      alert('Failed to open document editor');
+    }
+  };
+
+  // Download document from API
+  const handleDownloadDocument = async (doc) => {
+    if (!doc.isFromAPI) {
+      alert('This document cannot be downloaded (mock document)');
+      return;
+    }
+    try {
+      await documentService.downloadDocument(doc.id, doc.name);
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('Download failed');
+    }
+  };
+
+  // Delete document from API
+  const handleDeleteDocument = async (doc) => {
+    if (!confirm(`Are you sure you want to delete "${doc.name}"?`)) return;
+    
+    try {
+      const response = await documentService.deleteDocument(doc.id);
+      if (response.success) {
+        await fetchDocumentsFromAPI();
+      }
+    } catch (error) {
+      console.error('Delete failed:', error);
+      alert('Failed to delete document');
+    }
+  };
+
+  const closeOnlyOffice = () => {
+    setShowOnlyOffice(false);
+    setOnlyOfficeConfig(null);
+    setOnlyOfficeDoc(null);
+    fetchDocumentsFromAPI();
   };
 
   // Save hash to blockchain
@@ -725,10 +832,26 @@ export default function Documents() {
                         <span className="text-xs text-slate-500 dark:text-slate-400">{doc.uploadedBy.name}</span>
                       </div>
                       <div className="flex gap-1">
+                        {/* View in OnlyOffice */}
+                        {doc.isFromAPI && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewInOnlyOffice(doc);
+                            }}
+                            className="p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                            title="View in OnlyOffice"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          </button>
+                        )}
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleEditDocument(doc);
+                            handleEditInOnlyOffice(doc);
                           }}
                           className="p-2 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-500/10 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                           title="Edit in OnlyOffice"
@@ -750,12 +873,28 @@ export default function Documents() {
                           </svg>
                         </button>
                         <button
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadDocument(doc);
+                          }}
                           className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                           title="Download"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        </button>
+                        {/* Delete button */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteDocument(doc);
+                          }}
+                          className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                          title="Delete"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
                         </button>
                       </div>
@@ -812,10 +951,26 @@ export default function Documents() {
                         </td>
                         <td className="px-5 py-4">
                           <div className="flex gap-1">
+                            {/* View in OnlyOffice */}
+                            {doc.isFromAPI && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewInOnlyOffice(doc);
+                                }}
+                                className="p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                                title="View"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                </svg>
+                              </button>
+                            )}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleEditDocument(doc);
+                                handleEditInOnlyOffice(doc);
                               }}
                               className="p-2 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-500/10 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                               title="Edit"
@@ -837,12 +992,28 @@ export default function Documents() {
                               </svg>
                             </button>
                             <button
-                              onClick={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownloadDocument(doc);
+                              }}
                               className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                               title="Download"
                             >
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                              </svg>
+                            </button>
+                            {/* Delete button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteDocument(doc);
+                              }}
+                              className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                              title="Delete"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                               </svg>
                             </button>
                           </div>
@@ -2210,6 +2381,15 @@ export default function Documents() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* OnlyOffice Editor Modal */}
+      {showOnlyOffice && onlyOfficeConfig && (
+        <OnlyOfficeEditor
+          config={onlyOfficeConfig}
+          onClose={closeOnlyOffice}
+          documentName={onlyOfficeDoc?.name}
+        />
+      )}
     </DashboardLayout>
   );
 }
