@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import useAuthStore from "@/app/store/auth.store";
 import authService from "@/services/auth.service";
+import totpService from "@/services/totp.service";
 
 export default function OTPVerification() {
   const navigate = useNavigate();
@@ -14,8 +15,12 @@ export default function OTPVerification() {
   
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [error, setError] = useState("");
-  const [resendTimer, setResendTimer] = useState(30);
+  const [resendTimer, setResendTimer] = useState(0);
+  const [authMethod, setAuthMethod] = useState("authenticator"); // "authenticator" | "email"
+  const [emailSent, setEmailSent] = useState(false);
+  const [maskedEmail, setMaskedEmail] = useState("");
   const inputRefs = useRef([]);
 
   // Redirect if no user data
@@ -36,7 +41,40 @@ export default function OTPVerification() {
   // Auto-focus first input
   useEffect(() => {
     inputRefs.current[0]?.focus();
-  }, []);
+  }, [authMethod]);
+
+  // Reset OTP when switching methods
+  useEffect(() => {
+    setOtp(["", "", "", "", "", ""]);
+    setError("");
+    if (authMethod === "authenticator") {
+      setEmailSent(false);
+    }
+  }, [authMethod]);
+
+  // Send email OTP when method changes to email
+  const handleSendEmailOTP = async () => {
+    setIsSendingEmail(true);
+    setError("");
+    
+    try {
+      const result = await totpService.sendEmailOTP(userId);
+      
+      if (result.success) {
+        setEmailSent(true);
+        setMaskedEmail(result.data?.email || email);
+        setResendTimer(60); // 60 seconds before allowing resend
+        setOtp(["", "", "", "", "", ""]);
+        inputRefs.current[0]?.focus();
+      } else {
+        setError(result.message || "Failed to send verification email");
+      }
+    } catch (err) {
+      setError("Failed to send email. Please try again.");
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
 
   const handleChange = (index, value) => {
     // Only allow digits
@@ -111,8 +149,13 @@ export default function OTPVerification() {
     setError("");
 
     try {
-      // Verify OTP
-      const verifyResponse = await authService.verifyTOTP(userId, code);
+      // Verify OTP based on method
+      let verifyResponse;
+      if (authMethod === "email") {
+        verifyResponse = await totpService.verifyEmailOTP(userId, code);
+      } else {
+        verifyResponse = await authService.verifyTOTP(userId, code);
+      }
       
       if (verifyResponse.success) {
         // Complete login
@@ -138,12 +181,10 @@ export default function OTPVerification() {
     }
   };
 
-  const handleResend = () => {
-    // For now, just reset timer (in real app, would resend code)
-    setResendTimer(30);
-    setError("");
-    setOtp(["", "", "", "", "", ""]);
-    inputRefs.current[0]?.focus();
+  const handleResend = async () => {
+    if (authMethod === "email" && resendTimer === 0) {
+      await handleSendEmailOTP();
+    }
   };
 
   return (
@@ -201,7 +242,12 @@ export default function OTPVerification() {
               transition={{ delay: 0.4 }}
               className="text-slate-400 text-sm"
             >
-              Enter the 6-digit code from your authenticator app
+              {authMethod === "authenticator" 
+                ? "Enter the 6-digit code from your authenticator app"
+                : emailSent 
+                  ? `Enter the code sent to ${maskedEmail}`
+                  : "Get a verification code via email"
+              }
             </motion.p>
             {email && (
               <motion.p
@@ -215,14 +261,94 @@ export default function OTPVerification() {
             )}
           </div>
 
-          {/* OTP Input */}
-          <div className="px-8 pb-8">
+          {/* Auth Method Selector */}
+          <div className="px-8 pb-4">
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="flex gap-2 sm:gap-3 justify-center mb-6"
+              transition={{ delay: 0.45 }}
+              className="flex gap-2 p-1 bg-slate-800/50 rounded-xl border border-slate-700/50"
             >
+              <button
+                type="button"
+                onClick={() => setAuthMethod("authenticator")}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  authMethod === "authenticator"
+                    ? "bg-indigo-600 text-white shadow-lg"
+                    : "text-slate-400 hover:text-white hover:bg-slate-700/50"
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                <span className="hidden sm:inline">Authenticator</span>
+                <span className="sm:hidden">App</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthMethod("email")}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-all duration-200 ${
+                  authMethod === "email"
+                    ? "bg-indigo-600 text-white shadow-lg"
+                    : "text-slate-400 hover:text-white hover:bg-slate-700/50"
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                Email
+              </button>
+            </motion.div>
+          </div>
+
+          {/* OTP Input */}
+          <div className="px-8 pb-8">
+            {/* Email OTP: Show send button if not sent yet */}
+            {authMethod === "email" && !emailSent ? (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-center"
+              >
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-indigo-500/20 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <p className="text-slate-400 text-sm mb-6">
+                  Click the button below to receive a verification code at your email address
+                </p>
+                <button
+                  onClick={handleSendEmailOTP}
+                  disabled={isSendingEmail}
+                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-medium transition-all duration-200 shadow-lg shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isSendingEmail ? (
+                    <>
+                      <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      </svg>
+                      Send Verification Code
+                    </>
+                  )}
+                </button>
+              </motion.div>
+            ) : (
+              <>
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="flex gap-2 sm:gap-3 justify-center mb-6"
+                >
               {otp.map((digit, index) => (
                 <motion.input
                   key={index}
@@ -309,6 +435,31 @@ export default function OTPVerification() {
                 </div>
               </div>
             </motion.div>
+
+            {/* Resend for Email OTP */}
+            {authMethod === "email" && emailSent && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="mt-4 text-center"
+              >
+                {resendTimer > 0 ? (
+                  <p className="text-slate-500 text-sm">
+                    Resend code in <span className="text-indigo-400 font-medium">{resendTimer}s</span>
+                  </p>
+                ) : (
+                  <button
+                    onClick={handleResend}
+                    disabled={isSendingEmail}
+                    className="text-indigo-400 hover:text-indigo-300 text-sm font-medium transition-colors"
+                  >
+                    Resend verification code
+                  </button>
+                )}
+              </motion.div>
+            )}
+            </>
+            )}
 
             {/* Divider */}
             <div className="flex items-center gap-4 my-6">

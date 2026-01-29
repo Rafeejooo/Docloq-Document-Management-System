@@ -61,6 +61,36 @@ export const totpService = {
       };
     }
   },
+
+  /**
+   * Send Email OTP
+   */
+  async sendEmailOTP(userId) {
+    try {
+      const response = await api.post('/totp/send-email-otp', { userId });
+      return response.data;
+    } catch (error) {
+      return { 
+        success: false, 
+        message: error.response?.data?.message || 'Failed to send email OTP' 
+      };
+    }
+  },
+
+  /**
+   * Verify Email OTP
+   */
+  async verifyEmailOTP(userId, code) {
+    try {
+      const response = await api.post('/totp/verify-email-otp', { userId, code });
+      return response.data;
+    } catch (error) {
+      return { 
+        success: false, 
+        message: error.response?.data?.message || 'Failed to verify email OTP' 
+      };
+    }
+  },
 };
 
 export default totpService;

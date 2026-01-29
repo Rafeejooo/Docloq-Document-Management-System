@@ -21,7 +21,7 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 
-// Sample documents for each folder
+
 const folderDocuments = {
   "1": [
     { id: "doc-1", name: "Master Agreement 2025.pdf", type: "PDF", date: "Dec 28, 2025" },
@@ -52,7 +52,7 @@ function SortableFolderItem({
   onViewDocs,
   onMoveToFolder,
   allFolders,
-  globalIsDragging, // New prop to track if any drag is happening
+  globalIsDragging, 
 }) {
   const {
     attributes,
@@ -81,7 +81,7 @@ function SortableFolderItem({
     }
   }, [globalIsDragging]);
 
-  // Close move menu when clicking outside
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (moveMenuRef.current && !moveMenuRef.current.contains(event.target)) {
@@ -92,7 +92,7 @@ function SortableFolderItem({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Get available folders to move to (excluding self and children)
+  
   const getAvailableFolders = (items, excludeId, currentPath = "") => {
     const result = [];
     items.forEach(f => {
@@ -552,8 +552,31 @@ export default function FolderHierarchy() {
     setShowDocsModal(true);
   };
 
+  // Helper function to get all descendant folder IDs
+  const getAllDescendantIds = (folder) => {
+    const ids = [];
+    if (folder.children && folder.children.length > 0) {
+      folder.children.forEach(child => {
+        ids.push(child.id);
+        ids.push(...getAllDescendantIds(child));
+      });
+    }
+    return ids;
+  };
+
   const handleDragStart = (event) => {
-    setActiveId(event.active.id);
+    const draggedId = event.active.id;
+    setActiveId(draggedId);
+    
+    const draggedFolder = findFolder(folders, draggedId);
+    if (draggedFolder) {
+      const descendantIds = getAllDescendantIds(draggedFolder);
+      const idsToClose = [draggedId, ...descendantIds];
+      
+      setExpandedFolders(prev => 
+        prev.filter(id => !idsToClose.includes(id))
+      );
+    }
   };
 
   const handleDragEnd = (event) => {
@@ -631,10 +654,46 @@ export default function FolderHierarchy() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
-          { label: "Root Folders", value: folders.length, icon: "📁" },
-          { label: "Total Folders", value: countAllFolders(folders), icon: "🗂️" },
-          { label: "Max Depth", value: 4, icon: "📊" },
-          { label: "Empty Folders", value: countEmptyFolders(folders), icon: "📭" },
+          { 
+            label: "Root Folders", 
+            value: folders.length, 
+            icon: (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+            ),
+            color: "from-indigo-500 to-purple-600" 
+          },
+          { 
+            label: "Total Folders", 
+            value: countAllFolders(folders), 
+            icon: (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+              </svg>
+            ),
+            color: "from-emerald-500 to-teal-600" 
+          },
+          { 
+            label: "Max Depth", 
+            value: 4, 
+            icon: (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            ),
+            color: "from-amber-500 to-orange-600" 
+          },
+          { 
+            label: "Empty Folders", 
+            value: countEmptyFolders(folders), 
+            icon: (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+              </svg>
+            ),
+            color: "from-rose-500 to-pink-600" 
+          },
         ].map((stat, index) => (
           <motion.div
             key={stat.label}
@@ -644,7 +703,9 @@ export default function FolderHierarchy() {
           >
             <Card className="p-4" hover>
               <div className="flex items-center gap-3">
-                <span className="text-2xl">{stat.icon}</span>
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center text-white flex-shrink-0`}>
+                  {stat.icon}
+                </div>
                 <div>
                   <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{stat.label}</p>
                   <p className="text-xl font-bold text-slate-900 dark:text-white">{stat.value}</p>

@@ -7,6 +7,8 @@ import {
   disableTOTP,
   verifyTOTPLogin,
   getTOTPStatus,
+  sendEmailOTP,
+  verifyEmailOTP,
 } from '../controllers/totp.controller.js';
 import { authenticate } from '../middlewares/auth.middleware.js';
 
@@ -14,6 +16,10 @@ const router = Router();
 
 // Public - Verify saat login
 router.post('/verify-login', verifyTOTPLogin);
+
+// Public - Email OTP
+router.post('/send-email-otp', sendEmailOTP);
+router.post('/verify-email-otp', verifyEmailOTP);
 
 // Protected - Butuh authentication
 router.use(authenticate);

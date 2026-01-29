@@ -4,11 +4,13 @@ import { useTheme } from "@/app/providers/ThemeProvider";
 import { motion, AnimatePresence } from "framer-motion";
 import AIAssistant from "@/components/ai-assistant/AIAssistant";
 import { useAuthStore } from "@/app/store/auth.store";
+import { authService } from "@/services/auth.service";
 
 export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const profileDropdownRef = useRef(null);
   const location = useLocation();
   const navigate = useNavigate();
@@ -86,9 +88,18 @@ export default function DashboardLayout({ children }) {
 
   const isActive = (path) => location.pathname === path;
 
-  const handleLogout = () => {
-    localStorage.removeItem("authToken");
-    navigate("/login");
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await authService.logout();
+      navigate("/login");
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Still navigate to login even if API fails
+      navigate("/login");
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -263,21 +274,21 @@ export default function DashboardLayout({ children }) {
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               transition={{ type: "spring", damping: 25, stiffness: 300 }}
               onClick={(e) => e.stopPropagation()}
-              className="relative bg-slate-900 rounded-3xl shadow-2xl shadow-black/50 p-8 max-w-sm w-full border border-slate-800/50 overflow-hidden"
+              className="relative bg-white dark:bg-slate-900 rounded-3xl shadow-2xl shadow-black/50 p-6 sm:p-8 max-w-sm w-full border border-slate-200 dark:border-slate-800/50 overflow-hidden"
             >
               {/* Decorative gradient */}
-              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-slate-700/50 to-transparent" />
-              <div className="absolute -top-24 -right-24 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-slate-300 dark:via-slate-700/50 to-transparent" />
+              <div className="absolute -top-24 -right-24 w-48 h-48 bg-red-500/10 rounded-full blur-3xl pointer-events-none" />
               
-              <div className="relative text-center mb-8">
+              <div className="relative text-center mb-6 sm:mb-8">
                 {/* Animated icon */}
                 <motion.div 
                   initial={{ scale: 0, rotate: -180 }}
                   animate={{ scale: 1, rotate: 0 }}
                   transition={{ type: "spring", damping: 15, stiffness: 200, delay: 0.1 }}
-                  className="w-16 h-16 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700/50 flex items-center justify-center shadow-lg"
+                  className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 sm:mb-5 rounded-2xl bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-800/50 flex items-center justify-center shadow-lg"
                 >
-                  <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-7 h-7 sm:w-8 sm:h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                   </svg>
                 </motion.div>
@@ -286,7 +297,7 @@ export default function DashboardLayout({ children }) {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.15 }}
-                  className="text-xl font-semibold text-white mb-2"
+                  className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-white mb-2"
                 >
                   Sign out
                 </motion.h2>
@@ -294,7 +305,7 @@ export default function DashboardLayout({ children }) {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="text-sm text-slate-400"
+                  className="text-sm text-slate-500 dark:text-slate-400"
                 >
                   Are you sure you want to sign out of your account?
                 </motion.p>
@@ -308,20 +319,34 @@ export default function DashboardLayout({ children }) {
               >
                 <button
                   onClick={() => setShowLogoutModal(false)}
-                  className="flex-1 px-5 py-3 rounded-xl bg-slate-800/80 border border-slate-700/50 text-slate-300 text-sm font-medium hover:bg-slate-800 hover:border-slate-600 transition-all duration-200"
+                  disabled={isLoggingOut}
+                  className="flex-1 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/50 text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-slate-200 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 transition-all duration-200 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <motion.button
                   onClick={handleLogout}
+                  disabled={isLoggingOut}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className="flex-1 px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 group"
+                  className="flex-1 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Sign out
-                  <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
+                  {isLoggingOut ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Signing out...
+                    </>
+                  ) : (
+                    <>
+                      Sign out
+                      <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                      </svg>
+                    </>
+                  )}
                 </motion.button>
               </motion.div>
             </motion.div>

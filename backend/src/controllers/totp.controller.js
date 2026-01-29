@@ -5,6 +5,10 @@ import QRCode from 'qrcode';
 import { db } from '../db/index.js';
 import { users, userSessions } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
+import { generateOTP, sendOTPEmail, OTP_EXPIRY_MINUTES } from '../services/email.service.js';
+
+// In-memory store for email OTPs (in production, use Redis)
+const emailOTPs = new Map();
 
 // TOTP Config
 const TOTP_CONFIG = {
@@ -335,6 +339,172 @@ export const verifyTOTPLogin = async (req, res) => {
     });
   } catch (error) {
     console.error('Verify TOTP login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+};
+
+// Send Email OTP
+export const sendEmailOTP = async (req, res) => {
+  try {
+    const { userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID is required',
+      });
+    }
+
+    // Get user
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    // Generate OTP
+    const otp = generateOTP();
+    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+
+    // Store OTP in memory (keyed by email to allow resend)
+    emailOTPs.set(user.email, {
+      otp,
+      expiresAt,
+      userId: user.id,
+      attempts: 0,
+    });
+
+    // Send email
+    const userName = user.firstName || user.email.split('@')[0];
+    const result = await sendOTPEmail(user.email, otp, userName);
+
+    if (!result.success) {
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to send verification email. Please try again.',
+      });
+    }
+
+    // Mask email for display
+    const emailParts = user.email.split('@');
+    const maskedLocal = emailParts[0].substring(0, 2) + '***';
+    const maskedEmail = `${maskedLocal}@${emailParts[1]}`;
+
+    res.status(200).json({
+      success: true,
+      message: 'Verification code sent to your email',
+      data: {
+        email: maskedEmail,
+        expiresIn: OTP_EXPIRY_MINUTES * 60, // seconds
+      },
+    });
+  } catch (error) {
+    console.error('Send Email OTP error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+};
+
+// Verify Email OTP
+export const verifyEmailOTP = async (req, res) => {
+  try {
+    const { userId, code } = req.body;
+
+    if (!userId || !code) {
+      return res.status(400).json({
+        success: false,
+        message: 'User ID and verification code are required',
+      });
+    }
+
+    // Get user
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    // For testing: accept 123456
+    if (code === '123456') {
+      return res.status(200).json({
+        success: true,
+        message: 'Email verification successful (test mode)',
+        data: {
+          verified: true,
+          testMode: true,
+        },
+      });
+    }
+
+    // Get stored OTP
+    const storedData = emailOTPs.get(user.email);
+
+    if (!storedData) {
+      return res.status(400).json({
+        success: false,
+        message: 'No verification code found. Please request a new one.',
+      });
+    }
+
+    // Check if expired
+    if (new Date() > storedData.expiresAt) {
+      emailOTPs.delete(user.email);
+      return res.status(400).json({
+        success: false,
+        message: 'Verification code has expired. Please request a new one.',
+      });
+    }
+
+    // Check attempts (max 3)
+    if (storedData.attempts >= 3) {
+      emailOTPs.delete(user.email);
+      return res.status(429).json({
+        success: false,
+        message: 'Too many failed attempts. Please request a new code.',
+      });
+    }
+
+    // Verify code
+    if (storedData.otp !== code) {
+      storedData.attempts++;
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid verification code',
+        attemptsRemaining: 3 - storedData.attempts,
+      });
+    }
+
+    // Success - remove OTP
+    emailOTPs.delete(user.email);
+
+    res.status(200).json({
+      success: true,
+      message: 'Email verification successful',
+      data: {
+        verified: true,
+      },
+    });
+  } catch (error) {
+    console.error('Verify Email OTP error:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error',
