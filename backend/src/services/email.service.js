@@ -1,4 +1,4 @@
-// Email Service - SMTP via Brevo
+
 
 import nodemailer from 'nodemailer';
 
@@ -7,7 +7,7 @@ const createTransporter = () => {
   return nodemailer.createTransport({
     host: process.env.MAIL_HOST || 'smtp-relay.brevo.com',
     port: parseInt(process.env.MAIL_PORT || '587'),
-    secure: false, // true for 465, false for other ports
+    secure: false,
     auth: {
       user: process.env.MAIL_USERNAME,
       pass: process.env.MAIL_PASSWORD,

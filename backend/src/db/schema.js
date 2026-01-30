@@ -1156,3 +1156,171 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
   }),
   comments: many(taskComments),
 }));
+
+
+// =======================================
+// ADMIN DOCLOQ TABLES
+// =======================================
+
+export const adminRoleEnum = pgEnum('admin_role', ['super_admin', 'admin', 'support']);
+
+// Admin Users (separate from regular users)
+export const adminUsers = pgTable('admin_users', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  
+  email: text('email').notNull().unique(),
+  passwordHash: text('password_hash').notNull(),
+  
+  // Profile
+  firstName: text('first_name'),
+  lastName: text('last_name'),
+  avatarUrl: text('avatar_url'),
+  
+  // Role & Status
+  role: adminRoleEnum('role').default('admin'),
+  isActive: boolean('is_active').default(true),
+  
+  // Security
+  lastLoginAt: timestamp('last_login_at'),
+  lastLoginIp: text('last_login_ip'),
+  failedLoginAttempts: integer('failed_login_attempts').default(0),
+  lockedUntil: timestamp('locked_until'),
+  
+  // Timestamps
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  emailIdx: uniqueIndex('admin_user_email_idx').on(table.email),
+}));
+
+
+// Admin Sessions
+export const adminSessions = pgTable('admin_sessions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  adminId: uuid('admin_id').references(() => adminUsers.id, { onDelete: 'cascade' }).notNull(),
+  
+  token: text('token').notNull().unique(),
+  refreshToken: text('refresh_token'),
+  
+  userAgent: text('user_agent'),
+  ipAddress: text('ip_address'),
+  
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  tokenIdx: uniqueIndex('admin_session_token_idx').on(table.token),
+  adminIdx: index('admin_session_admin_idx').on(table.adminId),
+}));
+
+
+// API Request Logs (for tracking)
+export const apiRequestLogs = pgTable('api_request_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  
+  endpoint: text('endpoint').notNull(),
+  method: text('method').notNull(),
+  statusCode: integer('status_code'),
+  
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  organizationId: uuid('organization_id').references(() => organizations.id, { onDelete: 'set null' }),
+  
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  
+  requestDuration: integer('request_duration'), // in milliseconds
+  
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  endpointIdx: index('api_request_endpoint_idx').on(table.endpoint),
+  userIdx: index('api_request_user_idx').on(table.userId),
+  createdAtIdx: index('api_request_created_at_idx').on(table.createdAt),
+}));
+
+
+// Payment History (for admin dashboard)
+export const paymentHistory = pgTable('payment_history', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  
+  organizationId: uuid('organization_id').references(() => organizations.id, { onDelete: 'cascade' }).notNull(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  
+  amount: integer('amount').notNull(), // in cents/smallest currency unit
+  currency: varchar('currency', { length: 3 }).default('IDR'),
+  
+  paymentMethod: text('payment_method'), // credit_card, bank_transfer, etc.
+  paymentProvider: text('payment_provider'), // stripe, midtrans, etc.
+  transactionId: text('transaction_id'),
+  
+  status: text('status').default('pending'), // pending, completed, failed, refunded
+  
+  description: text('description'),
+  metadata: jsonb('metadata').default({}),
+  
+  paidAt: timestamp('paid_at'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('payment_org_idx').on(table.organizationId),
+  statusIdx: index('payment_status_idx').on(table.status),
+  createdAtIdx: index('payment_created_at_idx').on(table.createdAt),
+}));
+
+
+// System Settings (for admin config)
+export const systemSettings = pgTable('system_settings', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  
+  key: text('key').notNull().unique(),
+  value: jsonb('value'),
+  description: text('description'),
+  
+  updatedBy: uuid('updated_by').references(() => adminUsers.id),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+});
+
+
+// Admin Audit Log
+export const adminAuditLogs = pgTable('admin_audit_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  
+  adminId: uuid('admin_id').references(() => adminUsers.id, { onDelete: 'set null' }),
+  
+  action: text('action').notNull(), // user_created, user_suspended, settings_changed, etc.
+  targetType: text('target_type'), // user, organization, document, setting, etc.
+  targetId: uuid('target_id'),
+  
+  details: jsonb('details').default({}),
+  ipAddress: text('ip_address'),
+  
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  adminIdx: index('admin_audit_admin_idx').on(table.adminId),
+  actionIdx: index('admin_audit_action_idx').on(table.action),
+  createdAtIdx: index('admin_audit_created_at_idx').on(table.createdAt),
+}));
+
+
+// Admin Relations
+export const adminUsersRelations = relations(adminUsers, ({ many }) => ({
+  sessions: many(adminSessions),
+  auditLogs: many(adminAuditLogs),
+}));
+
+export const adminSessionsRelations = relations(adminSessions, ({ one }) => ({
+  admin: one(adminUsers, {
+    fields: [adminSessions.adminId],
+    references: [adminUsers.id],
+  }),
+}));
+
+export const paymentHistoryRelations = relations(paymentHistory, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [paymentHistory.organizationId],
+    references: [organizations.id],
+  }),
+  user: one(users, {
+    fields: [paymentHistory.userId],
+    references: [users.id],
+  }),
+}));

@@ -5,6 +5,7 @@ import authRoutes from './auth.routes.js';
 import userRoutes from './user.routes.js';
 import totpRoutes from './totp.routes.js';
 import documentRoutes from './document.routes.js';
+import adminRoutes from './admin.routes.js';
 
 const router = Router();
 
@@ -13,6 +14,7 @@ router.use('/auth', authRoutes);
 router.use('/users', userRoutes);
 router.use('/totp', totpRoutes);
 router.use('/documents', documentRoutes);
+router.use('/admin', adminRoutes);
 
 // Health Check
 router.get('/health', (req, res) => {

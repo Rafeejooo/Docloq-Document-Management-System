@@ -19,6 +19,12 @@ import Tasks from "@/features/tasks/Tasks";
 import AIDocumentAnalysis from "@/features/ai-analysis/AIDocumentAnalysis";
 import Settings from "@/features/settings/Settings";
 
+// Admin imports
+import AdminLogin from "@/features/admin/AdminLogin";
+import AdminDashboard from "@/features/admin/AdminDashboardNew";
+import BlockchainSettings from "@/features/admin/BlockchainSettings";
+import AIManagement from "@/features/admin/AIManagement";
+
 export const router = createBrowserRouter([
   { path: "/", element: <LandingPage /> },
   { path: "/contact", element: <Contact /> },
@@ -37,4 +43,10 @@ export const router = createBrowserRouter([
   { path: "/roles", element: <RoleManagement /> },
   { path: "/osint-tracker", element: <OSINTTracker /> },
   { path: "/settings", element: <Settings /> },
+  
+  // Admin routes
+  { path: "/login2", element: <AdminLogin /> },
+  { path: "/admin/dashboard", element: <AdminDashboard /> },
+  { path: "/admin/blockchain", element: <BlockchainSettings /> },
+  { path: "/admin/ai", element: <AIManagement /> },
 ]);

@@ -9,6 +9,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "node src/scripts/seed.js",
+    "db:seed:admin": "node src/scripts/seed-admin.js",
     "db:studio": "drizzle-kit studio"
   },
   "type": "module",
