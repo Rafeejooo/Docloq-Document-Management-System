@@ -1,6 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useMotionValue, useSpring } from "framer-motion";
+import Particles, { initParticlesEngine } from "@tsparticles/react";
+import { loadSlim } from "@tsparticles/slim";
 import adminService from "../../services/admin.service";
 
 // Animation variants
@@ -8,7 +10,7 @@ const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.1 },
+    transition: { staggerChildren: 0.08 },
   },
 };
 
@@ -17,8 +19,37 @@ const itemVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: { duration: 0.5 },
+    transition: { duration: 0.5, ease: "easeOut" },
   },
+};
+
+// Particles configuration - violet/purple AI theme
+const aiParticlesOptions = {
+  fullScreen: { enable: false },
+  background: { color: { value: "transparent" } },
+  fpsLimit: 60,
+  particles: {
+    color: { value: ["#8b5cf6", "#a78bfa", "#7c3aed", "#06b6d4"] },
+    links: {
+      color: "#8b5cf6",
+      distance: 150,
+      enable: true,
+      opacity: 0.08,
+      width: 1,
+    },
+    move: {
+      enable: true,
+      speed: 0.4,
+      direction: "none",
+      random: true,
+      straight: false,
+      outModes: { default: "out" },
+    },
+    number: { value: 30, density: { enable: true, area: 1200 } },
+    opacity: { value: { min: 0.1, max: 0.3 } },
+    size: { value: { min: 1, max: 2.5 } },
+  },
+  detectRetina: true,
 };
 
 export default function AIManagement() {
@@ -34,6 +65,25 @@ export default function AIManagement() {
   const [streamStatus, setStreamStatus] = useState('idle'); // idle, connecting, streaming, complete, error
   const [selectedModel, setSelectedModel] = useState('gpt-4o-mini');
   const responseRef = useRef(null);
+  
+  // Particles & Effects State
+  const [particlesReady, setParticlesReady] = useState(false);
+  const mouseX = useMotionValue(0);
+  const mouseY = useMotionValue(0);
+  const smoothX = useSpring(mouseX, { damping: 30, stiffness: 100 });
+  const smoothY = useSpring(mouseY, { damping: 30, stiffness: 100 });
+
+  // Floating neural network nodes
+  const neuralNodes = useMemo(() => 
+    Array.from({ length: 6 }, (_, i) => ({
+      id: i,
+      x: 10 + Math.random() * 80,
+      y: 10 + Math.random() * 80,
+      size: 4 + Math.random() * 8,
+      delay: i * 0.8,
+      duration: 6 + Math.random() * 4,
+    })), []
+  );
   
   // Credits State
   const [credits, setCredits] = useState({
@@ -58,6 +108,27 @@ export default function AIManagement() {
     { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', description: 'High performance', tokensPerCredit: 2 },
     { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', description: 'Cost effective', tokensPerCredit: 20 },
   ];
+
+  // Initialize particles engine
+  useEffect(() => {
+    initParticlesEngine(async (engine) => {
+      await loadSlim(engine);
+    }).then(() => setParticlesReady(true));
+  }, []);
+
+  // Mouse tracking for parallax
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      mouseX.set(e.clientX - window.innerWidth / 2);
+      mouseY.set(e.clientY - window.innerHeight / 2);
+    };
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, [mouseX, mouseY]);
+
+  const particlesLoaded = useCallback(async (container) => {
+    // Particles loaded
+  }, []);
 
   useEffect(() => {
     if (!adminService.isAuthenticated()) {
@@ -175,41 +246,110 @@ Response completed successfully! ✅`;
 
   return (
     <div className="min-h-screen bg-slate-950">
-      {/* Background Effects */}
+      {/* === ENHANCED BACKGROUND EFFECTS === */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-1/4 w-[600px] h-[600px] bg-violet-500/5 rounded-full blur-[150px] animate-pulse" />
-        <div className="absolute bottom-0 left-1/4 w-[500px] h-[500px] bg-cyan-500/5 rounded-full blur-[120px]" />
+        {/* Particles Layer */}
+        {particlesReady && (
+          <Particles
+            id="ai-particles"
+            particlesLoaded={particlesLoaded}
+            options={aiParticlesOptions}
+            className="absolute inset-0"
+          />
+        )}
+        
+        {/* Parallax Gradient Orbs */}
+        <motion.div
+          className="absolute top-0 right-1/4 w-150 h-150 bg-violet-500/8 rounded-full blur-[150px]"
+          style={{ x: smoothX, y: smoothY }}
+        />
+        <motion.div
+          className="absolute bottom-0 left-1/4 w-125 h-125 bg-cyan-500/6 rounded-full blur-[120px]"
+          style={{
+            x: smoothX,
+            y: smoothY,
+          }}
+        />
+        <motion.div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-100 h-100 bg-purple-500/5 rounded-full blur-[100px]"
+          animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        />
+
+        {/* CSS Grid Overlay */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `linear-gradient(rgba(139,92,246,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(139,92,246,0.02) 1px, transparent 1px)`,
+            backgroundSize: "60px 60px",
+          }}
+        />
+
+        {/* Floating Neural Nodes */}
+        {neuralNodes.map((node) => (
+          <motion.div
+            key={node.id}
+            className="absolute rounded-full border border-violet-500/15 bg-violet-500/5"
+            style={{
+              left: `${node.x}%`,
+              top: `${node.y}%`,
+              width: node.size,
+              height: node.size,
+            }}
+            animate={{
+              y: [-15, 15, -15],
+              x: [-8, 8, -8],
+              opacity: [0.2, 0.5, 0.2],
+            }}
+            transition={{
+              duration: node.duration,
+              repeat: Infinity,
+              delay: node.delay,
+              ease: "easeInOut",
+            }}
+          />
+        ))}
+
+        {/* Scan Line */}
+        <motion.div
+          className="absolute left-0 right-0 h-px bg-linear-to-r from-transparent via-violet-500/20 to-transparent"
+          animate={{ top: ["0%", "100%"] }}
+          transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+        />
       </div>
 
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-slate-900/80 backdrop-blur-xl border-b border-slate-800/50">
+      <header className="sticky top-0 z-40 bg-slate-900/70 backdrop-blur-2xl border-b border-violet-500/10">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link 
                 to="/admin/dashboard"
-                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-xl transition-all"
+                className="p-2.5 text-slate-400 hover:text-white bg-slate-800/50 hover:bg-slate-800 rounded-xl border border-slate-700/50 hover:border-violet-500/30 transition-all duration-200"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
               </Link>
               <div>
-                <h1 className="text-xl font-bold text-white flex items-center gap-2">
-                  <div className="p-2 rounded-xl bg-gradient-to-br from-violet-500/20 to-purple-500/20">
+                <h1 className="text-xl font-bold text-white flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-linear-to-br from-violet-500/20 to-purple-500/20 border border-violet-500/20">
                     <svg className="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                     </svg>
                   </div>
-                  AI Management
+                  <span className="flex items-center gap-2">
+                    AI Management
+                    <span className="px-2 py-0.5 text-[10px] font-bold bg-violet-500/20 text-violet-400 rounded-full border border-violet-500/30">NEURAL</span>
+                  </span>
                 </h1>
-                <p className="text-sm text-slate-400">Test AI availability and manage credits</p>
+                <p className="text-sm text-slate-400 ml-12">Test AI availability and manage credits</p>
               </div>
             </div>
             
             {/* Quick Stats */}
             <div className="flex items-center gap-4">
-              <div className="px-4 py-2 bg-slate-800/50 rounded-xl border border-slate-700/50">
+              <div className="px-4 py-2 bg-slate-800/60 backdrop-blur-sm rounded-xl border border-violet-500/20">
                 <p className="text-xs text-slate-400">Credits Remaining</p>
                 <p className="text-lg font-bold text-violet-400">{credits.remaining.toLocaleString()}</p>
               </div>
@@ -242,20 +382,22 @@ Response completed successfully! ✅`;
 
       <main className="max-w-7xl mx-auto px-6 py-8 relative z-10">
         {/* Tabs */}
-        <div className="flex gap-2 mb-8 p-1 bg-slate-900/50 rounded-2xl border border-slate-800/50 w-fit">
+        <div className="flex gap-2 mb-8 p-1.5 bg-slate-900/60 backdrop-blur-xl rounded-2xl border border-violet-500/10 w-fit">
           {tabs.map(tab => (
-            <button
+            <motion.button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               className={`flex items-center gap-2 px-5 py-3 rounded-xl font-medium transition-all duration-200 ${
                 activeTab === tab.id
-                  ? 'bg-gradient-to-r from-violet-500/20 to-purple-500/20 text-violet-400 border border-violet-500/30'
+                  ? 'bg-linear-to-r from-violet-500/20 to-purple-500/20 text-violet-400 border border-violet-500/30 shadow-lg shadow-violet-500/10'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
             >
               {tab.icon}
               {tab.label}
-            </button>
+            </motion.button>
           ))}
         </div>
 
@@ -273,13 +415,15 @@ Response completed successfully! ✅`;
               {/* Model Selector */}
               <motion.div variants={itemVariants} className="grid md:grid-cols-4 gap-4">
                 {aiModels.map(model => (
-                  <button
+                  <motion.button
                     key={model.id}
                     onClick={() => setSelectedModel(model.id)}
-                    className={`p-4 rounded-2xl border transition-all duration-200 text-left ${
+                    whileHover={{ y: -4, scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className={`p-4 rounded-2xl border transition-all duration-200 text-left group ${
                       selectedModel === model.id
-                        ? 'bg-violet-500/10 border-violet-500/30 shadow-lg shadow-violet-500/10'
-                        : 'bg-slate-900/50 border-slate-800/50 hover:border-slate-700'
+                        ? 'bg-violet-500/10 border-violet-500/30 shadow-lg shadow-violet-500/10 backdrop-blur-xl'
+                        : 'bg-slate-900/60 backdrop-blur-xl border-violet-500/10 hover:border-violet-500/25'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
@@ -287,24 +431,39 @@ Response completed successfully! ✅`;
                         {model.name}
                       </span>
                       {selectedModel === model.id && (
-                        <svg className="w-4 h-4 text-violet-400" fill="currentColor" viewBox="0 0 20 20">
+                        <motion.svg
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          className="w-4 h-4 text-violet-400"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
                           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
+                        </motion.svg>
                       )}
                     </div>
                     <p className="text-xs text-slate-500">{model.description}</p>
                     <p className="text-xs text-slate-600 mt-1">{model.tokensPerCredit} tokens/credit</p>
-                  </button>
+                    {/* Bottom border reveal on hover */}
+                    <div className={`absolute bottom-0 left-0 right-0 h-0.5 rounded-b-2xl transition-all duration-300 ${
+                      selectedModel === model.id
+                        ? 'bg-linear-to-r from-violet-500 to-purple-500 opacity-100'
+                        : 'bg-linear-to-r from-violet-500 to-purple-500 opacity-0 group-hover:opacity-50'
+                    }`} />
+                  </motion.button>
                 ))}
               </motion.div>
 
               {/* Chat Interface */}
               <motion.div variants={itemVariants} className="grid lg:grid-cols-2 gap-6">
                 {/* Input */}
-                <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800/50 rounded-2xl overflow-hidden">
-                  <div className="p-4 border-b border-slate-800/50 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-white">Prompt Input</h3>
-                    <span className="text-xs text-slate-500">{prompt.length} characters</span>
+                <div className="bg-slate-900/60 backdrop-blur-xl border border-violet-500/10 rounded-2xl overflow-hidden group hover:border-violet-500/20 transition-all duration-300">
+                  <div className="p-4 border-b border-violet-500/10 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />
+                      Prompt Input
+                    </h3>
+                    <span className="text-xs text-slate-500 font-mono">{prompt.length} chars</span>
                   </div>
                   <div className="p-4">
                     <textarea
@@ -321,7 +480,7 @@ Response completed successfully! ✅`;
                         className={`flex-1 flex items-center justify-center gap-2 py-3 px-6 rounded-xl font-medium transition-all duration-200 ${
                           isStreaming || !prompt.trim()
                             ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-500 hover:to-purple-500 shadow-lg shadow-violet-500/25'
+                            : 'bg-linear-to-r from-violet-600 to-purple-600 text-white hover:from-violet-500 hover:to-purple-500 shadow-lg shadow-violet-500/25'
                         }`}
                       >
                         {isStreaming ? (
@@ -349,9 +508,12 @@ Response completed successfully! ✅`;
                 </div>
 
                 {/* Response */}
-                <div className="bg-slate-900/50 backdrop-blur-sm border border-slate-800/50 rounded-2xl overflow-hidden">
-                  <div className="p-4 border-b border-slate-800/50 flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-white">AI Response</h3>
+                <div className="bg-slate-900/60 backdrop-blur-xl border border-violet-500/10 rounded-2xl overflow-hidden group hover:border-violet-500/20 transition-all duration-300">
+                  <div className="p-4 border-b border-violet-500/10 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                      AI Response
+                    </h3>
                     <div className="flex items-center gap-2">
                       {streamStatus === 'streaming' && (
                         <span className="flex items-center gap-1 text-xs text-green-400">
@@ -364,7 +526,7 @@ Response completed successfully! ✅`;
                   </div>
                   <div 
                     ref={responseRef}
-                    className="p-4 h-[320px] overflow-y-auto"
+                    className="p-4 h-80 overflow-y-auto"
                   >
                     {response ? (
                       <div className="prose prose-invert prose-sm max-w-none">
@@ -389,9 +551,9 @@ Response completed successfully! ✅`;
 
               {/* Connection Test Info */}
               <motion.div variants={itemVariants} className="grid md:grid-cols-3 gap-4">
-                <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-5">
+                <motion.div whileHover={{ y: -4 }} className="bg-slate-900/60 backdrop-blur-xl border border-violet-500/10 rounded-2xl p-5 group hover:border-green-500/20 transition-all duration-300">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg bg-green-500/10">
+                    <div className="p-2 rounded-lg bg-green-500/10 border border-green-500/20">
                       <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -402,11 +564,12 @@ Response completed successfully! ✅`;
                     </div>
                   </div>
                   <p className="text-xs text-slate-500">Last checked: Just now</p>
-                </div>
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-b-2xl bg-linear-to-r from-green-500 to-emerald-500 opacity-0 group-hover:opacity-50 transition-opacity duration-300" />
+                </motion.div>
                 
-                <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-5">
+                <motion.div whileHover={{ y: -4 }} className="bg-slate-900/60 backdrop-blur-xl border border-violet-500/10 rounded-2xl p-5 group hover:border-violet-500/20 transition-all duration-300">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg bg-violet-500/10">
+                    <div className="p-2 rounded-lg bg-violet-500/10 border border-violet-500/20">
                       <svg className="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                       </svg>
@@ -417,11 +580,12 @@ Response completed successfully! ✅`;
                     </div>
                   </div>
                   <p className="text-xs text-slate-500">Based on last 100 requests</p>
-                </div>
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-b-2xl bg-linear-to-r from-violet-500 to-purple-500 opacity-0 group-hover:opacity-50 transition-opacity duration-300" />
+                </motion.div>
                 
-                <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-5">
+                <motion.div whileHover={{ y: -4 }} className="bg-slate-900/60 backdrop-blur-xl border border-violet-500/10 rounded-2xl p-5 group hover:border-cyan-500/20 transition-all duration-300">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2 rounded-lg bg-cyan-500/10">
+                    <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20">
                       <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                       </svg>
@@ -432,7 +596,8 @@ Response completed successfully! ✅`;
                     </div>
                   </div>
                   <p className="text-xs text-slate-500">All-time average</p>
-                </div>
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 rounded-b-2xl bg-linear-to-r from-cyan-500 to-teal-500 opacity-0 group-hover:opacity-50 transition-opacity duration-300" />
+                </motion.div>
               </motion.div>
             </motion.div>
           )}
@@ -449,8 +614,11 @@ Response completed successfully! ✅`;
             >
               {/* Credit Overview */}
               <motion.div variants={itemVariants} className="grid lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 bg-slate-900/50 backdrop-blur-sm border border-slate-800/50 rounded-2xl p-6">
-                  <h3 className="text-lg font-semibold text-white mb-6">Credit Balance</h3>
+                <div className="lg:col-span-2 bg-slate-900/60 backdrop-blur-xl border border-violet-500/10 rounded-2xl p-6">
+                  <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />
+                    Credit Balance
+                  </h3>
                   
                   {/* Progress Bar */}
                   <div className="mb-6">
@@ -463,7 +631,7 @@ Response completed successfully! ✅`;
                         initial={{ width: 0 }}
                         animate={{ width: `${100 - creditPercentage}%` }}
                         transition={{ duration: 1, ease: "easeOut" }}
-                        className="h-full bg-gradient-to-r from-violet-600 to-purple-600 rounded-full"
+                        className="h-full bg-linear-to-r from-violet-600 to-purple-600 rounded-full"
                       />
                     </div>
                     <div className="flex justify-between text-xs mt-2">
@@ -490,16 +658,18 @@ Response completed successfully! ✅`;
                 </div>
 
                 {/* Add Credits Card */}
-                <div className="bg-gradient-to-br from-violet-500/10 to-purple-500/10 backdrop-blur-sm border border-violet-500/20 rounded-2xl p-6">
+                <div className="bg-linear-to-br from-violet-500/10 to-purple-500/10 backdrop-blur-xl border border-violet-500/20 rounded-2xl p-6 relative overflow-hidden">
+                  {/* Decorative glow */}
+                  <div className="absolute -top-10 -right-10 w-32 h-32 bg-violet-500/10 rounded-full blur-3xl" />
                   <div className="text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-gradient-to-br from-violet-500/20 to-purple-500/20 rounded-2xl flex items-center justify-center">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-linear-to-br from-violet-500/20 to-purple-500/20 rounded-2xl flex items-center justify-center">
                       <svg className="w-8 h-8 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
                       </svg>
                     </div>
                     <h4 className="text-lg font-semibold text-white mb-2">Need More Credits?</h4>
                     <p className="text-sm text-slate-400 mb-4">Upgrade your plan or purchase additional credits.</p>
-                    <button className="w-full py-3 px-4 bg-gradient-to-r from-violet-600 to-purple-600 text-white font-medium rounded-xl hover:from-violet-500 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/25">
+                    <button className="w-full py-3 px-4 bg-linear-to-r from-violet-600 to-purple-600 text-white font-medium rounded-xl hover:from-violet-500 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/25">
                       Add Credits
                     </button>
                   </div>
@@ -508,9 +678,9 @@ Response completed successfully! ✅`;
 
               {/* Usage Stats */}
               <motion.div variants={itemVariants} className="grid md:grid-cols-4 gap-4">
-                <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-5">
+                <motion.div whileHover={{ y: -4 }} className="bg-slate-900/60 backdrop-blur-xl border border-violet-500/10 rounded-2xl p-5 group hover:border-violet-500/20 transition-all duration-300 relative overflow-hidden">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2.5 rounded-xl bg-violet-500/10">
+                    <div className="p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20">
                       <svg className="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                       </svg>
@@ -518,11 +688,12 @@ Response completed successfully! ✅`;
                   </div>
                   <p className="text-2xl font-bold text-white">{usageStats.totalRequests.toLocaleString()}</p>
                   <p className="text-sm text-slate-400">Total Requests</p>
-                </div>
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-linear-to-r from-violet-500 to-purple-500 opacity-0 group-hover:opacity-50 transition-opacity" />
+                </motion.div>
                 
-                <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-5">
+                <motion.div whileHover={{ y: -4 }} className="bg-slate-900/60 backdrop-blur-xl border border-violet-500/10 rounded-2xl p-5 group hover:border-cyan-500/20 transition-all duration-300 relative overflow-hidden">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2.5 rounded-xl bg-cyan-500/10">
+                    <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
                       <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
                       </svg>
@@ -530,11 +701,12 @@ Response completed successfully! ✅`;
                   </div>
                   <p className="text-2xl font-bold text-white">{(usageStats.totalTokens / 1000).toFixed(0)}K</p>
                   <p className="text-sm text-slate-400">Tokens Processed</p>
-                </div>
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-linear-to-r from-cyan-500 to-teal-500 opacity-0 group-hover:opacity-50 transition-opacity" />
+                </motion.div>
                 
-                <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-5">
+                <motion.div whileHover={{ y: -4 }} className="bg-slate-900/60 backdrop-blur-xl border border-violet-500/10 rounded-2xl p-5 group hover:border-emerald-500/20 transition-all duration-300 relative overflow-hidden">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2.5 rounded-xl bg-emerald-500/10">
+                    <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                       <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -542,11 +714,12 @@ Response completed successfully! ✅`;
                   </div>
                   <p className="text-2xl font-bold text-white">{usageStats.avgResponseTime}s</p>
                   <p className="text-sm text-slate-400">Avg Response Time</p>
-                </div>
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-linear-to-r from-emerald-500 to-green-500 opacity-0 group-hover:opacity-50 transition-opacity" />
+                </motion.div>
                 
-                <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-5">
+                <motion.div whileHover={{ y: -4 }} className="bg-slate-900/60 backdrop-blur-xl border border-violet-500/10 rounded-2xl p-5 group hover:border-amber-500/20 transition-all duration-300 relative overflow-hidden">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="p-2.5 rounded-xl bg-amber-500/10">
+                    <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
                       <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -554,13 +727,17 @@ Response completed successfully! ✅`;
                   </div>
                   <p className="text-2xl font-bold text-white">{usageStats.successRate}%</p>
                   <p className="text-sm text-slate-400">Success Rate</p>
-                </div>
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-linear-to-r from-amber-500 to-orange-500 opacity-0 group-hover:opacity-50 transition-opacity" />
+                </motion.div>
               </motion.div>
 
               {/* Usage History Chart Placeholder */}
-              <motion.div variants={itemVariants} className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-6">
-                <h3 className="text-lg font-semibold text-white mb-4">Usage History</h3>
-                <div className="h-64 flex items-center justify-center text-slate-500 border border-dashed border-slate-700 rounded-xl">
+              <motion.div variants={itemVariants} className="bg-slate-900/60 backdrop-blur-xl border border-violet-500/10 rounded-2xl p-6">
+                <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                  Usage History
+                </h3>
+                <div className="h-64 flex items-center justify-center text-slate-500 border border-dashed border-violet-500/20 rounded-xl bg-slate-800/20">
                   <div className="text-center">
                     <svg className="w-12 h-12 mx-auto mb-3 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -583,9 +760,12 @@ Response completed successfully! ✅`;
               className="space-y-6"
             >
               {/* API Configuration */}
-              <motion.div variants={itemVariants} className="bg-slate-900/50 backdrop-blur-sm border border-slate-800/50 rounded-2xl overflow-hidden">
-                <div className="p-5 border-b border-slate-800/50">
-                  <h3 className="text-lg font-semibold text-white">API Configuration</h3>
+              <motion.div variants={itemVariants} className="bg-slate-900/60 backdrop-blur-xl border border-violet-500/10 rounded-2xl overflow-hidden">
+                <div className="p-5 border-b border-violet-500/10">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />
+                    API Configuration
+                  </h3>
                   <p className="text-sm text-slate-400 mt-1">Configure your OpenAI API settings</p>
                 </div>
                 <div className="p-6 space-y-6">
@@ -644,9 +824,12 @@ Response completed successfully! ✅`;
               </motion.div>
 
               {/* Rate Limits */}
-              <motion.div variants={itemVariants} className="bg-slate-900/50 backdrop-blur-sm border border-slate-800/50 rounded-2xl overflow-hidden">
-                <div className="p-5 border-b border-slate-800/50">
-                  <h3 className="text-lg font-semibold text-white">Rate Limits</h3>
+              <motion.div variants={itemVariants} className="bg-slate-900/60 backdrop-blur-xl border border-violet-500/10 rounded-2xl overflow-hidden">
+                <div className="p-5 border-b border-violet-500/10">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                    Rate Limits
+                  </h3>
                   <p className="text-sm text-slate-400 mt-1">Configure usage limits for AI features</p>
                 </div>
                 <div className="p-6 space-y-6">
@@ -680,9 +863,12 @@ Response completed successfully! ✅`;
               </motion.div>
 
               {/* Features Toggle */}
-              <motion.div variants={itemVariants} className="bg-slate-900/50 backdrop-blur-sm border border-slate-800/50 rounded-2xl overflow-hidden">
-                <div className="p-5 border-b border-slate-800/50">
-                  <h3 className="text-lg font-semibold text-white">AI Features</h3>
+              <motion.div variants={itemVariants} className="bg-slate-900/60 backdrop-blur-xl border border-violet-500/10 rounded-2xl overflow-hidden">
+                <div className="p-5 border-b border-violet-500/10">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    AI Features
+                  </h3>
                   <p className="text-sm text-slate-400 mt-1">Enable or disable AI features</p>
                 </div>
                 <div className="p-6 space-y-4">
@@ -693,7 +879,11 @@ Response completed successfully! ✅`;
                     { name: 'Content Generation', desc: 'AI-generated content and reports', enabled: false },
                     { name: 'Smart Search', desc: 'Semantic search across documents', enabled: true },
                   ].map((feature, index) => (
-                    <div key={index} className="flex items-center justify-between p-4 bg-slate-800/30 rounded-xl">
+                    <motion.div
+                      key={index}
+                      whileHover={{ x: 4 }}
+                      className="flex items-center justify-between p-4 bg-slate-800/30 rounded-xl border border-violet-500/5 hover:border-violet-500/15 transition-all duration-200"
+                    >
                       <div>
                         <p className="text-sm font-medium text-white">{feature.name}</p>
                         <p className="text-xs text-slate-500">{feature.desc}</p>
@@ -701,19 +891,23 @@ Response completed successfully! ✅`;
                       <button className={`relative w-12 h-6 rounded-full transition-colors ${feature.enabled ? 'bg-violet-600' : 'bg-slate-700'}`}>
                         <span className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${feature.enabled ? 'right-1' : 'left-1'}`} />
                       </button>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
               </motion.div>
 
               {/* Save Button */}
               <motion.div variants={itemVariants} className="flex justify-end gap-3">
-                <button className="px-6 py-3 text-slate-400 hover:text-white transition-colors">
+                <button className="px-6 py-3 text-slate-400 hover:text-white transition-colors rounded-xl hover:bg-slate-800/50">
                   Cancel
                 </button>
-                <button className="px-6 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white font-medium rounded-xl hover:from-violet-500 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/25">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="px-6 py-3 bg-linear-to-r from-violet-600 to-purple-600 text-white font-medium rounded-xl hover:from-violet-500 hover:to-purple-500 transition-all shadow-lg shadow-violet-500/25"
+                >
                   Save Settings
-                </button>
+                </motion.button>
               </motion.div>
             </motion.div>
           )}

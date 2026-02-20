@@ -168,6 +168,15 @@ export default function Login() {
 
   const isSubmitDisabled = isLoading || authLoading;
 
+  const handleDevBypassUserLogin = useCallback(() => {
+    if (!DEV_BYPASS_ENABLED) return;
+    const result = authService.devBypassLogin();
+    if (result?.success) {
+      console.log('%c🔓 Dev bypass user login activated', 'color: #10b981; font-weight: bold;');
+      navigate("/dashboard");
+    }
+  }, [navigate]);
+
   return (
     <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 relative overflow-hidden">
       {/* Static Background Grid - CSS only, no JS */}
@@ -236,6 +245,31 @@ export default function Login() {
               {/* Login Form */}
               <motion.form variants={itemVariants} onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-4">
+
+                  {/* Dev bypass user login (dev-only, no backend) */}
+                  {DEV_BYPASS_ENABLED && (
+                    <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold text-emerald-300 uppercase tracking-wider">Dev Tools</p>
+                          <p className="text-sm text-slate-300 mt-1">
+                            Masuk sebagai <span className="font-semibold text-white">dev user</span> tanpa backend.
+                          </p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            Shortcut juga tersedia: <span className="font-mono">Ctrl+Shift+D</span>
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleDevBypassUserLogin}
+                          className="shrink-0 px-3 py-2 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 text-emerald-200 text-xs font-semibold transition-colors"
+                        >
+                          Dev Login
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="group">
                     <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
                       Email

@@ -1,32 +1,37 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
+import Particles, { initParticlesEngine } from "@tsparticles/react";
+import { loadSlim } from "@tsparticles/slim";
 import adminService from "../../services/admin.service";
 
-// Format date
 const formatDate = (dateString) => {
   if (!dateString) return '-';
-  return new Date(dateString).toLocaleDateString('id-ID', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  return new Date(dateString).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
-// Animation variants
 const containerVariants = {
   hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 },
-  },
+  visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
 };
-
 const itemVariants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0 },
+};
+
+const bcParticlesOptions = {
+  fullScreen: false,
+  background: { color: { value: "transparent" } },
+  fpsLimit: 60,
+  particles: {
+    color: { value: ["#a855f7", "#06b6d4", "#10b981"] },
+    links: { color: "#a855f7", distance: 120, enable: true, opacity: 0.04, width: 1 },
+    move: { enable: true, speed: 0.4, direction: "none", outModes: { default: "out" } },
+    number: { density: { enable: true, area: 1000 }, value: 25 },
+    opacity: { value: { min: 0.05, max: 0.2 } },
+    size: { value: { min: 1, max: 2 } },
+  },
+  detectRetina: true,
 };
 
 export default function BlockchainSettings() {
@@ -40,6 +45,24 @@ export default function BlockchainSettings() {
     rpcUrl: 'https://polygon-rpc.com',
     network: 'polygon-mainnet',
   });
+  const [particlesReady, setParticlesReady] = useState(false);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    initParticlesEngine(async (engine) => { await loadSlim(engine); }).then(() => setParticlesReady(true));
+  }, []);
+
+  useEffect(() => {
+    const h = (e) => setMousePos({ x: (e.clientX / window.innerWidth - 0.5) * 15, y: (e.clientY / window.innerHeight - 0.5) * 15 });
+    window.addEventListener("mousemove", h, { passive: true });
+    return () => window.removeEventListener("mousemove", h);
+  }, []);
+
+  // Floating blockchain nodes decoration
+  const nodes = useMemo(() => Array.from({ length: 5 }, (_, i) => ({
+    id: i, size: Math.random() * 8 + 4, x: Math.random() * 100, y: Math.random() * 100,
+    delay: Math.random() * 4, duration: Math.random() * 8 + 10,
+  })), []);
 
   useEffect(() => {
     if (!adminService.isAuthenticated()) {
@@ -82,28 +105,58 @@ export default function BlockchainSettings() {
 
   return (
     <div className="min-h-screen bg-slate-950">
+      {/* Particles */}
+      {particlesReady && (
+        <Particles id="bc-particles" options={bcParticlesOptions} className="fixed inset-0 z-0 pointer-events-none" />
+      )}
+
       {/* Background Effects */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-cyan-500/5 rounded-full blur-[120px]" />
-        <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-purple-500/5 rounded-full blur-[120px]" />
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <motion.div
+          animate={{ x: mousePos.x * 1.2, y: mousePos.y * 1.2 }}
+          transition={{ type: "spring", damping: 40, stiffness: 80 }}
+          className="absolute top-0 left-1/4 w-150 h-150 rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(168,85,247,0.07) 0%, transparent 70%)" }}
+        />
+        <motion.div
+          animate={{ x: mousePos.x * -0.8, y: mousePos.y * -0.8 }}
+          transition={{ type: "spring", damping: 40, stiffness: 80 }}
+          className="absolute bottom-0 right-1/4 w-150 h-150 rounded-full"
+          style={{ background: "radial-gradient(circle, rgba(6,182,212,0.07) 0%, transparent 70%)" }}
+        />
+        {/* Grid overlay */}
+        <div className="absolute inset-0 opacity-[0.02]" style={{ backgroundImage: "linear-gradient(rgba(168,85,247,0.4) 1px, transparent 1px), linear-gradient(90deg, rgba(168,85,247,0.4) 1px, transparent 1px)", backgroundSize: "80px 80px" }} />
+        {/* Floating nodes */}
+        {nodes.map((n) => (
+          <motion.div key={n.id} className="absolute rounded-full border border-purple-500/20"
+            style={{ left: `${n.x}%`, top: `${n.y}%`, width: n.size, height: n.size }}
+            animate={{ y: [-15, 15, -15], opacity: [0.1, 0.3, 0.1] }}
+            transition={{ duration: n.duration, delay: n.delay, repeat: Infinity, ease: "easeInOut" }}
+          />
+        ))}
+        {/* Scan line */}
+        <motion.div className="absolute left-0 right-0 h-px bg-linear-to-r from-transparent via-purple-500/20 to-transparent" animate={{ top: ["0%", "100%"] }} transition={{ duration: 10, repeat: Infinity, ease: "linear" }} />
       </div>
 
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-xl border-b border-slate-800/50">
+      <header className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-2xl border-b border-purple-500/10">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Link 
-                to="/admin/dashboard" 
-                className="p-2 rounded-lg bg-slate-800/50 hover:bg-slate-800 text-slate-400 hover:text-white transition-all"
+              <Link
+                to="/admin/dashboard"
+                className="p-2 rounded-xl bg-slate-800/50 border border-slate-700/50 hover:border-purple-500/30 text-slate-400 hover:text-white transition-all"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
               </Link>
               <div>
-                <h1 className="text-xl font-bold text-white">Blockchain Settings</h1>
-                <p className="text-sm text-slate-400">Manage blockchain configuration and view transactions</p>
+                <h1 className="text-xl font-bold text-white flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+                  Blockchain Settings
+                </h1>
+                <p className="text-sm text-slate-500">Manage blockchain configuration and view transactions</p>
               </div>
             </div>
             
@@ -128,7 +181,7 @@ export default function BlockchainSettings() {
           {/* Stats Cards */}
           <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* MATIC Balance */}
-            <div className="relative bg-gradient-to-br from-purple-500/10 to-transparent border border-purple-500/20 rounded-2xl p-5 overflow-hidden group">
+            <motion.div whileHover={{ y: -4 }} className="relative bg-slate-900/60 backdrop-blur-xl border border-purple-500/15 rounded-2xl p-5 overflow-hidden group hover:border-purple-500/30 transition-all duration-300">
               <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-full blur-2xl group-hover:bg-purple-500/20 transition-all" />
               <div className="relative">
                 <div className="flex items-center gap-3 mb-3">
@@ -144,10 +197,10 @@ export default function BlockchainSettings() {
                 </p>
                 <p className="text-xs text-slate-500">≈ ${blockchainData?.maticUsdValue || '0.00'} USD</p>
               </div>
-            </div>
+            </motion.div>
 
             {/* Total Transactions */}
-            <div className="relative bg-gradient-to-br from-cyan-500/10 to-transparent border border-cyan-500/20 rounded-2xl p-5 overflow-hidden group">
+            <motion.div whileHover={{ y: -4 }} className="relative bg-slate-900/60 backdrop-blur-xl border border-cyan-500/15 rounded-2xl p-5 overflow-hidden group hover:border-cyan-500/30 transition-all duration-300">
               <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl group-hover:bg-cyan-500/20 transition-all" />
               <div className="relative">
                 <div className="flex items-center gap-3 mb-3">
@@ -163,10 +216,10 @@ export default function BlockchainSettings() {
                 </p>
                 <p className="text-xs text-slate-500">{blockchainData?.pendingTransactions || 0} pending</p>
               </div>
-            </div>
+            </motion.div>
 
             {/* Documents Verified */}
-            <div className="relative bg-gradient-to-br from-emerald-500/10 to-transparent border border-emerald-500/20 rounded-2xl p-5 overflow-hidden group">
+            <motion.div whileHover={{ y: -4 }} className="relative bg-slate-900/60 backdrop-blur-xl border border-emerald-500/15 rounded-2xl p-5 overflow-hidden group hover:border-emerald-500/30 transition-all duration-300">
               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all" />
               <div className="relative">
                 <div className="flex items-center gap-3 mb-3">
@@ -182,10 +235,10 @@ export default function BlockchainSettings() {
                 </p>
                 <p className="text-xs text-slate-500">On-chain verification</p>
               </div>
-            </div>
+            </motion.div>
 
             {/* Gas Used */}
-            <div className="relative bg-gradient-to-br from-amber-500/10 to-transparent border border-amber-500/20 rounded-2xl p-5 overflow-hidden group">
+            <motion.div whileHover={{ y: -4 }} className="relative bg-slate-900/60 backdrop-blur-xl border border-amber-500/15 rounded-2xl p-5 overflow-hidden group hover:border-amber-500/30 transition-all duration-300">
               <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl group-hover:bg-amber-500/20 transition-all" />
               <div className="relative">
                 <div className="flex items-center gap-3 mb-3">
@@ -201,7 +254,7 @@ export default function BlockchainSettings() {
                 </p>
                 <p className="text-xs text-slate-500">All time gas fees</p>
               </div>
-            </div>
+            </motion.div>
           </motion.div>
 
           {/* Tabs */}
@@ -237,8 +290,8 @@ export default function BlockchainSettings() {
                 className="space-y-6"
               >
                 {/* Wallet Configuration */}
-                <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-6">
-                  <h3 className="text-lg font-semibold text-white mb-6">Wallet Configuration</h3>
+                <div className="bg-slate-900/60 backdrop-blur-xl border border-cyan-500/10 rounded-2xl p-6">
+                  <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />Wallet Configuration</h3>
                   
                   <div className="grid gap-6 md:grid-cols-2">
                     <div>
@@ -302,7 +355,7 @@ export default function BlockchainSettings() {
                     <button className="px-5 py-2.5 text-slate-400 hover:text-white transition-colors">
                       Reset
                     </button>
-                    <button className="px-5 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-white font-medium rounded-xl transition-all">
+                    <button className="px-5 py-2.5 bg-linear-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-cyan-500/20">
                       Save Configuration
                     </button>
                   </div>
@@ -310,7 +363,7 @@ export default function BlockchainSettings() {
 
                 {/* Quick Stats */}
                 <div className="grid gap-4 md:grid-cols-3">
-                  <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-5">
+                  <div className="bg-slate-900/60 backdrop-blur-xl border border-cyan-500/10 rounded-2xl p-5">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center">
                         <span className="text-lg">🔗</span>
@@ -322,7 +375,7 @@ export default function BlockchainSettings() {
                     </div>
                   </div>
 
-                  <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-5">
+                  <div className="bg-slate-900/60 backdrop-blur-xl border border-cyan-500/10 rounded-2xl p-5">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center">
                         <span className="text-lg">⛽</span>
@@ -334,7 +387,7 @@ export default function BlockchainSettings() {
                     </div>
                   </div>
 
-                  <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-5">
+                  <div className="bg-slate-900/60 backdrop-blur-xl border border-cyan-500/10 rounded-2xl p-5">
                     <div className="flex items-center gap-3 mb-3">
                       <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
                         <span className="text-lg">📡</span>
@@ -356,7 +409,7 @@ export default function BlockchainSettings() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
               >
-                <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden">
+                <div className="bg-slate-900/60 backdrop-blur-xl border border-cyan-500/10 rounded-2xl overflow-hidden">
                   <div className="p-5 border-b border-slate-800/50">
                     <div className="flex items-center justify-between">
                       <h3 className="text-lg font-semibold text-white">Transaction History</h3>
@@ -421,8 +474,8 @@ export default function BlockchainSettings() {
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-4"
               >
-                <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-6">
-                  <h3 className="text-lg font-semibold text-white mb-4">Document Verification Contract</h3>
+                <div className="bg-slate-900/60 backdrop-blur-xl border border-cyan-500/10 rounded-2xl p-6">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-purple-400" />Document Verification Contract</h3>
                   <div className="space-y-4">
                     <div>
                       <label className="text-sm text-slate-400">Contract Address</label>
