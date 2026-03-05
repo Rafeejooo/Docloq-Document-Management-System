@@ -301,3 +301,65 @@ export const moveDocumentToFolder = async (req, res) => {
     res.status(500).json({ success: false, message: 'Failed to move document' });
   }
 };
+
+// ──────────────────────────────────────────────
+// MOVE folder to a new parent (or root)
+// ──────────────────────────────────────────────
+export const moveFolder = async (req, res) => {
+  try {
+    const { folderId, newParentId } = req.body;
+
+    if (!folderId) {
+      return res.status(400).json({ success: false, message: 'folderId is required' });
+    }
+
+    // prevent moving a folder into itself
+    if (folderId === newParentId) {
+      return res.status(400).json({ success: false, message: 'Cannot move folder into itself' });
+    }
+
+    const [folder] = await db.select().from(folders).where(eq(folders.id, folderId));
+    if (!folder) {
+      return res.status(404).json({ success: false, message: 'Folder not found' });
+    }
+
+    // validate new parent exists (unless moving to root)
+    let parentPath = '';
+    if (newParentId) {
+      const [parent] = await db.select().from(folders).where(eq(folders.id, newParentId));
+      if (!parent) {
+        return res.status(404).json({ success: false, message: 'Target folder not found' });
+      }
+      // prevent moving into own descendant
+      if (parent.path.startsWith(folder.path + '/')) {
+        return res.status(400).json({ success: false, message: 'Cannot move folder into its own descendant' });
+      }
+      parentPath = parent.path;
+    }
+
+    const oldPath = folder.path;
+    const newPath = parentPath ? `${parentPath}/${folder.name}` : `/${folder.name}`;
+
+    // update this folder
+    await db
+      .update(folders)
+      .set({ parentId: newParentId || null, path: newPath, updatedAt: new Date() })
+      .where(eq(folders.id, folderId));
+
+    // update all descendants' paths
+    const descendants = await db
+      .select()
+      .from(folders)
+      .where(like(folders.path, `${oldPath}/%`));
+
+    for (const desc of descendants) {
+      const updatedPath = desc.path.replace(oldPath, newPath);
+      await db.update(folders).set({ path: updatedPath, updatedAt: new Date() }).where(eq(folders.id, desc.id));
+    }
+
+    res.json({ success: true, message: 'Folder moved successfully' });
+  } catch (error) {
+    console.error('Move folder error:', error);
+    res.status(500).json({ success: false, message: 'Failed to move folder' });
+  }
+};

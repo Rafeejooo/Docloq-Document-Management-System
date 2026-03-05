@@ -6,8 +6,9 @@ import {
   documentVersions,
   documentQrCodes,
   auditLogs,
+  trashItems,
 } from '../db/schema.js';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, isNull } from 'drizzle-orm';
 import path from 'path';
 import fs from 'fs/promises';
 import { randomUUID } from 'crypto';
@@ -17,6 +18,7 @@ import { downloadFile, uploadFile } from '../services/storage.service.js';
 import { decryptFile, encryptFile as encryptFileService, generateDocumentKey } from '../services/encryption.service.js';
 import { verifyQRPayload } from '../services/qrcode.service.js';
 import { generateSHA256 } from '../services/hash.service.js';
+import { convertDocument, downloadFromUrl } from '../services/conversion.service.js';
 
 // ============================================================
 // Legacy: Upload directory for plain OnlyOffice files
@@ -34,7 +36,9 @@ const ensureUploadDir = async () => {
 // Get all documents
 export const getAllDocuments = async (req, res) => {
   try {
-    const allDocs = await db.select().from(documents).orderBy(desc(documents.createdAt));
+    const allDocs = await db.select().from(documents)
+      .where(isNull(documents.deletedAt))
+      .orderBy(desc(documents.createdAt));
     
     res.json({
       success: true,
@@ -138,6 +142,7 @@ export const uploadDocument = async (req, res) => {
 
 // ============================================================
 // Upload simple (legacy, for OnlyOffice direct saving)
+// Supports ?convertToDocx=true to auto-convert PDF uploads to DOCX
 // ============================================================
 export const uploadDocumentSimple = async (req, res) => {
   try {
@@ -147,7 +152,33 @@ export const uploadDocumentSimple = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
-    const { originalname, mimetype, size, buffer } = req.file;
+    let { originalname, mimetype, size, buffer } = req.file;
+    const convertToDocx = req.query.convertToDocx === 'true' || req.body.convertToDocx === 'true';
+
+    // PDF → DOCX conversion if requested or if file is PDF
+    if (convertToDocx && (mimetype === 'application/pdf' || path.extname(originalname).toLowerCase() === '.pdf')) {
+      console.log('[UploadSimple] Converting PDF to DOCX...');
+
+      // Save temp PDF for OnlyOffice to access
+      const tempFilename = `temp_${randomUUID()}.pdf`;
+      const tempPath = path.join(UPLOAD_DIR, tempFilename);
+      await fs.writeFile(tempPath, buffer);
+
+      try {
+        const backendUrlDocker = process.env.BACKEND_URL_DOCKER || 'http://host.docker.internal:3000';
+        const tempFileUrl = `${backendUrlDocker}/uploads/${tempFilename}`;
+
+        const { url: convertedUrl } = await convertDocument(tempFileUrl, 'pdf', 'docx');
+        buffer = await downloadFromUrl(convertedUrl);
+        size = buffer.length;
+        mimetype = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        originalname = originalname.replace(/\.pdf$/i, '.docx');
+        console.log('[UploadSimple] PDF→DOCX conversion successful');
+      } finally {
+        try { await fs.unlink(tempPath); } catch {}
+      }
+    }
+
     const fileExt = path.extname(originalname);
     const uniqueFilename = `${randomUUID()}${fileExt}`;
     const filePath = path.join(UPLOAD_DIR, uniqueFilename);
@@ -366,28 +397,49 @@ export const deleteDocument = async (req, res) => {
       });
     }
 
-    // Try deleting encrypted storage directory
-    const storagePath = path.join(process.cwd(), 'storage', 'documents', id);
-    try {
-      await fs.rm(storagePath, { recursive: true, force: true });
-    } catch (err) {
-      console.warn('Could not delete storage dir:', err.message);
+    let userId = req.user?.id || null;
+    // Fallback: resolve user when no auth (dev mode)
+    if (!userId) {
+      try {
+        const { users } = await import('../db/schema.js');
+        const [firstUser] = await db.select().from(users).limit(1);
+        if (firstUser) userId = firstUser.id;
+      } catch { /* ok */ }
     }
+    const orgId = doc.organizationId;
+    const now = new Date();
+    const autoDeleteDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
 
-    // Try deleting legacy file
-    const legacyPath = path.join(UPLOAD_DIR, doc.filename);
-    try {
-      await fs.unlink(legacyPath);
-    } catch (err) {
-      // Not in legacy uploads — that's fine
-    }
+    // Soft-delete: mark document as deleted
+    await db.update(documents).set({
+      deletedAt: now,
+      deletedBy: userId,
+      status: 'deleted',
+      updatedAt: now,
+    }).where(eq(documents.id, id));
 
-    // Delete from database
-    await db.delete(documents).where(eq(documents.id, id));
+    // Insert into trash_items for tracking
+    await db.insert(trashItems).values({
+      organizationId: orgId,
+      itemType: 'document',
+      itemId: id,
+      originalFolderId: doc.folderId,
+      originalPath: doc.originalFilename,
+      itemMetadata: {
+        originalFilename: doc.originalFilename,
+        filename: doc.filename,
+        mimeType: doc.mimeType,
+        fileSize: doc.fileSize,
+        ownerId: doc.ownerId,
+      },
+      autoDeleteAt: autoDeleteDate,
+      deletedBy: userId,
+      deletedAt: now,
+    });
 
     res.json({
       success: true,
-      message: 'Document deleted successfully',
+      message: 'Document moved to trash',
     });
   } catch (error) {
     console.error('Delete document error:', error);
@@ -450,7 +502,8 @@ export const getOnlyOfficeConfig = async (req, res) => {
           name: req.user?.firstName ? `${req.user.firstName} ${req.user.lastName || ''}`.trim() : 'Guest User',
         },
         customization: {
-          autosave: true,
+          autosave: false,
+          forcesave: false,
           chat: false,
           comments: true,
           help: false,
@@ -591,6 +644,43 @@ export const onlyOfficeCallback = async (req, res) => {
   }
 };
 
+// Force-save: calls OnlyOffice Command Service to trigger a save
+export const forceSaveDocument = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [doc] = await db.select().from(documents).where(eq(documents.id, id));
+    if (!doc) {
+      return res.status(404).json({ success: false, message: 'Document not found' });
+    }
+
+    const docKey = `${doc.id}-${doc.updatedAt?.getTime() || Date.now()}`;
+    const onlyOfficeUrl = process.env.ONLYOFFICE_URL_INTERNAL || process.env.ONLYOFFICE_URL || 'http://localhost:8082';
+
+    // Call the OnlyOffice Command Service API
+    const response = await fetch(`${onlyOfficeUrl}/coauthoring/CommandService.ashx`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        c: 'forcesave',
+        key: docKey,
+      }),
+    });
+
+    const result = await response.json();
+    console.log('Force-save result:', result);
+
+    // error 0 = success, error 4 = no changes
+    if (result.error === 0 || result.error === 4) {
+      res.json({ success: true, message: result.error === 4 ? 'No changes to save' : 'Document saved' });
+    } else {
+      res.status(500).json({ success: false, message: `Force-save failed (code ${result.error})` });
+    }
+  } catch (error) {
+    console.error('Force-save error:', error);
+    res.status(500).json({ success: false, message: 'Force-save failed' });
+  }
+};
+
 // ============================================================
 // NEW ENDPOINTS: Versions, Download (decrypt), Verify
 // ============================================================
@@ -724,6 +814,112 @@ export const downloadDocumentDecrypted = async (req, res) => {
   } catch (error) {
     console.error('Download decrypted document error:', error);
     res.status(500).json({ success: false, message: 'Failed to download document' });
+  }
+};
+
+// ─────────────── MIME helpers for conversion ───────────────
+const FORMAT_MIME_MAP = {
+  pdf:  'application/pdf',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  png:  'image/png',
+  jpg:  'image/jpeg',
+  csv:  'text/csv',
+  txt:  'text/plain',
+  odt:  'application/vnd.oasis.opendocument.text',
+  ods:  'application/vnd.oasis.opendocument.spreadsheet',
+  rtf:  'application/rtf',
+};
+
+function extFromMime(mime) {
+  const map = {
+    'application/pdf': 'pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+    'application/msword': 'doc',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+    'application/vnd.ms-excel': 'xls',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+    'application/vnd.ms-powerpoint': 'ppt',
+    'image/png': 'png',
+    'image/jpeg': 'jpg',
+    'text/plain': 'txt',
+    'text/csv': 'csv',
+    'application/vnd.oasis.opendocument.text': 'odt',
+    'application/vnd.oasis.opendocument.spreadsheet': 'ods',
+    'application/rtf': 'rtf',
+  };
+  return map[mime] || 'bin';
+}
+
+// Download document with optional format conversion via OnlyOffice
+// GET /documents/:id/download-as?format=pdf|docx|xlsx|png|jpg
+export const downloadDocumentConverted = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const targetFormat = (req.query.format || '').toLowerCase().trim();
+
+    if (!targetFormat) {
+      return res.status(400).json({ success: false, message: 'Missing ?format= parameter' });
+    }
+
+    const [doc] = await db.select().from(documents).where(eq(documents.id, id));
+    if (!doc) {
+      return res.status(404).json({ success: false, message: 'Document not found' });
+    }
+
+    const srcExt = extFromMime(doc.mimeType);
+
+    // If requested format is same as source, serve the original file directly
+    // (don't use redirect — Axios blob requests may not follow redirects properly)
+    if (srcExt === targetFormat || (srcExt === 'doc' && targetFormat === 'docx') || (srcExt === 'xls' && targetFormat === 'xlsx')) {
+      // Pipe through the normal download logic by importing the function
+      req.params.id = id;
+      return downloadDocumentDecrypted(req, res);
+    }
+
+    // Build the URL that OnlyOffice can fetch the source file from
+    // OnlyOffice runs in Docker, so use the Docker-accessible URL (same as onlyoffice-config)
+    const backendUrl = process.env.BACKEND_URL_DOCKER || 'http://host.docker.internal:3000';
+    const fileUrl = `${backendUrl}/api/documents/${id}/file`;
+
+    console.log(`[Convert] ${doc.originalFilename} (${srcExt}) → ${targetFormat}, url: ${fileUrl}`);
+
+    // Call OnlyOffice conversion
+    const convKey = `convert-${id}-${targetFormat}-${Date.now()}`;
+    const { url: convertedUrl } = await convertDocument(fileUrl, srcExt, targetFormat, convKey);
+
+    // Download converted file from OnlyOffice
+    const convertedBuffer = await downloadFromUrl(convertedUrl);
+
+    // Build output filename: replace extension
+    const baseName = doc.originalFilename.replace(/\.[^.]+$/, '');
+    const outputFilename = `${baseName}.${targetFormat}`;
+    const outputMime = FORMAT_MIME_MAP[targetFormat] || 'application/octet-stream';
+
+    // Audit log
+    try {
+      await db.insert(auditLogs).values({
+        organizationId: doc.organizationId,
+        userId: req.user?.id,
+        action: 'download_converted',
+        resourceType: 'document',
+        resourceId: id,
+        details: { sourceFormat: srcExt, targetFormat, filename: outputFilename },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+    } catch { /* non-critical */ }
+
+    res.setHeader('Content-Type', outputMime);
+    res.setHeader('Content-Disposition', `attachment; filename="${outputFilename}"`);
+    return res.send(convertedBuffer);
+  } catch (error) {
+    console.error('Download converted document error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to convert and download document',
+    });
   }
 };
 

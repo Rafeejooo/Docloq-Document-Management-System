@@ -54,6 +54,26 @@ const documentService = {
     window.URL.revokeObjectURL(url);
   },
 
+  // Download document converted to specific format
+  downloadDocumentAs: async (id, originalFilename, format) => {
+    const response = await api.get(`/documents/${id}/download-as`, {
+      params: { format },
+      responseType: 'blob',
+    });
+
+    const baseName = originalFilename.replace(/\.[^.]+$/, '');
+    const outputFilename = `${baseName}.${format}`;
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', outputFilename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
   // Delete document
   deleteDocument: async (id) => {
     const response = await api.delete(`/documents/${id}`);
@@ -65,6 +85,12 @@ const documentService = {
     const response = await api.get(`/documents/${id}/onlyoffice-config`, {
       params: { mode },
     });
+    return response.data;
+  },
+
+  // Force-save document via OnlyOffice Command Service
+  forceSave: async (id) => {
+    const response = await api.post(`/documents/${id}/force-save`);
     return response.data;
   },
 

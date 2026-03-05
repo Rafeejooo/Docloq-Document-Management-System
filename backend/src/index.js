@@ -4,6 +4,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import path from 'path';
 import 'dotenv/config';
 
 import routes from './routes/index.js';
@@ -53,6 +54,9 @@ if (process.env.NODE_ENV !== 'production') {
 
 // Routes
 app.use('/api', routes);
+
+// Serve uploaded files (needed for OnlyOffice to access documents & temp files for conversion)
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
 
 // Health Check
 app.get('/', (req, res) => {

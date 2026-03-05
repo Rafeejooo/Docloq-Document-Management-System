@@ -10,7 +10,7 @@ import {
   formInstances,
   formWorkflowSteps,
 } from '../db/schema.js';
-import { eq, and, desc, asc, sql, or } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, or, inArray } from 'drizzle-orm';
 
 // ──────────────────────────────────────────────
 // Helper: resolve orgId (dev fallback)
@@ -70,7 +70,7 @@ export const getTasks = async (req, res) => {
       const creators = await db
         .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, email: users.email })
         .from(users)
-        .where(sql`${users.id} = ANY(${creatorIds})`);
+        .where(inArray(users.id, creatorIds));
       for (const c of creators) {
         creatorsMap[c.id] = {
           name: c.firstName ? `${c.firstName}${c.lastName ? ' ' + c.lastName : ''}` : c.email,
@@ -86,7 +86,7 @@ export const getTasks = async (req, res) => {
       const docs = await db
         .select({ id: documents.id, filename: documents.filename, originalFilename: documents.originalFilename })
         .from(documents)
-        .where(sql`${documents.id} = ANY(${docIds})`);
+        .where(inArray(documents.id, docIds));
       for (const d of docs) {
         docsMap[d.id] = d.originalFilename || d.filename;
       }
@@ -99,7 +99,7 @@ export const getTasks = async (req, res) => {
       const formsList = await db
         .select({ id: forms.id, title: forms.title })
         .from(forms)
-        .where(sql`${forms.id} = ANY(${formIds})`);
+        .where(inArray(forms.id, formIds));
       for (const f of formsList) {
         formsMap[f.id] = f.title;
       }

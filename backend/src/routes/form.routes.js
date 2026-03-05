@@ -1,12 +1,16 @@
 // Form Routes
 
 import { Router } from 'express';
+import multer from 'multer';
 import {
   getFormTemplates,
   getFormTemplate,
   createFormTemplate,
   updateFormTemplate,
   deleteFormTemplate,
+  createBlankTemplate,
+  uploadExistingTemplate,
+  getTemplateDocument,
   getFormInstances,
   getFormInstance,
   createFormInstance,
@@ -18,16 +22,39 @@ import {
 
 const router = Router();
 
+// Multer config for template file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword',
+      'application/vnd.oasis.opendocument.text',
+      'application/rtf',
+    ];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only PDF, DOCX, DOC, ODT, RTF files are allowed'));
+  },
+});
+
 // ── Form Templates ────────────────────────────
-// GET    /api/forms/templates          — list all templates
-// POST   /api/forms/templates          — create template
-// GET    /api/forms/templates/:id      — single template
-// PUT    /api/forms/templates/:id      — update template
-// DELETE /api/forms/templates/:id      — delete template
+// GET    /api/forms/templates              — list all templates
+// POST   /api/forms/templates              — create template (JSON schema)
+// POST   /api/forms/templates/create-blank — create blank docx template
+// POST   /api/forms/templates/upload-file  — upload file as template (PDF→DOCX)
+// GET    /api/forms/templates/:id          — single template
+// GET    /api/forms/templates/:id/document — get template's document + OnlyOffice config
+// PUT    /api/forms/templates/:id          — update template
+// DELETE /api/forms/templates/:id          — delete template
 
 router.get('/templates', getFormTemplates);
 router.post('/templates', createFormTemplate);
+router.post('/templates/create-blank', createBlankTemplate);
+router.post('/templates/upload-file', upload.single('file'), uploadExistingTemplate);
 router.get('/templates/:id', getFormTemplate);
+router.get('/templates/:id/document', getTemplateDocument);
 router.put('/templates/:id', updateFormTemplate);
 router.delete('/templates/:id', deleteFormTemplate);
 

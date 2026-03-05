@@ -8,8 +8,19 @@ import {
   formSubmissions,
   tasks,
   users,
+  documents,
+  trashItems,
 } from '../db/schema.js';
-import { eq, and, desc, asc, sql, count } from 'drizzle-orm';
+import { eq, and, desc, asc, sql, count, inArray } from 'drizzle-orm';
+import path from 'path';
+import fs from 'fs/promises';
+import { randomUUID } from 'crypto';
+import { createBlankDocx, convertDocument, downloadFromUrl } from '../services/conversion.service.js';
+
+const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
+const ensureUploadDir = async () => {
+  try { await fs.access(UPLOAD_DIR); } catch { await fs.mkdir(UPLOAD_DIR, { recursive: true }); }
+};
 
 // ──────────────────────────────────────────────
 // Helper: resolve orgId (dev fallback)
@@ -128,8 +139,40 @@ export const updateFormTemplate = async (req, res) => {
 export const deleteFormTemplate = async (req, res) => {
   try {
     const { id } = req.params;
-    await db.update(forms).set({ isActive: false, updatedAt: new Date() }).where(eq(forms.id, id));
-    res.json({ success: true, message: 'Form template deleted' });
+
+    // Get template info for trash metadata
+    const [template] = await db.select().from(forms).where(eq(forms.id, id));
+    if (!template) return res.status(404).json({ success: false, message: 'Template not found' });
+
+    const userId = req.user?.id || template.createdBy;
+    const orgId = template.organizationId;
+    const now = new Date();
+    const autoDeleteDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    // Soft-delete template
+    await db.update(forms).set({ isActive: false, updatedAt: now }).where(eq(forms.id, id));
+
+    // Insert into trash_items
+    await db.insert(trashItems).values({
+      organizationId: orgId,
+      itemType: 'template',
+      itemId: id,
+      originalFolderId: null,
+      originalPath: template.title,
+      itemMetadata: {
+        title: template.title,
+        description: template.description,
+        icon: template.icon,
+        category: template.category,
+        createdBy: template.createdBy,
+        documentId: template.schema?.documentId || null,
+      },
+      autoDeleteAt: autoDeleteDate,
+      deletedBy: userId,
+      deletedAt: now,
+    });
+
+    res.json({ success: true, message: 'Template moved to trash' });
   } catch (error) {
     console.error('Delete form template error:', error);
     res.status(500).json({ success: false, message: 'Failed to delete form template' });
@@ -172,7 +215,7 @@ export const getFormInstances = async (req, res) => {
         })
         .from(formWorkflowSteps)
         .leftJoin(users, eq(formWorkflowSteps.assignedTo, users.id))
-        .where(sql`${formWorkflowSteps.formInstanceId} = ANY(${instanceIds})`)
+        .where(inArray(formWorkflowSteps.formInstanceId, instanceIds))
         .orderBy(asc(formWorkflowSteps.stepOrder));
     }
 
@@ -196,7 +239,7 @@ export const getFormInstances = async (req, res) => {
       const creators = await db
         .select({ id: users.id, firstName: users.firstName, lastName: users.lastName, email: users.email })
         .from(users)
-        .where(sql`${users.id} = ANY(${creatorIds})`);
+        .where(inArray(users.id, creatorIds));
       for (const c of creators) {
         creatorsMap[c.id] = c.firstName ? `${c.firstName}${c.lastName ? ' ' + c.lastName : ''}` : c.email;
       }
@@ -277,7 +320,7 @@ export const createFormInstance = async (req, res) => {
     const orgId = await resolveOrgId(req);
     if (!orgId) return res.status(400).json({ success: false, message: 'No organization found' });
 
-    const { name, formId, dueDate, workflowSteps } = req.body;
+    const { name, formId, startDate, dueDate, workflowSteps } = req.body;
     if (!name || !formId) {
       return res.status(400).json({ success: false, message: 'Name and formId are required' });
     }
@@ -299,6 +342,7 @@ export const createFormInstance = async (req, res) => {
       formId,
       name,
       status: 'active',
+      startDate: startDate ? new Date(startDate) : null,
       dueDate: dueDate ? new Date(dueDate) : null,
       createdBy,
     }).returning();
@@ -361,7 +405,7 @@ export const createFormInstance = async (req, res) => {
 export const updateFormInstance = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, status, dueDate } = req.body;
+    const { name, status, startDate, dueDate } = req.body;
 
     const [existing] = await db.select().from(formInstances).where(eq(formInstances.id, id));
     if (!existing) return res.status(404).json({ success: false, message: 'Form instance not found' });
@@ -369,6 +413,7 @@ export const updateFormInstance = async (req, res) => {
     const updateData = { updatedAt: new Date() };
     if (name) updateData.name = name;
     if (status) updateData.status = status;
+    if (startDate !== undefined) updateData.startDate = startDate ? new Date(startDate) : null;
     if (dueDate !== undefined) updateData.dueDate = dueDate ? new Date(dueDate) : null;
     if (status === 'completed') updateData.completedAt = new Date();
 
@@ -518,5 +563,241 @@ export const getOrgUsers = async (req, res) => {
   } catch (error) {
     console.error('Get org users error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch users' });
+  }
+};
+
+// ══════════════════════════════════════════════
+//  TEMPLATE DOCUMENT MANAGEMENT
+//  Creates document-backed templates that open in OnlyOffice
+// ══════════════════════════════════════════════
+
+// Helper: create a document record from a buffer
+async function createDocumentRecord(orgId, userId, filename, buffer, mimeType) {
+  await ensureUploadDir();
+  const ext = path.extname(filename);
+  const uniqueFilename = `${randomUUID()}${ext}`;
+  const filePath = path.join(UPLOAD_DIR, uniqueFilename);
+  await fs.writeFile(filePath, buffer);
+
+  const [newDoc] = await db.insert(documents).values({
+    organizationId: orgId,
+    filename: uniqueFilename,
+    originalFilename: filename,
+    mimeType,
+    fileSize: buffer.length,
+    ownerId: userId,
+    status: 'active',
+  }).returning();
+
+  return newDoc;
+}
+
+// POST /api/forms/templates/create-blank
+// Creates a blank DOCX document, then creates a form template linked to it.
+// Returns { template, document } so frontend can open OnlyOffice.
+export const createBlankTemplate = async (req, res) => {
+  try {
+    const orgId = await resolveOrgId(req);
+    if (!orgId) return res.status(400).json({ success: false, message: 'No organization found' });
+
+    let userId = req.user?.id;
+    if (!userId) {
+      const [firstUser] = await db.select().from(users).limit(1);
+      if (firstUser) userId = firstUser.id;
+    }
+    if (!userId) return res.status(400).json({ success: false, message: 'No user found' });
+
+    const { title, description, icon, category } = req.body;
+    const templateName = title || 'Untitled Template';
+
+    // 1. Create blank .docx buffer
+    const docxBuffer = await createBlankDocx();
+
+    // 2. Save as document record
+    const doc = await createDocumentRecord(
+      orgId,
+      userId,
+      `${templateName.replace(/[^a-zA-Z0-9 ]/g, '')}.docx`,
+      docxBuffer,
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    );
+
+    // 3. Create form template with document reference in schema
+    const [template] = await db.insert(forms).values({
+      organizationId: orgId,
+      title: templateName,
+      description: description || null,
+      icon: icon || 'document',
+      category: category || 'general',
+      schema: { type: 'document-template', documentId: doc.id, fields: [] },
+      createdBy: userId,
+    }).returning();
+
+    res.status(201).json({
+      success: true,
+      data: { template, document: doc },
+    });
+  } catch (error) {
+    console.error('Create blank template error:', error);
+    res.status(500).json({ success: false, message: 'Failed to create blank template' });
+  }
+};
+
+// POST /api/forms/templates/upload-file
+// Accepts file upload (DOCX, PDF, ODT, etc.). If PDF → converts to DOCX via OnlyOffice.
+// Creates document record + form template. Returns both.
+export const uploadExistingTemplate = async (req, res) => {
+  try {
+    const orgId = await resolveOrgId(req);
+    if (!orgId) return res.status(400).json({ success: false, message: 'No organization found' });
+
+    let userId = req.user?.id;
+    if (!userId) {
+      const [firstUser] = await db.select().from(users).limit(1);
+      if (firstUser) userId = firstUser.id;
+    }
+    if (!userId) return res.status(400).json({ success: false, message: 'No user found' });
+
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+
+    const { title, description, icon, category } = req.body;
+    const { originalname, mimetype, buffer } = req.file;
+    const ext = path.extname(originalname).toLowerCase();
+    const templateName = title || path.basename(originalname, ext);
+
+    let finalBuffer = buffer;
+    let finalMimeType = mimetype;
+    let finalExt = ext;
+    let finalOriginalName = originalname;
+
+    // If PDF, convert to DOCX via OnlyOffice
+    if (ext === '.pdf' || mimetype === 'application/pdf') {
+      console.log('[UploadTemplate] PDF detected, converting to DOCX...');
+
+      // Save PDF temporarily so OnlyOffice can fetch it
+      await ensureUploadDir();
+      const tempFilename = `temp_${randomUUID()}.pdf`;
+      const tempPath = path.join(UPLOAD_DIR, tempFilename);
+      await fs.writeFile(tempPath, buffer);
+
+      try {
+        // Build URL that OnlyOffice (in Docker) can access
+        const backendUrlDocker = process.env.BACKEND_URL_DOCKER || 'http://host.docker.internal:3000';
+        const tempFileUrl = `${backendUrlDocker}/uploads/${tempFilename}`;
+
+        const { url: convertedUrl } = await convertDocument(tempFileUrl, 'pdf', 'docx');
+
+        // Download converted file
+        finalBuffer = await downloadFromUrl(convertedUrl);
+        finalMimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        finalExt = '.docx';
+        finalOriginalName = originalname.replace(/\.pdf$/i, '.docx');
+        console.log('[UploadTemplate] PDF→DOCX conversion successful');
+      } finally {
+        // Clean up temp PDF
+        try { await fs.unlink(tempPath); } catch {}
+      }
+    }
+
+    // Save document
+    const doc = await createDocumentRecord(
+      orgId,
+      userId,
+      finalOriginalName,
+      finalBuffer,
+      finalMimeType,
+    );
+
+    // Create form template
+    const [template] = await db.insert(forms).values({
+      organizationId: orgId,
+      title: templateName,
+      description: description || null,
+      icon: icon || 'document',
+      category: category || 'general',
+      schema: { type: 'document-template', documentId: doc.id, fields: [] },
+      createdBy: userId,
+    }).returning();
+
+    res.status(201).json({
+      success: true,
+      data: { template, document: doc },
+    });
+  } catch (error) {
+    console.error('Upload existing template error:', error);
+    res.status(500).json({ success: false, message: 'Failed to upload template' });
+  }
+};
+
+// GET /api/forms/templates/:id/document
+// Returns the document info and OnlyOffice config for a template's linked document
+export const getTemplateDocument = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const mode = req.query.mode === 'view' ? 'view' : 'edit';
+
+    const [template] = await db.select().from(forms).where(eq(forms.id, id));
+    if (!template) return res.status(404).json({ success: false, message: 'Template not found' });
+
+    const docId = template.schema?.documentId;
+    if (!docId) return res.status(404).json({ success: false, message: 'No document linked to this template' });
+
+    const [doc] = await db.select().from(documents).where(eq(documents.id, docId));
+    if (!doc) return res.status(404).json({ success: false, message: 'Linked document not found' });
+
+    // Build OnlyOffice config (same pattern as document.controller.js)
+    const ext = path.extname(doc.originalFilename).toLowerCase().slice(1);
+    const backendUrlDocker = process.env.BACKEND_URL_DOCKER || 'http://host.docker.internal:3000';
+    const onlyOfficeUrl = process.env.ONLYOFFICE_URL || 'http://localhost:8082';
+
+    // Use template title as the displayed document name (preserving file extension)
+    const displayTitle = `${template.title}.${ext}`;
+
+    const config = {
+      document: {
+        fileType: ext,
+        key: `${doc.id}-${doc.updatedAt?.getTime() || Date.now()}`,
+        title: displayTitle,
+        url: `${backendUrlDocker}/api/documents/${doc.id}/file`,
+        permissions: {
+          edit: mode === 'edit',
+          download: true,
+          print: true,
+          review: mode === 'edit',
+          comment: mode === 'edit',
+        },
+      },
+      documentType: ext === 'docx' || ext === 'doc' ? 'word' : ext === 'xlsx' || ext === 'xls' ? 'cell' : ext === 'pptx' || ext === 'ppt' ? 'slide' : 'word',
+      editorConfig: {
+        mode: mode,
+        lang: 'en',
+        callbackUrl: mode === 'edit' ? `${backendUrlDocker}/api/documents/${doc.id}/callback` : undefined,
+        user: {
+          id: req.user?.id || 'guest',
+          name: req.user?.firstName ? `${req.user.firstName} ${req.user.lastName || ''}`.trim() : 'Guest User',
+        },
+        customization: {
+          autosave: true,
+          forcesave: true,
+          chat: false,
+          comments: true,
+          help: false,
+        },
+      },
+      type: 'desktop',
+    };
+
+    res.json({
+      success: true,
+      data: {
+        document: doc,
+        templateTitle: template.title,
+        config,
+        onlyOfficeUrl: `${onlyOfficeUrl}/web-apps/apps/api/documents/api.js`,
+      },
+    });
+  } catch (error) {
+    console.error('Get template document error:', error);
+    res.status(500).json({ success: false, message: 'Failed to get template document' });
   }
 };

@@ -38,6 +38,12 @@ const folderService = {
     const response = await api.post('/folders/move-document', { documentId, folderId });
     return response.data;
   },
+
+  // Move folder to new parent (or root if newParentId is null)
+  moveFolder: async (folderId, newParentId) => {
+    const response = await api.post('/folders/move-folder', { folderId, newParentId });
+    return response.data;
+  },
 };
 
 export default folderService;

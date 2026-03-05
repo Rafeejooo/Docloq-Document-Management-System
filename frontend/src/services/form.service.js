@@ -29,6 +29,33 @@ const formService = {
     return response.data;
   },
 
+  // Create a blank document-backed template (opens blank DOCX in OnlyOffice)
+  createBlankTemplate: async (data = {}) => {
+    const response = await api.post('/forms/templates/create-blank', data);
+    return response.data;
+  },
+
+  // Upload a file as template (PDF auto-converts to DOCX)
+  uploadFileTemplate: async (file, data = {}) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (data.title) formData.append('title', data.title);
+    if (data.description) formData.append('description', data.description);
+    if (data.icon) formData.append('icon', data.icon);
+    if (data.category) formData.append('category', data.category);
+    const response = await api.post('/forms/templates/upload-file', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  // Get template's linked document + OnlyOffice config
+  // mode: 'edit' (default) or 'view' (read-only)
+  getTemplateDocument: async (id, mode = 'edit') => {
+    const response = await api.get(`/forms/templates/${id}/document?mode=${mode}`);
+    return response.data;
+  },
+
   // ── Instances ───────────────────────────────
   getInstances: async () => {
     const response = await api.get('/forms/instances');

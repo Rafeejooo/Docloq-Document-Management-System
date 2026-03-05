@@ -6,6 +6,9 @@ services:
     environment:
       - JWT_ENABLED=false  
       - JWT_SECRET=secret  
+      - DS_FORCESAVE=true
+      - ALLOW_PRIVATE_IP_ADDRESS=true
+      - ALLOW_META_IP_ADDRESS=true
     ports:
       - "8082:80"         
     volumes:

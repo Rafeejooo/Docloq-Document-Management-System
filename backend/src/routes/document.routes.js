@@ -10,9 +10,11 @@ import {
   serveDocument,
   downloadDocument, 
   downloadDocumentDecrypted,
+  downloadDocumentConverted,
   deleteDocument,
   getOnlyOfficeConfig,
   onlyOfficeCallback,
+  forceSaveDocument,
   getDocumentVersions,
   verifyDocument,
   verifyByShortCode,
@@ -74,11 +76,13 @@ router.post('/upload', optionalAuth, upload.single('file'), uploadDocument);    
 router.post('/upload-simple', optionalAuth, upload.single('file'), uploadDocumentSimple);     // Legacy simple upload
 router.get('/:id/versions', optionalAuth, getDocumentVersions);
 router.get('/:id/download', optionalAuth, downloadDocumentDecrypted);                         // Decrypt + download
+router.get('/:id/download-as', optionalAuth, downloadDocumentConverted);                       // Convert + download (format=pdf|docx|xlsx|png|jpg)
 router.post('/:id/verify', optionalAuth, upload.single('file'), verifyDocument);              // Verify document
 router.delete('/:id', optionalAuth, deleteDocument);
 
 // === OnlyOffice specific routes ===
 router.get('/:id/onlyoffice-config', optionalAuth, getOnlyOfficeConfig);
 router.post('/:id/callback', onlyOfficeCallback);      // No auth — OnlyOffice callback
+router.post('/:id/force-save', optionalAuth, forceSaveDocument);  // Manual save trigger
 
 export default router;

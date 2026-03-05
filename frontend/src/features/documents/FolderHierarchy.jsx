@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -122,36 +122,51 @@ const SpinnerIcon = ({ className = "w-5 h-5" }) => (
 );
 
 // ══════════════════════════════════════════════
-// FolderTreeItem – recursive tree node
+// FolderTreeItem – recursive tree node with drag & drop
 // ══════════════════════════════════════════════
-function FolderTreeItem({ folder, depth = 0, expanded, onToggle, onAddSub, onDelete, onRename, onViewDocs, onOpenInDocuments }) {
+function FolderTreeItem({ folder, depth = 0, expanded, onToggle, onAddSub, onDelete, onRename, onViewDocs, onOpenInDocuments, dragItem, dropTargetId, onDragStart, onDragEnd, onDragEnterFolder, onDragLeaveFolder, onDropOnFolder }) {
   const hasChildren = folder.children?.length > 0;
   const isExpanded = expanded.has(folder.id);
   const docCount = folder.documentCount || 0;
   const color = folder.color || "#6366f1";
+  const isDragging = dragItem && dragItem.id === folder.id;
+  const isDropTarget = dropTargetId === folder.id;
 
   return (
-    <div>
+    <div className={`transition-all duration-200 ${isDragging ? "opacity-40 scale-[0.97]" : ""}`}>
       {/* Row */}
       <div
-        className={`group flex items-center gap-2 py-2.5 pr-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all ${isExpanded ? "bg-slate-50/50 dark:bg-slate-800/30" : ""}`}
+        className={`relative group flex items-center gap-2 py-2.5 pr-3 rounded-xl transition-all duration-200 cursor-grab active:cursor-grabbing ${isDropTarget ? "bg-indigo-50 dark:bg-indigo-500/10 ring-2 ring-indigo-500 ring-inset shadow-md shadow-indigo-500/10" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"} ${isExpanded && !isDropTarget ? "bg-slate-50/50 dark:bg-slate-800/30" : ""}`}
         style={{ paddingLeft: `${depth * 24 + 12}px` }}
+        draggable
+        onDragStart={(e) => {
+          e.stopPropagation();
+          onDragStart(e, folder);
+        }}
+        onDragEnd={(e) => { e.stopPropagation(); onDragEnd(); }}
+        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "move"; }}
+        onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); onDragEnterFolder(folder.id); }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget)) onDragLeaveFolder();
+        }}
+        onDrop={(e) => { e.preventDefault(); e.stopPropagation(); onDropOnFolder(folder.id); }}
       >
         {/* Expand chevron */}
         <button
-          onClick={() => hasChildren && onToggle(folder.id)}
+          draggable="false"
+          onClick={(e) => { e.stopPropagation(); hasChildren && onToggle(folder.id); }}
           className={`w-5 h-5 flex items-center justify-center rounded transition-all flex-shrink-0 ${hasChildren ? "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" : "invisible"}`}
         >
           <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`} />
         </button>
 
         {/* Folder icon */}
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}18` }}>
+        <div draggable="false" className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}18` }}>
           <FolderIcon style={{ color }} className="w-4 h-4" />
         </div>
 
         {/* Name + description */}
-        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => hasChildren ? onToggle(folder.id) : onViewDocs(folder)}>
+        <div draggable="false" className="flex-1 min-w-0 cursor-pointer" onClick={() => hasChildren ? onToggle(folder.id) : onViewDocs(folder)}>
           <span className="text-sm font-medium text-slate-900 dark:text-white truncate block">{folder.name}</span>
           {folder.description && <span className="text-[11px] text-slate-400 truncate block">{folder.description}</span>}
         </div>
@@ -171,23 +186,30 @@ function FolderTreeItem({ folder, depth = 0, expanded, onToggle, onAddSub, onDel
         )}
 
         {/* Actions */}
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-          <button onClick={(e) => { e.stopPropagation(); onViewDocs(folder); }} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" title="View documents">
+        <div draggable="false" className={`flex items-center gap-0.5 transition-opacity flex-shrink-0 ${dragItem ? "opacity-0 pointer-events-none" : "opacity-0 group-hover:opacity-100"}`}>
+          <button draggable="false" onClick={(e) => { e.stopPropagation(); onViewDocs(folder); }} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" title="View documents">
             <DocIcon />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onOpenInDocuments(folder.id); }} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors" title="Open in Documents">
+          <button draggable="false" onClick={(e) => { e.stopPropagation(); onOpenInDocuments(folder.id); }} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors" title="Open in Documents">
             <ExternalLinkIcon />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onAddSub(folder.id); }} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors" title="Add subfolder">
+          <button draggable="false" onClick={(e) => { e.stopPropagation(); onAddSub(folder.id); }} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors" title="Add subfolder">
             <PlusIcon className="w-3.5 h-3.5" />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onRename(folder); }} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors" title="Rename">
+          <button draggable="false" onClick={(e) => { e.stopPropagation(); onRename(folder); }} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors" title="Rename">
             <EditIcon />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onDelete(folder.id, folder.name); }} className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors" title="Delete">
+          <button draggable="false" onClick={(e) => { e.stopPropagation(); onDelete(folder.id, folder.name); }} className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors" title="Delete">
             <TrashIcon />
           </button>
         </div>
+
+        {/* Drop-here badge */}
+        {isDropTarget && dragItem && dragItem.id !== folder.id && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-lg bg-indigo-600 text-white text-[11px] font-semibold shadow-lg pointer-events-none z-10">
+            Drop here
+          </div>
+        )}
       </div>
 
       {/* Children (animated) */}
@@ -212,6 +234,13 @@ function FolderTreeItem({ folder, depth = 0, expanded, onToggle, onAddSub, onDel
                 onRename={onRename}
                 onViewDocs={onViewDocs}
                 onOpenInDocuments={onOpenInDocuments}
+                dragItem={dragItem}
+                dropTargetId={dropTargetId}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
+                onDragEnterFolder={onDragEnterFolder}
+                onDragLeaveFolder={onDragLeaveFolder}
+                onDropOnFolder={onDropOnFolder}
               />
             ))}
           </motion.div>
@@ -386,6 +415,84 @@ export default function FolderHierarchy() {
     navigate(`/documents?folder=${folderId}`);
   };
 
+  // ── Drag & Drop ──
+  const [dragItem, setDragItem] = useState(null);          // { id, data }
+  const [dropTargetId, setDropTargetId] = useState(null);  // folder id being hovered
+  const [dragToast, setDragToast] = useState(null);        // { msg, type }
+  const dragGhostRef = useRef(null);
+  const dragItemRef = useRef(null);
+
+  const showDragToast = useCallback((msg, type = "success") => {
+    setDragToast({ msg, type });
+    setTimeout(() => setDragToast(null), 2500);
+  }, []);
+
+  const createDragGhost = useCallback((label) => {
+    if (dragGhostRef.current) { document.body.removeChild(dragGhostRef.current); dragGhostRef.current = null; }
+    const ghost = document.createElement("div");
+    ghost.style.cssText = "position:fixed;top:-1000px;left:-1000px;padding:8px 14px;background:#4f46e5;color:#fff;border-radius:12px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;box-shadow:0 8px 24px rgba(0,0,0,.25);white-space:nowrap;z-index:9999;max-width:220px;overflow:hidden;text-overflow:ellipsis;";
+    ghost.innerHTML = `<span style="font-size:16px">📁</span><span style="overflow:hidden;text-overflow:ellipsis">${label}</span>`;
+    document.body.appendChild(ghost);
+    dragGhostRef.current = ghost;
+    return ghost;
+  }, []);
+
+  const removeDragGhost = useCallback(() => {
+    if (dragGhostRef.current) { document.body.removeChild(dragGhostRef.current); dragGhostRef.current = null; }
+  }, []);
+
+  const handleDragStart = useCallback((e, folder) => {
+    const item = { id: folder.id, data: folder };
+    setDragItem(item);
+    dragItemRef.current = item;
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", JSON.stringify({ type: "folder", id: folder.id }));
+    const ghost = createDragGhost(folder.name || "Folder");
+    e.dataTransfer.setDragImage(ghost, 24, 24);
+    // Collapse the folder being dragged if expanded
+    if (expanded.has(folder.id)) {
+      setExpanded((prev) => { const next = new Set(prev); next.delete(folder.id); return next; });
+    }
+  }, [createDragGhost, expanded]);
+
+  const handleDragEnd = useCallback(() => {
+    setDragItem(null);
+    dragItemRef.current = null;
+    setDropTargetId(null);
+    removeDragGhost();
+  }, [removeDragGhost]);
+
+  const handleDragEnterFolder = useCallback((folderId) => {
+    setDropTargetId(folderId);
+  }, []);
+
+  const handleDragLeaveFolder = useCallback(() => {
+    setDropTargetId(null);
+  }, []);
+
+  const handleDropOnFolder = useCallback(async (targetFolderId) => {
+    setDropTargetId(null);
+    const item = dragItemRef.current;
+    if (!item || item.id === targetFolderId) return;
+
+    try {
+      setActionLoading(true);
+      await folderService.moveFolder(item.id, targetFolderId);
+      showDragToast(`"${item.data?.name}" moved`);
+      await fetchFolders();
+      // Auto-expand parent to show the moved folder
+      if (targetFolderId) setExpanded((prev) => new Set([...prev, targetFolderId]));
+    } catch (err) {
+      console.error("Move folder error:", err);
+      showDragToast(err?.response?.data?.message || "Move failed", "error");
+    } finally {
+      setActionLoading(false);
+      setDragItem(null);
+      dragItemRef.current = null;
+      removeDragGhost();
+    }
+  }, [showDragToast, fetchFolders, removeDragGhost]);
+
   // Lock scroll on modal
   useEffect(() => {
     const open = showAddModal || showRenameModal || showDocsModal;
@@ -509,6 +616,35 @@ export default function FolderHierarchy() {
             </div>
           ) : (
             <div className="space-y-0.5">
+              {/* Root drop target — drop here to make a folder root-level */}
+              {dragItem && (
+                <div
+                  className={`flex items-center gap-2 py-2 px-3 rounded-xl border-2 border-dashed mb-2 transition-all duration-200 ${dropTargetId === "root" ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-500/10" : "border-slate-300 dark:border-slate-600"}`}
+                  onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "move"; }}
+                  onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setDropTargetId("root"); }}
+                  onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setDropTargetId(null); }}
+                  onDrop={async (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    setDropTargetId(null);
+                    const item = dragItemRef.current;
+                    if (!item) return;
+                    try {
+                      setActionLoading(true);
+                      await folderService.moveFolder(item.id, null);
+                      showDragToast(`"${item.data?.name}" moved to root`);
+                      await fetchFolders();
+                    } catch (err) {
+                      showDragToast(err?.response?.data?.message || "Move failed", "error");
+                    } finally {
+                      setActionLoading(false);
+                      setDragItem(null); dragItemRef.current = null; removeDragGhost();
+                    }
+                  }}
+                >
+                  <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Drop here to move to root level</span>
+                </div>
+              )}
               {filteredTree.map((folder) => (
                 <FolderTreeItem
                   key={folder.id}
@@ -521,6 +657,13 @@ export default function FolderHierarchy() {
                   onRename={openRename}
                   onViewDocs={handleViewDocs}
                   onOpenInDocuments={openInDocuments}
+                  dragItem={dragItem}
+                  dropTargetId={dropTargetId}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                  onDragEnterFolder={handleDragEnterFolder}
+                  onDragLeaveFolder={handleDragLeaveFolder}
+                  onDropOnFolder={handleDropOnFolder}
                 />
               ))}
             </div>
@@ -733,6 +876,42 @@ export default function FolderHierarchy() {
                 </Button>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ═══════════════════════════════════════ */}
+      {/* Drag Toast                              */}
+      {/* ═══════════════════════════════════════ */}
+      <AnimatePresence>
+        {dragToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-xl shadow-2xl text-sm font-medium flex items-center gap-2 ${dragToast.type === "error" ? "bg-red-600 text-white" : "bg-slate-900 dark:bg-white text-white dark:text-slate-900"}`}
+          >
+            {dragToast.type === "error" ? (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            ) : (
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+            )}
+            {dragToast.msg}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Drag active hint */}
+      <AnimatePresence>
+        {dragItem && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 px-5 py-3 rounded-xl bg-indigo-600 text-white text-sm font-medium shadow-2xl flex items-center gap-2 pointer-events-none"
+          >
+            <svg className="w-4 h-4 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" /></svg>
+            Drop on a folder to move "{dragItem.data?.name || "folder"}"
           </motion.div>
         )}
       </AnimatePresence>

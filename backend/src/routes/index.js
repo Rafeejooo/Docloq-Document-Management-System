@@ -9,6 +9,7 @@ import folderRoutes from './folder.routes.js';
 import formRoutes from './form.routes.js';
 import taskRoutes from './task.routes.js';
 import adminRoutes from './admin.routes.js';
+import trashRoutes from './trash.routes.js';
 
 const router = Router();
 
@@ -21,6 +22,7 @@ router.use('/folders', folderRoutes);
 router.use('/forms', formRoutes);
 router.use('/tasks', taskRoutes);
 router.use('/admin', adminRoutes);
+router.use('/trash', trashRoutes);
 
 // Health Check
 router.get('/health', (req, res) => {

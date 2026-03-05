@@ -683,6 +683,7 @@ export const formInstances = pgTable('form_instances', {
   status: formInstanceStatusEnum('status').default('draft'),
   
   // Dates
+  startDate: timestamp('start_date'),
   dueDate: timestamp('due_date'),
   completedAt: timestamp('completed_at'),
   
