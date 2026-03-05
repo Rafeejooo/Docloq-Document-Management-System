@@ -6,11 +6,13 @@ import {
   taskComments,
   users,
   documents,
+  documentVersions,
   forms,
   formInstances,
   formWorkflowSteps,
 } from '../db/schema.js';
 import { eq, and, desc, asc, sql, or, inArray } from 'drizzle-orm';
+import path from 'path';
 
 // ──────────────────────────────────────────────
 // Helper: resolve orgId (dev fallback)
@@ -328,5 +330,265 @@ export const addTaskComment = async (req, res) => {
   } catch (error) {
     console.error('Add task comment error:', error);
     res.status(500).json({ success: false, message: 'Failed to add comment' });
+  }
+};
+
+// ══════════════════════════════════════════════
+//  TASK DOCUMENT CONFIG (OnlyOffice integration by role)
+// ══════════════════════════════════════════════
+
+// GET /api/tasks/:id/document-config — OnlyOffice config based on task type
+export const getTaskDocumentConfig = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get task + linked workflow step
+    const [task] = await db.select().from(tasks).where(eq(tasks.id, id));
+    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+
+    const docId = task.relatedDocumentId;
+    if (!docId) return res.status(404).json({ success: false, message: 'No document linked to this task' });
+
+    const [doc] = await db.select().from(documents).where(eq(documents.id, docId));
+    if (!doc) return res.status(404).json({ success: false, message: 'Document not found' });
+
+    // Determine mode based on task type
+    // fill = edit, sign = edit, review = view, approve = view
+    const mode = (task.taskType === 'fill' || task.taskType === 'sign') ? 'edit' : 'view';
+
+    const ext = path.extname(doc.originalFilename || doc.filename).toLowerCase().slice(1);
+    const backendUrlDocker = process.env.BACKEND_URL_DOCKER || 'http://host.docker.internal:3000';
+    const onlyOfficeUrl = process.env.ONLYOFFICE_URL || 'http://localhost:8082';
+
+    const documentType = ext === 'docx' || ext === 'doc' ? 'word'
+      : ext === 'xlsx' || ext === 'xls' ? 'cell'
+      : ext === 'pptx' || ext === 'ppt' ? 'slide' : 'word';
+
+    const config = {
+      document: {
+        fileType: ext,
+        key: `${doc.id}-${doc.updatedAt?.getTime() || Date.now()}`,
+        title: doc.originalFilename || doc.filename,
+        url: `${backendUrlDocker}/api/documents/${doc.id}/file`,
+        permissions: {
+          edit: mode === 'edit',
+          download: true,
+          print: true,
+          review: false,
+          comment: task.taskType === 'review', // reviewers can add comments
+        },
+      },
+      documentType,
+      editorConfig: {
+        mode,
+        lang: 'en',
+        callbackUrl: mode === 'edit' ? `${backendUrlDocker}/api/documents/${doc.id}/callback` : undefined,
+        user: {
+          id: req.user?.id || 'guest',
+          name: req.user?.firstName ? `${req.user.firstName} ${req.user.lastName || ''}`.trim() : 'Guest User',
+        },
+        customization: {
+          autosave: false,
+          forcesave: false,
+          chat: false,
+          comments: task.taskType === 'review',
+          help: false,
+        },
+      },
+      type: 'desktop',
+    };
+
+    // Get workflow context (step order, total steps)
+    let workflowContext = null;
+    if (task.relatedFormInstanceId) {
+      const allSteps = await db.select({
+        step: formWorkflowSteps,
+        userName: users.firstName,
+        userLastName: users.lastName,
+      })
+        .from(formWorkflowSteps)
+        .leftJoin(users, eq(formWorkflowSteps.assignedTo, users.id))
+        .where(eq(formWorkflowSteps.formInstanceId, task.relatedFormInstanceId))
+        .orderBy(asc(formWorkflowSteps.stepOrder));
+
+      const currentStep = allSteps.find(s => s.step.taskId === id);
+
+      workflowContext = {
+        steps: allSteps.map(s => ({
+          id: s.step.id,
+          stepOrder: s.step.stepOrder,
+          action: s.step.action,
+          status: s.step.status,
+          assignee: s.userName ? `${s.userName}${s.userLastName ? ' ' + s.userLastName : ''}` : 'Unknown',
+          notes: s.step.notes,
+          completedAt: s.step.completedAt,
+        })),
+        currentStepOrder: currentStep?.step.stepOrder || null,
+        totalSteps: allSteps.length,
+      };
+    }
+
+    res.json({
+      success: true,
+      data: {
+        task,
+        document: doc,
+        config,
+        onlyOfficeUrl: `${onlyOfficeUrl}/web-apps/apps/api/documents/api.js`,
+        mode,
+        workflowContext,
+      },
+    });
+  } catch (error) {
+    console.error('Get task document config error:', error);
+    res.status(500).json({ success: false, message: 'Failed to get task document config' });
+  }
+};
+
+// PUT /api/tasks/:id/submit — submit a workflow step action
+// For review: { notes: "looks good" }
+// For approve: { approved: true/false, notes: "optional reason" }
+// For fill/sign: no body needed (just marks as complete)
+export const submitTaskAction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes, approved } = req.body;
+
+    const [task] = await db.select().from(tasks).where(eq(tasks.id, id));
+    if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+    if (task.status === 'completed') return res.status(400).json({ success: false, message: 'Task already completed' });
+    if (task.status === 'pending') return res.status(400).json({ success: false, message: 'Task is not yet active' });
+
+    // For approve action — if rejected, cancel the workflow
+    if (task.taskType === 'approve' && approved === false) {
+      // Mark task as cancelled
+      await db.update(tasks).set({
+        status: 'cancelled',
+        updatedAt: new Date(),
+      }).where(eq(tasks.id, id));
+
+      // Find and update linked workflow step
+      const [linkedStep] = await db.select().from(formWorkflowSteps)
+        .where(eq(formWorkflowSteps.taskId, id));
+
+      if (linkedStep) {
+        await db.update(formWorkflowSteps).set({
+          status: 'skipped',
+          notes: notes || 'Rejected by approver',
+          updatedAt: new Date(),
+        }).where(eq(formWorkflowSteps.id, linkedStep.id));
+
+        // Cancel all remaining pending steps
+        await db.update(formWorkflowSteps).set({
+          status: 'skipped',
+          updatedAt: new Date(),
+        }).where(and(
+          eq(formWorkflowSteps.formInstanceId, linkedStep.formInstanceId),
+          eq(formWorkflowSteps.status, 'pending'),
+        ));
+
+        // Cancel remaining pending tasks
+        const remainingSteps = await db.select().from(formWorkflowSteps)
+          .where(and(
+            eq(formWorkflowSteps.formInstanceId, linkedStep.formInstanceId),
+            eq(formWorkflowSteps.status, 'skipped'),
+          ));
+        for (const s of remainingSteps) {
+          if (s.taskId && s.taskId !== id) {
+            await db.update(tasks).set({ status: 'cancelled', updatedAt: new Date() })
+              .where(eq(tasks.id, s.taskId));
+          }
+        }
+
+        // Mark form instance as rejected
+        await db.update(formInstances).set({
+          status: 'cancelled',
+          updatedAt: new Date(),
+        }).where(eq(formInstances.id, linkedStep.formInstanceId));
+      }
+
+      // Save rejection comment
+      if (notes) {
+        const userId = await resolveUserId(req);
+        await db.insert(taskComments).values({
+          taskId: id,
+          content: `Rejected: ${notes}`,
+          createdBy: userId,
+        });
+      }
+
+      return res.json({ success: true, message: 'Task rejected, workflow cancelled', data: { status: 'cancelled' } });
+    }
+
+    // For review — save notes to the workflow step
+    if (task.taskType === 'review' && notes) {
+      const [linkedStep] = await db.select().from(formWorkflowSteps)
+        .where(eq(formWorkflowSteps.taskId, id));
+      if (linkedStep) {
+        await db.update(formWorkflowSteps).set({
+          notes,
+          updatedAt: new Date(),
+        }).where(eq(formWorkflowSteps.id, linkedStep.id));
+      }
+
+      // Also save as comment
+      const userId = await resolveUserId(req);
+      await db.insert(taskComments).values({
+        taskId: id,
+        content: `Review notes: ${notes}`,
+        createdBy: userId,
+      });
+    }
+
+    // Mark task completed
+    const [updated] = await db.update(tasks).set({
+      status: 'completed',
+      completedAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(tasks.id, id)).returning();
+
+    // Sync workflow step + activate next
+    const [linkedStep] = await db.select().from(formWorkflowSteps)
+      .where(eq(formWorkflowSteps.taskId, id));
+
+    if (linkedStep) {
+      await db.update(formWorkflowSteps).set({
+        status: 'completed',
+        completedAt: new Date(),
+        notes: notes || linkedStep.notes,
+        updatedAt: new Date(),
+      }).where(eq(formWorkflowSteps.id, linkedStep.id));
+
+      // Activate next step
+      const [nextStep] = await db.select().from(formWorkflowSteps)
+        .where(and(
+          eq(formWorkflowSteps.formInstanceId, linkedStep.formInstanceId),
+          eq(formWorkflowSteps.stepOrder, linkedStep.stepOrder + 1),
+        ));
+
+      if (nextStep) {
+        await db.update(formWorkflowSteps).set({
+          status: 'in_progress', updatedAt: new Date(),
+        }).where(eq(formWorkflowSteps.id, nextStep.id));
+
+        if (nextStep.taskId) {
+          await db.update(tasks).set({
+            status: 'in_progress', updatedAt: new Date(),
+          }).where(eq(tasks.id, nextStep.taskId));
+        }
+      } else {
+        // All steps done — complete the form instance
+        await db.update(formInstances).set({
+          status: 'completed',
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        }).where(eq(formInstances.id, linkedStep.formInstanceId));
+      }
+    }
+
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Submit task action error:', error);
+    res.status(500).json({ success: false, message: 'Failed to submit task action' });
   }
 };

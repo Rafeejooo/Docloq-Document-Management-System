@@ -37,6 +37,18 @@ const taskService = {
     return response.data;
   },
 
+  // Submit workflow action (fill/review/approve)
+  submitAction: async (id, data = {}) => {
+    const response = await api.put(`/tasks/${id}/submit`, data);
+    return response.data;
+  },
+
+  // Get task document config (OnlyOffice config based on task role)
+  getTaskDocumentConfig: async (id) => {
+    const response = await api.get(`/tasks/${id}/document-config`);
+    return response.data;
+  },
+
   // Delete task
   deleteTask: async (id) => {
     const response = await api.delete(`/tasks/${id}`);

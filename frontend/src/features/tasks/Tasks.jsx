@@ -1,30 +1,67 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Card from "@/components/ui/Card";
+import OnlyOfficeEditor from "@/components/onlyoffice/OnlyOfficeEditor";
 import taskService from "@/services/task.service";
 
 // ── Config ───────────────────────────────────
 const taskTypeConfig = {
   sign: {
-    label: "Signature", action: "Sign",
-    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>,
+    label: "Sign", action: "Sign Document", color: "violet", mode: "edit",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+      </svg>
+    ),
+    bg: "bg-violet-50 dark:bg-violet-500/10",
+    border: "border-violet-100 dark:border-violet-500/20",
+    text: "text-violet-600 dark:text-violet-400",
   },
   fill: {
-    label: "Form", action: "Fill Out",
-    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+    label: "Fill", action: "Edit Document", color: "blue", mode: "edit",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+      </svg>
+    ),
+    bg: "bg-blue-50 dark:bg-blue-500/10",
+    border: "border-blue-100 dark:border-blue-500/20",
+    text: "text-blue-600 dark:text-blue-400",
   },
   review: {
-    label: "Review", action: "Review",
-    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>,
+    label: "Review", action: "Review Document", color: "amber", mode: "view",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+      </svg>
+    ),
+    bg: "bg-amber-50 dark:bg-amber-500/10",
+    border: "border-amber-100 dark:border-amber-500/20",
+    text: "text-amber-600 dark:text-amber-400",
   },
   approve: {
-    label: "Approve", action: "Approve",
-    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+    label: "Approve", action: "Review & Approve", color: "emerald", mode: "view",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+    bg: "bg-emerald-50 dark:bg-emerald-500/10",
+    border: "border-emerald-100 dark:border-emerald-500/20",
+    text: "text-emerald-600 dark:text-emerald-400",
   },
   general: {
-    label: "Task", action: "Complete",
-    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>,
+    label: "Task", action: "Complete", color: "slate", mode: "view",
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+      </svg>
+    ),
+    bg: "bg-slate-100 dark:bg-slate-800",
+    border: "border-slate-200 dark:border-slate-700",
+    text: "text-slate-600 dark:text-slate-400",
   },
 };
 
@@ -35,52 +72,122 @@ const priorityConfig = {
   low: { label: "Low", color: "bg-slate-400", ring: "ring-slate-400/20" },
 };
 
-const priorityOptions = [
-  { value: "all", label: "All Priorities" },
-  { value: "urgent", label: "Urgent", dot: "bg-rose-600" },
-  { value: "high", label: "High Priority", dot: "bg-rose-500" },
-  { value: "medium", label: "Medium Priority", dot: "bg-amber-500" },
-  { value: "low", label: "Low Priority", dot: "bg-slate-400" },
-];
+const statusConfig = {
+  pending: { label: "Waiting", dot: "bg-slate-400", bg: "bg-slate-100 dark:bg-slate-800", text: "text-slate-600 dark:text-slate-400" },
+  in_progress: { label: "Active", dot: "bg-indigo-500", bg: "bg-indigo-50 dark:bg-indigo-500/10", text: "text-indigo-600 dark:text-indigo-400" },
+  completed: { label: "Done", dot: "bg-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-500/10", text: "text-emerald-600 dark:text-emerald-400" },
+  cancelled: { label: "Rejected", dot: "bg-rose-500", bg: "bg-rose-50 dark:bg-rose-500/10", text: "text-rose-600 dark:text-rose-400" },
+};
 
 // ── Helpers ──────────────────────────────────
 const getDaysUntilDue = (dueDate) => {
   if (!dueDate) return null;
-  const due = new Date(dueDate);
-  const now = new Date();
-  return Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+  return Math.ceil((new Date(dueDate) - new Date()) / (1000 * 60 * 60 * 24));
 };
 
-const formatDisplayDate = (dateStr) => {
+const formatDate = (dateStr) => {
   if (!dateStr) return "—";
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 };
 
+// ── Workflow Progress Steps ──────────────────
+function WorkflowProgress({ steps, currentStepOrder }) {
+  if (!steps || steps.length === 0) return null;
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-3">Workflow Progress</p>
+      <div className="relative">
+        {steps.map((step, i) => {
+          const isActive = step.stepOrder === currentStepOrder;
+          const isDone = step.status === "completed";
+          const isSkipped = step.status === "skipped";
+          const cfg = taskTypeConfig[step.action] || taskTypeConfig.general;
+          return (
+            <div key={step.id} className="flex items-start gap-3 relative">
+              {/* Vertical line */}
+              {i < steps.length - 1 && (
+                <div className={`absolute left-[15px] top-8 bottom-0 w-0.5 ${isDone ? "bg-emerald-300 dark:bg-emerald-600" : "bg-slate-200 dark:bg-slate-700"}`} />
+              )}
+              {/* Dot */}
+              <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 border-2 ${
+                isDone ? "bg-emerald-500 border-emerald-500 text-white"
+                : isSkipped ? "bg-rose-100 dark:bg-rose-500/20 border-rose-300 dark:border-rose-500/50 text-rose-500"
+                : isActive ? "bg-indigo-500 border-indigo-500 text-white animate-pulse"
+                : "bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-400"
+              }`}>
+                {isDone ? (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                ) : isSkipped ? (
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                ) : (
+                  <span className="text-xs font-bold">{step.stepOrder}</span>
+                )}
+              </div>
+              {/* Info */}
+              <div className={`pb-5 flex-1 min-w-0 ${isActive ? "" : "opacity-70"}`}>
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-semibold ${isActive ? "text-indigo-600 dark:text-indigo-400" : isDone ? "text-emerald-600 dark:text-emerald-400" : isSkipped ? "text-rose-500" : "text-slate-600 dark:text-slate-300"}`}>
+                    {cfg.label}
+                  </span>
+                  {isActive && (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400">
+                      CURRENT
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{step.assignee}</p>
+                {step.notes && (
+                  <p className="text-xs mt-1 px-2 py-1 rounded-md bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20">
+                    Note: {step.notes}
+                  </p>
+                )}
+                {step.completedAt && (
+                  <p className="text-[11px] text-slate-400 mt-0.5">{formatDate(step.completedAt)}</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════
+//  MAIN COMPONENT
+// ══════════════════════════════════════════════
 export default function Tasks() {
-  const [activeTab, setActiveTab] = useState("pending");
+  // ─── State ──────────────────────────────────
+  const [activeTab, setActiveTab] = useState("active");
+  const [filterType, setFilterType] = useState("all");
+  const [showTypeDropdown, setShowTypeDropdown] = useState(false);
+
+  const [allTasks, setAllTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Task detail / document view
   const [selectedTask, setSelectedTask] = useState(null);
-  const [showTaskModal, setShowTaskModal] = useState(false);
-  const [filterPriority, setFilterPriority] = useState("all");
-  const [showPriorityDropdown, setShowPriorityDropdown] = useState(false);
+  const [taskDocConfig, setTaskDocConfig] = useState(null);
+  const [showEditor, setShowEditor] = useState(false);
+  const [docConfigLoading, setDocConfigLoading] = useState(false);
+  const [workflowContext, setWorkflowContext] = useState(null);
+
+  // Review/Approve action state
+  const [reviewNotes, setReviewNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  // Calendar
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(null);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  // Data from API
-  const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  // ─── Fetch tasks ────────────────────────────
-  useEffect(() => {
-    fetchTasks();
-  }, []);
+  // ─── Fetch ──────────────────────────────────
+  useEffect(() => { fetchTasks(); }, []);
 
   const fetchTasks = async () => {
     setLoading(true);
     try {
       const res = await taskService.getTasks();
-      if (res.success) {
-        setTasks(res.data);
-      }
+      if (res.success) setAllTasks(res.data);
     } catch (err) {
       console.error("Failed to fetch tasks:", err);
     } finally {
@@ -88,25 +195,9 @@ export default function Tasks() {
     }
   };
 
-  // ─── Handlers ───────────────────────────────
-  const handleCompleteTask = async (taskId) => {
-    try {
-      const res = await taskService.completeTask(taskId);
-      if (res.success) {
-        setTasks((prev) =>
-          prev.map((t) =>
-            t.id === taskId ? { ...t, status: "completed", completedAt: new Date().toISOString() } : t
-          )
-        );
-        setShowTaskModal(false);
-        setSelectedTask(null);
-      }
-    } catch (err) {
-      console.error("Complete task error:", err);
-    }
-  };
-
-  const openTaskModal = async (task) => {
+  // ─── Open task detail ───────────────────────
+  const openTask = async (task) => {
+    // Get full task detail
     try {
       const res = await taskService.getTask(task.id);
       if (res.success) {
@@ -117,22 +208,141 @@ export default function Tasks() {
     } catch {
       setSelectedTask(task);
     }
-    setShowTaskModal(true);
+
+    // Fetch document config + workflow context
+    if (task.relatedDocumentId) {
+      setDocConfigLoading(true);
+      try {
+        const dcRes = await taskService.getTaskDocumentConfig(task.id);
+        if (dcRes.success) {
+          setTaskDocConfig(dcRes.data.config);
+          setWorkflowContext(dcRes.data.workflowContext);
+        }
+      } catch (err) {
+        console.error("Failed to fetch doc config:", err);
+      } finally {
+        setDocConfigLoading(false);
+      }
+    }
+
+    setReviewNotes("");
+  };
+
+  const closeTaskDetail = () => {
+    setSelectedTask(null);
+    setTaskDocConfig(null);
+    setWorkflowContext(null);
+    setReviewNotes("");
+  };
+
+  // ─── Open OnlyOffice editor ─────────────────
+  const openEditor = () => {
+    if (taskDocConfig) setShowEditor(true);
+  };
+
+  const closeEditor = () => {
+    setShowEditor(false);
+  };
+
+  // ─── Submit actions ─────────────────────────
+  const handleSubmitFill = async () => {
+    if (!selectedTask) return;
+    setSubmitting(true);
+    try {
+      const res = await taskService.submitAction(selectedTask.id, {});
+      if (res.success) {
+        await fetchTasks();
+        closeTaskDetail();
+      }
+    } catch (err) {
+      console.error("Submit fill error:", err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSubmitReview = async () => {
+    if (!selectedTask) return;
+    setSubmitting(true);
+    try {
+      const res = await taskService.submitAction(selectedTask.id, { notes: reviewNotes || undefined });
+      if (res.success) {
+        await fetchTasks();
+        closeTaskDetail();
+      }
+    } catch (err) {
+      console.error("Submit review error:", err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleApprove = async () => {
+    if (!selectedTask) return;
+    setSubmitting(true);
+    try {
+      const res = await taskService.submitAction(selectedTask.id, { approved: true, notes: reviewNotes || undefined });
+      if (res.success) {
+        await fetchTasks();
+        closeTaskDetail();
+      }
+    } catch (err) {
+      console.error("Approve error:", err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!selectedTask || !reviewNotes.trim()) return;
+    setSubmitting(true);
+    try {
+      const res = await taskService.submitAction(selectedTask.id, { approved: false, notes: reviewNotes });
+      if (res.success) {
+        await fetchTasks();
+        closeTaskDetail();
+      }
+    } catch (err) {
+      console.error("Reject error:", err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleSubmitSign = async () => {
+    if (!selectedTask) return;
+    setSubmitting(true);
+    try {
+      const res = await taskService.submitAction(selectedTask.id, {});
+      if (res.success) {
+        await fetchTasks();
+        closeTaskDetail();
+      }
+    } catch (err) {
+      console.error("Submit sign error:", err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // ─── Derived data ──────────────────────────
-  const filteredTasks = tasks.filter((task) => {
-    const matchesTab =
-      activeTab === "pending"
-        ? task.status === "pending" || task.status === "in_progress"
-        : task.status === "completed";
-    const matchesPriority = filterPriority === "all" || task.priority === filterPriority;
-    const matchesDate = !selectedCalendarDate || (task.dueDate && task.dueDate.startsWith(selectedCalendarDate));
-    return matchesTab && matchesPriority && matchesDate;
-  });
+  const filteredTasks = useMemo(() => {
+    return allTasks.filter((t) => {
+      const tabMatch =
+        activeTab === "active"
+          ? t.status === "pending" || t.status === "in_progress"
+          : activeTab === "completed"
+          ? t.status === "completed"
+          : t.status === "cancelled";
+      const typeMatch = filterType === "all" || t.taskType === filterType;
+      const dateMatch = !selectedCalendarDate || (t.dueDate && t.dueDate.startsWith(selectedCalendarDate));
+      return tabMatch && typeMatch && dateMatch;
+    });
+  }, [allTasks, activeTab, filterType, selectedCalendarDate]);
 
-  const pendingCount = tasks.filter((t) => t.status === "pending" || t.status === "in_progress").length;
-  const completedCount = tasks.filter((t) => t.status === "completed").length;
+  const activeCount = allTasks.filter((t) => t.status === "pending" || t.status === "in_progress").length;
+  const completedCount = allTasks.filter((t) => t.status === "completed").length;
+  const cancelledCount = allTasks.filter((t) => t.status === "cancelled").length;
 
   // ─── Calendar ──────────────────────────────
   const calendarData = useMemo(() => {
@@ -142,29 +352,364 @@ export default function Tasks() {
     const lastDay = new Date(year, month + 1, 0);
     const startPadding = firstDay.getDay();
     const days = [];
-
-    for (let i = 0; i < startPadding; i++) {
-      days.push({ day: null, date: null });
-    }
-
+    for (let i = 0; i < startPadding; i++) days.push({ day: null, date: null });
     for (let i = 1; i <= lastDay.getDate(); i++) {
       const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(i).padStart(2, "0")}`;
-      const dayTasks = tasks.filter(
-        (t) => t.dueDate && t.dueDate.startsWith(dateStr) && (t.status === "pending" || t.status === "in_progress")
-      );
-      days.push({
-        day: i,
-        date: dateStr,
-        tasks: dayTasks,
-        isToday: new Date().toDateString() === new Date(dateStr).toDateString(),
-      });
+      const dayTasks = allTasks.filter((t) => t.dueDate && t.dueDate.startsWith(dateStr) && (t.status === "pending" || t.status === "in_progress"));
+      days.push({ day: i, date: dateStr, tasks: dayTasks, isToday: new Date().toDateString() === new Date(dateStr).toDateString() });
     }
     return days;
-  }, [currentMonth, tasks]);
+  }, [currentMonth, allTasks]);
 
   const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-  // ─── Render ─────────────────────────────────
+  const typeFilterOptions = [
+    { value: "all", label: "All Types" },
+    { value: "fill", label: "Fill", cfg: taskTypeConfig.fill },
+    { value: "review", label: "Review", cfg: taskTypeConfig.review },
+    { value: "approve", label: "Approve", cfg: taskTypeConfig.approve },
+    { value: "sign", label: "Sign", cfg: taskTypeConfig.sign },
+  ];
+
+  // ══════════════════════════════════════════════
+  //  RENDER
+  // ══════════════════════════════════════════════
+
+  // ─── OnlyOffice Full-screen Editor ──────────
+  if (showEditor && taskDocConfig && selectedTask) {
+    return (
+      <OnlyOfficeEditor
+        config={taskDocConfig}
+        documentName={selectedTask.documentName || selectedTask.title}
+        documentId={selectedTask.relatedDocumentId}
+        onClose={closeEditor}
+      />
+    );
+  }
+
+  // ─── Task Detail View ───────────────────────
+  if (selectedTask) {
+    const cfg = taskTypeConfig[selectedTask.taskType] || taskTypeConfig.general;
+    const isActive = selectedTask.status === "in_progress";
+    const isDone = selectedTask.status === "completed";
+    const isCancelled = selectedTask.status === "cancelled";
+    const isPending = selectedTask.status === "pending";
+    const daysLeft = getDaysUntilDue(selectedTask.dueDate);
+    const isOverdue = isActive && daysLeft !== null && daysLeft < 0;
+
+    return (
+      <DashboardLayout>
+        <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto space-y-6">
+          {/* Back button */}
+          <button onClick={closeTaskDetail} className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            Back to Tasks
+          </button>
+
+          {/* Header Card */}
+          <Card className="p-6">
+            <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+              <div className={`w-14 h-14 rounded-2xl ${cfg.bg} ${cfg.border} border ${cfg.text} flex items-center justify-center flex-shrink-0`}>
+                {cfg.icon}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-1 flex-wrap">
+                  <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{selectedTask.title}</h1>
+                  <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${(statusConfig[selectedTask.status] || statusConfig.pending).bg} ${(statusConfig[selectedTask.status] || statusConfig.pending).text}`}>
+                    {(statusConfig[selectedTask.status] || statusConfig.pending).label}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">{selectedTask.description || "No description"}</p>
+                <div className="flex items-center gap-4 flex-wrap text-sm">
+                  <span className={`flex items-center gap-1.5 font-medium ${cfg.text}`}>
+                    {cfg.icon} {cfg.label}
+                  </span>
+                  <span className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                    Due: {formatDate(selectedTask.dueDate)}
+                    {isOverdue && <span className="text-rose-500 font-semibold ml-1">(Overdue!)</span>}
+                  </span>
+                  {selectedTask.priority && (
+                    <span className="flex items-center gap-1.5">
+                      <span className={`w-2 h-2 rounded-full ${(priorityConfig[selectedTask.priority] || priorityConfig.medium).color}`} />
+                      <span className="text-slate-500 dark:text-slate-400">{(priorityConfig[selectedTask.priority] || priorityConfig.medium).label}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Card>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left: Document + Actions */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Document Section */}
+              {selectedTask.relatedDocumentId && (
+                <Card className="p-6">
+                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
+                    <svg className="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    Document
+                  </h3>
+
+                  <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 mb-4">
+                    <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center flex-shrink-0">
+                      <svg className="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{selectedTask.documentName || "Document"}</p>
+                      <p className="text-xs text-slate-400">
+                        {cfg.mode === "edit" ? "You have edit access" : "View only access"}
+                      </p>
+                    </div>
+
+                    {/* Open Document button — only for active tasks */}
+                    {isActive && taskDocConfig && (
+                      <button onClick={openEditor}
+                        className={`px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl flex items-center gap-2 ${
+                          cfg.mode === "edit"
+                            ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/25"
+                            : "bg-slate-700 hover:bg-slate-800 text-white shadow-slate-500/25"
+                        }`}>
+                        {cfg.mode === "edit" ? (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                        )}
+                        {cfg.mode === "edit" ? "Open & Edit" : "View Document"}
+                      </button>
+                    )}
+
+                    {docConfigLoading && (
+                      <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                    )}
+                  </div>
+
+                  {/* Pending info */}
+                  {isPending && (
+                    <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20">
+                      <p className="text-sm text-amber-700 dark:text-amber-400">
+                        <span className="font-semibold">Waiting:</span> This task will become active when the previous workflow step is completed.
+                      </p>
+                    </div>
+                  )}
+                </Card>
+              )}
+
+              {/* Action Panel — role-specific, only for active tasks */}
+              {isActive && (
+                <Card className="p-6">
+                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4">
+                    {selectedTask.taskType === "fill" && "Submit After Editing"}
+                    {selectedTask.taskType === "sign" && "Submit After Signing"}
+                    {selectedTask.taskType === "review" && "Review Notes"}
+                    {selectedTask.taskType === "approve" && "Approval Decision"}
+                    {!["fill", "sign", "review", "approve"].includes(selectedTask.taskType) && "Actions"}
+                  </h3>
+
+                  {/* Fill: edit + submit */}
+                  {selectedTask.taskType === "fill" && (
+                    <div className="space-y-3">
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Open the document, make your edits, save, then mark as complete.
+                      </p>
+                      <button onClick={handleSubmitFill} disabled={submitting}
+                        className="w-full px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2">
+                        {submitting ? (
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        )}
+                        Mark as Complete
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Sign: edit + submit */}
+                  {selectedTask.taskType === "sign" && (
+                    <div className="space-y-3">
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Open the document, add your signature, save, then submit.
+                      </p>
+                      <button onClick={handleSubmitSign} disabled={submitting}
+                        className="w-full px-4 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-semibold shadow-lg shadow-violet-500/25 transition-all flex items-center justify-center gap-2">
+                        {submitting ? (
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        )}
+                        Submit Signed Document
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Review: view + notes */}
+                  {selectedTask.taskType === "review" && (
+                    <div className="space-y-4">
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        View the document, then add your review notes. The filler will see your feedback if rejected.
+                      </p>
+                      <textarea
+                        value={reviewNotes}
+                        onChange={(e) => setReviewNotes(e.target.value)}
+                        placeholder="Add your review notes here... (optional)"
+                        rows={4}
+                        className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
+                      />
+                      <button onClick={handleSubmitReview} disabled={submitting}
+                        className="w-full px-4 py-3 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-semibold shadow-lg shadow-amber-500/25 transition-all flex items-center justify-center gap-2">
+                        {submitting ? (
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        )}
+                        Complete Review
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Approve: view + approve/reject */}
+                  {selectedTask.taskType === "approve" && (
+                    <div className="space-y-4">
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Review the document, then approve or reject. A reason is required when rejecting.
+                      </p>
+                      <textarea
+                        value={reviewNotes}
+                        onChange={(e) => setReviewNotes(e.target.value)}
+                        placeholder="Add notes or rejection reason..."
+                        rows={3}
+                        className="w-full px-4 py-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
+                      />
+                      <div className="flex gap-3">
+                        <button onClick={handleReject} disabled={submitting || !reviewNotes.trim()}
+                          className="flex-1 px-4 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-semibold shadow-lg shadow-rose-500/25 transition-all flex items-center justify-center gap-2">
+                          {submitting ? (
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                          )}
+                          Reject
+                        </button>
+                        <button onClick={handleApprove} disabled={submitting}
+                          className="flex-1 px-4 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2">
+                          {submitting ? (
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                          )}
+                          Approve
+                        </button>
+                      </div>
+                      {!reviewNotes.trim() && (
+                        <p className="text-xs text-rose-500">A reason is required to reject.</p>
+                      )}
+                    </div>
+                  )}
+                </Card>
+              )}
+
+              {/* Completed / Cancelled badge */}
+              {(isDone || isCancelled) && (
+                <Card className={`p-6 ${isDone ? "bg-emerald-50/50 dark:bg-emerald-500/5 border-emerald-200 dark:border-emerald-500/20" : "bg-rose-50/50 dark:bg-rose-500/5 border-rose-200 dark:border-rose-500/20"}`}>
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDone ? "bg-emerald-100 dark:bg-emerald-500/20" : "bg-rose-100 dark:bg-rose-500/20"}`}>
+                      {isDone ? (
+                        <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                      ) : (
+                        <svg className="w-6 h-6 text-rose-600 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      )}
+                    </div>
+                    <div>
+                      <p className={`font-semibold ${isDone ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}>
+                        {isDone ? "Task Completed" : "Task Rejected"}
+                      </p>
+                      <p className={`text-xs ${isDone ? "text-emerald-600 dark:text-emerald-500" : "text-rose-600 dark:text-rose-500"}`}>
+                        {formatDate(selectedTask.completedAt || selectedTask.updatedAt)}
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Comments */}
+              {selectedTask.comments && selectedTask.comments.length > 0 && (
+                <Card className="p-6">
+                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4">
+                    Comments ({selectedTask.comments.length})
+                  </h3>
+                  <div className="space-y-3">
+                    {selectedTask.comments.map((c, i) => (
+                      <div key={c.comment?.id || c.id || i} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{c.authorName || "User"}</span>
+                          <span className="text-xs text-slate-400">{formatDate(c.comment?.createdAt || c.createdAt)}</span>
+                        </div>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">{c.comment?.content || c.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+            </div>
+
+            {/* Right: Info + Workflow */}
+            <div className="space-y-6">
+              {/* Task Info */}
+              <Card className="p-5 space-y-4">
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Details</h3>
+
+                {selectedTask.assignee && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center">
+                      <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                        {selectedTask.assignee.avatar || selectedTask.assignee.name?.charAt(0)?.toUpperCase() || "?"}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{selectedTask.assignee.name}</p>
+                      <p className="text-xs text-slate-400">Assigned to</p>
+                    </div>
+                  </div>
+                )}
+
+                {selectedTask.assignedBy && (
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
+                      <span className="text-xs font-bold text-slate-600 dark:text-slate-300">
+                        {selectedTask.assignedBy.avatar || selectedTask.assignedBy.name?.charAt(0)?.toUpperCase() || "?"}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{selectedTask.assignedBy.name}</p>
+                      <p className="text-xs text-slate-400">Assigned by</p>
+                    </div>
+                  </div>
+                )}
+
+                {selectedTask.formName && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/20">
+                    <svg className="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    <span className="text-sm font-medium text-violet-600 dark:text-violet-400">{selectedTask.formName}</span>
+                  </div>
+                )}
+              </Card>
+
+              {/* Workflow Progress */}
+              {workflowContext && (
+                <Card className="p-5">
+                  <WorkflowProgress steps={workflowContext.steps} currentStepOrder={workflowContext.currentStepOrder} />
+                </Card>
+              )}
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // ══════════════════════════════════════════════
+  //  TASK LIST VIEW (default)
+  // ══════════════════════════════════════════════
   return (
     <DashboardLayout>
       <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6 sm:space-y-8">
@@ -180,34 +725,40 @@ export default function Tasks() {
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">My Tasks</h1>
             </div>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              Manage your assigned tasks, signatures, and form submissions
+              Your assigned workflow tasks — fill, review, approve, and sign documents
             </p>
           </div>
 
           {/* Stats */}
           <div className="flex gap-3">
             <div className="flex-1 sm:flex-none px-4 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-              <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{pendingCount}</p>
-              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Pending</p>
+              <p className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">{activeCount}</p>
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Active</p>
             </div>
-            <div className="flex-1 sm:flex-none px-4 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20">
-              <p className="text-xl sm:text-2xl font-bold text-indigo-600 dark:text-indigo-400">{completedCount}</p>
-              <p className="text-xs font-medium text-indigo-600/70 dark:text-indigo-400/70">Completed</p>
+            <div className="flex-1 sm:flex-none px-4 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20">
+              <p className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400">{completedCount}</p>
+              <p className="text-xs font-medium text-emerald-600/70 dark:text-emerald-400/70">Completed</p>
             </div>
+            {cancelledCount > 0 && (
+              <div className="flex-1 sm:flex-none px-4 sm:px-5 py-3 rounded-xl sm:rounded-2xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20">
+                <p className="text-xl sm:text-2xl font-bold text-rose-600 dark:text-rose-400">{cancelledCount}</p>
+                <p className="text-xs font-medium text-rose-600/70 dark:text-rose-400/70">Rejected</p>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Main */}
+        {/* Main Grid */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 xl:gap-8">
           {/* Tasks Column */}
           <div className="xl:col-span-2 space-y-4 sm:space-y-6">
-            {/* Filters */}
+            {/* Tabs + Filters */}
             <div className="flex flex-col gap-3 sm:gap-4">
-              {/* Tabs */}
               <div className="inline-flex p-1 sm:p-1.5 rounded-xl sm:rounded-2xl bg-slate-100 dark:bg-slate-800/50 shadow-inner w-full sm:w-auto">
                 {[
-                  { key: "pending", label: "Pending", count: pendingCount },
+                  { key: "active", label: "Active", count: activeCount },
                   { key: "completed", label: "Completed", count: completedCount },
+                  ...(cancelledCount > 0 ? [{ key: "cancelled", label: "Rejected", count: cancelledCount }] : []),
                 ].map((tab) => (
                   <button key={tab.key} onClick={() => setActiveTab(tab.key)}
                     className={`flex-1 sm:flex-none relative px-4 sm:px-5 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-sm font-semibold transition-all duration-200 ${
@@ -227,42 +778,37 @@ export default function Tasks() {
                 ))}
               </div>
 
-              {/* Priority filter + date indicator */}
+              {/* Type filter + date */}
               <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                 {selectedCalendarDate && (
                   <button onClick={() => setSelectedCalendarDate(null)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 text-sm text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors">
-                    <span className="text-xs sm:text-sm">{formatDisplayDate(selectedCalendarDate)}</span>
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 text-sm text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 transition-colors">
+                    <span className="text-xs sm:text-sm">{formatDate(selectedCalendarDate)}</span>
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 )}
 
                 <div className="relative">
-                  <button onClick={() => setShowPriorityDropdown(!showPriorityDropdown)}
+                  <button onClick={() => setShowTypeDropdown(!showTypeDropdown)}
                     className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all">
-                    <span className="text-sm text-slate-500 dark:text-slate-400">Priority:</span>
-                    <div className="flex items-center gap-2">
-                      {filterPriority !== "all" && (<span className={`w-2 h-2 rounded-full ${priorityConfig[filterPriority]?.color}`} />)}
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{priorityOptions.find(p => p.value === filterPriority)?.label}</span>
-                    </div>
-                    <svg className={`w-4 h-4 text-slate-400 transition-transform ${showPriorityDropdown ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    <span className="text-sm text-slate-500">Type:</span>
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                      {typeFilterOptions.find((o) => o.value === filterType)?.label}
+                    </span>
+                    <svg className={`w-4 h-4 text-slate-400 transition-transform ${showTypeDropdown ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                   </button>
 
                   <AnimatePresence>
-                    {showPriorityDropdown && (
+                    {showTypeDropdown && (
                       <>
-                        <div className="fixed inset-0 z-10" onClick={() => setShowPriorityDropdown(false)} />
+                        <div className="fixed inset-0 z-10" onClick={() => setShowTypeDropdown(false)} />
                         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
                           className="absolute right-0 top-full mt-2 w-48 py-2 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl z-20">
-                          {priorityOptions.map((option) => (
+                          {typeFilterOptions.map((option) => (
                             <button key={option.value}
-                              onClick={() => { setFilterPriority(option.value); setShowPriorityDropdown(false); }}
-                              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${filterPriority === option.value ? "bg-indigo-50 dark:bg-indigo-500/10" : ""}`}>
-                              {option.dot ? <span className={`w-2 h-2 rounded-full ${option.dot}`} /> : <span className="w-2" />}
-                              <span className={`text-sm ${filterPriority === option.value ? "font-medium text-indigo-600 dark:text-indigo-400" : "text-slate-600 dark:text-slate-300"}`}>{option.label}</span>
-                              {filterPriority === option.value && (
-                                <svg className="w-4 h-4 ml-auto text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                              )}
+                              onClick={() => { setFilterType(option.value); setShowTypeDropdown(false); }}
+                              className={`w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${filterType === option.value ? "bg-indigo-50 dark:bg-indigo-500/10" : ""}`}>
+                              <span className={`text-sm ${filterType === option.value ? "font-medium text-indigo-600 dark:text-indigo-400" : "text-slate-600 dark:text-slate-300"}`}>{option.label}</span>
                             </button>
                           ))}
                         </motion.div>
@@ -280,9 +826,9 @@ export default function Tasks() {
               </div>
             )}
 
-            {/* Tasks List */}
+            {/* Task Cards */}
             {!loading && (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {filteredTasks.length === 0 ? (
                   <Card className="p-16 text-center">
                     <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
@@ -291,101 +837,85 @@ export default function Tasks() {
                       </svg>
                     </div>
                     <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">
-                      {selectedCalendarDate ? "No tasks for this date" : activeTab === "pending" ? "All caught up!" : "No completed tasks yet"}
+                      {activeTab === "active" ? "No active tasks" : activeTab === "completed" ? "No completed tasks" : "No rejected tasks"}
                     </h3>
                     <p className="text-sm text-slate-500 dark:text-slate-400">
-                      {selectedCalendarDate
-                        ? "Try selecting another date or clear the filter"
-                        : activeTab === "pending"
-                        ? "You have no pending tasks."
-                        : "Completed tasks will appear here."}
+                      {activeTab === "active" ? "You're all caught up! Tasks assigned to you will appear here." : "Tasks will appear here once completed."}
                     </p>
                   </Card>
                 ) : (
                   filteredTasks.map((task, index) => {
-                    const config = taskTypeConfig[task.taskType] || taskTypeConfig.general;
-                    const daysUntilDue = getDaysUntilDue(task.dueDate);
-                    const isOverdue = (task.status === "pending" || task.status === "in_progress") && daysUntilDue !== null && daysUntilDue < 0;
-                    const isDueSoon = (task.status === "pending" || task.status === "in_progress") && daysUntilDue !== null && daysUntilDue >= 0 && daysUntilDue <= 2;
+                    const cfg = taskTypeConfig[task.taskType] || taskTypeConfig.general;
+                    const daysLeft = getDaysUntilDue(task.dueDate);
+                    const isOverdue = (task.status === "in_progress" || task.status === "pending") && daysLeft !== null && daysLeft < 0;
+                    const isDueSoon = (task.status === "in_progress" || task.status === "pending") && daysLeft !== null && daysLeft >= 0 && daysLeft <= 2;
+                    const stCfg = statusConfig[task.status] || statusConfig.pending;
 
                     return (
-                      <motion.div key={task.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }}
-                        onClick={() => openTaskModal(task)} className="cursor-pointer group">
-                        <Card className={`p-3.5 sm:p-5 hover:shadow-xl transition-all duration-300 border-l-4 ${
+                      <motion.div key={task.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04 }}
+                        onClick={() => openTask(task)} className="cursor-pointer group">
+                        <Card className={`p-4 sm:p-5 hover:shadow-xl transition-all duration-300 border-l-4 ${
                           isOverdue ? "border-l-rose-500 bg-rose-50/30 dark:bg-rose-500/5"
                           : isDueSoon ? "border-l-amber-500 bg-amber-50/30 dark:bg-amber-500/5"
-                          : "border-l-transparent hover:border-l-indigo-500"
+                          : task.status === "completed" ? "border-l-emerald-500"
+                          : task.status === "cancelled" ? "border-l-rose-400"
+                          : task.status === "in_progress" ? "border-l-indigo-500"
+                          : "border-l-slate-300 dark:border-l-slate-600"
                         }`}>
-                          <div className="flex items-start gap-3 sm:gap-5">
-                            {/* Type Icon */}
-                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg sm:rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center flex-shrink-0">
-                              {config.icon}
+                          <div className="flex items-start gap-4">
+                            {/* Type icon */}
+                            <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl ${cfg.bg} border ${cfg.border} ${cfg.text} flex items-center justify-center flex-shrink-0`}>
+                              {cfg.icon}
                             </div>
 
-                            {/* Info */}
+                            {/* Content */}
                             <div className="flex-1 min-w-0">
-                              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-4 mb-2">
-                                <div className="flex items-center gap-2 sm:gap-3">
-                                  <h3 className="font-semibold text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors line-clamp-1">
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-3 mb-1.5">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <h3 className="font-semibold text-sm sm:text-base text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">
                                     {task.title}
                                   </h3>
-                                  <span className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ring-2 sm:ring-4 flex-shrink-0 ${(priorityConfig[task.priority] || priorityConfig.medium).color} ${(priorityConfig[task.priority] || priorityConfig.medium).ring}`} />
+                                  <span className={`w-2 h-2 rounded-full ring-3 flex-shrink-0 ${(priorityConfig[task.priority] || priorityConfig.medium).color} ${(priorityConfig[task.priority] || priorityConfig.medium).ring}`} />
                                 </div>
-                                <span className="hidden sm:inline-block px-3 py-1 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                                  {config.label}
-                                </span>
-                              </div>
-
-                              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-3 sm:mb-4 line-clamp-1 sm:line-clamp-2">{task.description || "No description"}</p>
-
-                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
-                                <div className="flex items-center gap-3 sm:gap-4">
-                                  {/* Assigned By */}
-                                  {task.assignedBy && (
-                                    <div className="hidden sm:flex items-center gap-2">
-                                      <div className="w-7 h-7 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
-                                        <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300">{task.assignedBy.avatar || "?"}</span>
-                                      </div>
-                                      <span className="text-sm text-slate-500 dark:text-slate-400">{task.assignedBy.name}</span>
-                                    </div>
-                                  )}
-
-                                  {/* Due Date */}
-                                  <div className={`flex items-center gap-1.5 text-xs sm:text-sm ${isOverdue ? "text-rose-600 dark:text-rose-400" : isDueSoon ? "text-amber-600 dark:text-amber-400" : "text-slate-400"}`}>
-                                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                                    <span className="font-medium">
-                                      {task.status === "completed" ? formatDisplayDate(task.completedAt) : formatDisplayDate(task.dueDate)}
-                                    </span>
-                                  </div>
-
-                                  {/* Form name badge */}
-                                  {task.formName && (
-                                    <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-500/20">
-                                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                      {task.formName}
-                                    </span>
-                                  )}
-
-                                  {/* Mobile type badge */}
-                                  <span className="sm:hidden px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                                    {config.label}
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <span className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold ${stCfg.bg} ${stCfg.text}`}>
+                                    {stCfg.label}
+                                  </span>
+                                  <span className={`px-2 py-0.5 rounded-md text-[11px] font-medium ${cfg.bg} ${cfg.text} border ${cfg.border}`}>
+                                    {cfg.label}
                                   </span>
                                 </div>
+                              </div>
 
-                                {/* Action */}
-                                {task.status !== "completed" ? (
-                                  <button onClick={(e) => { e.stopPropagation(); handleCompleteTask(task.id); }}
-                                    className="w-full sm:w-auto px-4 sm:px-5 py-2 rounded-lg sm:rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-xl hover:-translate-y-0.5 transition-all">
-                                    {config.action}
-                                  </button>
-                                ) : (
-                                  <div className="w-full sm:w-auto flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-lg sm:rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20">
-                                    <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                                    <span className="text-xs sm:text-sm font-medium text-indigo-600 dark:text-indigo-400">Done</span>
-                                  </div>
+                              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-3 line-clamp-1">{task.description || "No description"}</p>
+
+                              <div className="flex items-center gap-3 sm:gap-4 flex-wrap text-xs sm:text-sm">
+                                {/* Due date */}
+                                <span className={`flex items-center gap-1.5 ${isOverdue ? "text-rose-600 dark:text-rose-400 font-semibold" : isDueSoon ? "text-amber-600 dark:text-amber-400" : "text-slate-400"}`}>
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                                  {task.status === "completed" ? formatDate(task.completedAt) : formatDate(task.dueDate)}
+                                </span>
+
+                                {/* Form */}
+                                {task.formName && (
+                                  <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-500/20">
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                    {task.formName}
+                                  </span>
+                                )}
+
+                                {/* Document */}
+                                {task.documentName && (
+                                  <span className="hidden sm:inline-flex items-center gap-1 text-slate-400">
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                    {task.documentName}
+                                  </span>
                                 )}
                               </div>
                             </div>
+
+                            {/* Arrow */}
+                            <svg className="w-5 h-5 text-slate-300 dark:text-slate-600 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                           </div>
                         </Card>
                       </motion.div>
@@ -424,11 +954,9 @@ export default function Tasks() {
               </div>
 
               <div className="grid grid-cols-7 gap-1">
-                {calendarData.map((dayData, index) => (
-                  <button key={index} disabled={!dayData.day}
-                    onClick={() => {
-                      if (dayData.date) setSelectedCalendarDate(selectedCalendarDate === dayData.date ? null : dayData.date);
-                    }}
+                {calendarData.map((dayData, idx) => (
+                  <button key={idx} disabled={!dayData.day}
+                    onClick={() => dayData.date && setSelectedCalendarDate(selectedCalendarDate === dayData.date ? null : dayData.date)}
                     className={`relative aspect-square rounded-lg flex flex-col items-center justify-center text-sm transition-all ${
                       !dayData.day ? "cursor-default"
                       : dayData.isToday ? "bg-indigo-600 text-white font-bold"
@@ -450,24 +978,28 @@ export default function Tasks() {
 
               {/* Upcoming */}
               <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
-                <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Upcoming Due Dates</h4>
+                <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Upcoming</h4>
                 <div className="space-y-2">
-                  {tasks
-                    .filter((t) => t.status === "pending" || t.status === "in_progress")
-                    .filter((t) => t.dueDate)
+                  {allTasks
+                    .filter((t) => (t.status === "pending" || t.status === "in_progress") && t.dueDate)
                     .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
-                    .slice(0, 4)
-                    .map((task) => (
-                      <div key={task.id} onClick={() => openTaskModal(task)}
-                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors">
-                        <span className={`w-2 h-2 rounded-full ${(priorityConfig[task.priority] || priorityConfig.medium).color}`} />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{task.title}</p>
-                          <p className="text-xs text-slate-400">{formatDisplayDate(task.dueDate)}</p>
+                    .slice(0, 5)
+                    .map((task) => {
+                      const cfg = taskTypeConfig[task.taskType] || taskTypeConfig.general;
+                      return (
+                        <div key={task.id} onClick={() => openTask(task)}
+                          className="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors">
+                          <div className={`w-7 h-7 rounded-md ${cfg.bg} ${cfg.text} flex items-center justify-center flex-shrink-0`}>
+                            <span className="scale-75">{cfg.icon}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{task.title}</p>
+                            <p className="text-xs text-slate-400">{formatDate(task.dueDate)}</p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  {tasks.filter((t) => (t.status === "pending" || t.status === "in_progress") && t.dueDate).length === 0 && (
+                      );
+                    })}
+                  {allTasks.filter((t) => (t.status === "pending" || t.status === "in_progress") && t.dueDate).length === 0 && (
                     <p className="text-xs text-slate-400 text-center py-4">No upcoming tasks</p>
                   )}
                 </div>
@@ -476,139 +1008,6 @@ export default function Tasks() {
           </div>
         </div>
       </div>
-
-      {/* Task Detail Modal */}
-      <AnimatePresence>
-        {showTaskModal && selectedTask && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
-            onClick={() => setShowTaskModal(false)}>
-            <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-md overflow-hidden"
-              onClick={(e) => e.stopPropagation()}>
-              {/* Header */}
-              <div className="relative px-6 pt-6 pb-4">
-                <div className="flex items-start justify-between">
-                  <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-100 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
-                    {(taskTypeConfig[selectedTask.taskType] || taskTypeConfig.general).icon}
-                  </div>
-                  <button onClick={() => setShowTaskModal(false)}
-                    className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-                    <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                  </button>
-                </div>
-
-                <div className="mt-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className={`w-2.5 h-2.5 rounded-full ring-4 ${(priorityConfig[selectedTask.priority] || priorityConfig.medium).color} ${(priorityConfig[selectedTask.priority] || priorityConfig.medium).ring}`} />
-                    <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-                      {(priorityConfig[selectedTask.priority] || priorityConfig.medium).label} Priority
-                    </span>
-                    {selectedTask.formName && (
-                      <span className="ml-2 px-2 py-0.5 rounded-md text-xs bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400">
-                        {selectedTask.formName}
-                      </span>
-                    )}
-                  </div>
-                  <h2 className="text-xl font-bold text-slate-900 dark:text-white">{selectedTask.title}</h2>
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="px-6 pb-6 space-y-5">
-                <p className="text-slate-600 dark:text-slate-300 leading-relaxed">{selectedTask.description || "No description provided."}</p>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
-                    <p className="text-xs text-slate-400 mb-1.5">Assigned by</p>
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-700 flex items-center justify-center">
-                        <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{selectedTask.assignedBy?.avatar || "?"}</span>
-                      </div>
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{selectedTask.assignedBy?.name || "System"}</span>
-                    </div>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
-                    <p className="text-xs text-slate-400 mb-1.5">Due date</p>
-                    <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{formatDisplayDate(selectedTask.dueDate)}</p>
-                  </div>
-                </div>
-
-                {/* Assignee */}
-                {selectedTask.assignee && (
-                  <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center">
-                      <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{selectedTask.assignee.avatar || "?"}</span>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{selectedTask.assignee.name}</p>
-                      <p className="text-xs text-slate-400">Assigned to</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Document */}
-                {selectedTask.documentName && (
-                  <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
-                    <div className="w-12 h-12 rounded-xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 flex items-center justify-center">
-                      <svg className="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{selectedTask.documentName}</p>
-                      <p className="text-xs text-slate-400">Related document</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Comments */}
-                {selectedTask.comments && selectedTask.comments.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Comments ({selectedTask.comments.length})</h4>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                      {selectedTask.comments.map((comment, i) => (
-                        <div key={comment.id || i} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">{comment.authorName || "Unknown"}</span>
-                            <span className="text-xs text-slate-400">{formatDisplayDate(comment.comment?.createdAt || comment.createdAt)}</span>
-                          </div>
-                          <p className="text-sm text-slate-600 dark:text-slate-400">{comment.comment?.content || comment.content}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Completed */}
-                {selectedTask.status === "completed" && (
-                  <div className="flex items-center gap-3 p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center">
-                      <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-indigo-700 dark:text-indigo-400">Completed</p>
-                      <p className="text-xs text-indigo-600 dark:text-indigo-500">{formatDisplayDate(selectedTask.completedAt)}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Actions */}
-                {selectedTask.status !== "completed" && (
-                  <div className="flex gap-3 pt-2">
-                    <button onClick={() => setShowTaskModal(false)}
-                      className="flex-1 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                      Cancel
-                    </button>
-                    <button onClick={() => handleCompleteTask(selectedTask.id)}
-                      className="flex-1 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg shadow-indigo-500/25 hover:shadow-xl transition-all">
-                      {(taskTypeConfig[selectedTask.taskType] || taskTypeConfig.general).action}
-                    </button>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </DashboardLayout>
   );
 }

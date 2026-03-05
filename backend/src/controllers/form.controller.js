@@ -9,6 +9,7 @@ import {
   tasks,
   users,
   documents,
+  documentVersions,
   trashItems,
 } from '../db/schema.js';
 import { eq, and, desc, asc, sql, count, inArray } from 'drizzle-orm';
@@ -16,6 +17,8 @@ import path from 'path';
 import fs from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { createBlankDocx, convertDocument, downloadFromUrl } from '../services/conversion.service.js';
+import { downloadFile, uploadFile } from '../services/storage.service.js';
+import { decryptFile, encryptFile as encryptFileService, generateDocumentKey } from '../services/encryption.service.js';
 
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
 const ensureUploadDir = async () => {
@@ -336,6 +339,75 @@ export const createFormInstance = async (req, res) => {
       if (firstUser) createdBy = firstUser.id;
     }
 
+    // ── Copy the template document if it has one ──
+    let copiedDocumentId = null;
+    const templateDocId = formTemplate.schema?.documentId;
+
+    if (templateDocId) {
+      // Fetch original document record
+      const [originalDoc] = await db.select().from(documents).where(eq(documents.id, templateDocId));
+
+      if (originalDoc) {
+        let fileBuffer = null;
+
+        // Strategy 1: Encrypted pipeline file (has a version with encryption data)
+        if (originalDoc.currentVersionId) {
+          try {
+            const [version] = await db.select().from(documentVersions)
+              .where(eq(documentVersions.id, originalDoc.currentVersionId));
+
+            if (version && version.encryptionKeyId && version.encryptionIv && version.s3Key) {
+              const encryptedBuffer = await downloadFile(version.s3Key);
+
+              let authTag = null;
+              try {
+                const metaBuffer = await downloadFile(`${version.s3Key}.meta.json`);
+                const meta = JSON.parse(metaBuffer.toString());
+                authTag = meta.authTag;
+              } catch { /* no meta file */ }
+
+              if (authTag) {
+                fileBuffer = decryptFile(encryptedBuffer, version.encryptionKeyId, version.encryptionIv, authTag);
+              }
+            }
+          } catch (err) {
+            console.warn('Encrypted copy failed, trying legacy:', err.message);
+          }
+        }
+
+        // Strategy 2: Legacy plain file in uploads/
+        if (!fileBuffer && originalDoc.filename) {
+          try {
+            const legacyPath = path.join(process.cwd(), 'uploads', originalDoc.filename);
+            fileBuffer = await fs.readFile(legacyPath);
+          } catch { /* file not found */ }
+        }
+
+        if (fileBuffer) {
+          // Save the copy as a new simple file in uploads/
+          const fileExt = path.extname(originalDoc.originalFilename || originalDoc.filename);
+          const copyFilename = `${randomUUID()}${fileExt}`;
+          const copyPath = path.join(UPLOAD_DIR, copyFilename);
+          await ensureUploadDir();
+          await fs.writeFile(copyPath, fileBuffer);
+
+          // Create new document record
+          const [copiedDoc] = await db.insert(documents).values({
+            organizationId: orgId,
+            filename: copyFilename,
+            originalFilename: `${name}${fileExt}`,
+            mimeType: originalDoc.mimeType,
+            fileSize: fileBuffer.length,
+            ownerId: createdBy,
+            status: 'active',
+          }).returning();
+
+          copiedDocumentId = copiedDoc.id;
+          console.log(`[CreateFormInstance] Copied template doc ${templateDocId} → ${copiedDocumentId}`);
+        }
+      }
+    }
+
     // Create instance
     const [instance] = await db.insert(formInstances).values({
       organizationId: orgId,
@@ -344,6 +416,7 @@ export const createFormInstance = async (req, res) => {
       status: 'active',
       startDate: startDate ? new Date(startDate) : null,
       dueDate: dueDate ? new Date(dueDate) : null,
+      generatedDocumentId: copiedDocumentId,
       createdBy,
     }).returning();
 
@@ -365,6 +438,7 @@ export const createFormInstance = async (req, res) => {
           description: `Workflow step: ${step.action} for form "${name}" (based on ${formTemplate.title})`,
           taskType: step.action,
           assignedTo: step.userId,
+          relatedDocumentId: copiedDocumentId,
           relatedFormId: formId,
           relatedFormInstanceId: instance.id,
           status: i === 0 ? 'in_progress' : 'pending', // First step is active
@@ -393,6 +467,7 @@ export const createFormInstance = async (req, res) => {
         ...instance,
         templateName: formTemplate.title,
         workflow: createdSteps,
+        copiedDocumentId,
       },
     });
   } catch (error) {
@@ -777,8 +852,8 @@ export const getTemplateDocument = async (req, res) => {
           name: req.user?.firstName ? `${req.user.firstName} ${req.user.lastName || ''}`.trim() : 'Guest User',
         },
         customization: {
-          autosave: true,
-          forcesave: true,
+          autosave: false,
+          forcesave: false,
           chat: false,
           comments: true,
           help: false,
