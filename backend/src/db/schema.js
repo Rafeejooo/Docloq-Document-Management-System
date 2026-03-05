@@ -27,6 +27,9 @@ export const taskPriorityEnum = pgEnum('task_priority', ['low', 'medium', 'high'
 export const auditActionEnum = pgEnum('audit_action', ['create', 'read', 'update', 'delete', 'download', 'share', 'verify', 'restore', 'archive']);
 export const shareTypeEnum = pgEnum('share_type', ['view_only', 'can_edit']);
 export const archiveStatusEnum = pgEnum('archive_status', ['active', 'glacier', 'deep_archive', 'deleted']);
+export const formInstanceStatusEnum = pgEnum('form_instance_status', ['draft', 'active', 'completed', 'cancelled']);
+export const workflowActionEnum = pgEnum('workflow_action', ['fill', 'review', 'approve', 'sign']);
+export const workflowStepStatusEnum = pgEnum('workflow_step_status', ['pending', 'in_progress', 'completed', 'skipped']);
 
 // Organizations
 export const organizations = pgTable('organizations', {
@@ -614,6 +617,8 @@ export const forms = pgTable('forms', {
   
   title: text('title').notNull(),
   description: text('description'),
+  icon: text('icon').default('document'), // document, user, calendar, receipt, star, clipboard
+  category: text('category'), // hr, finance, legal, operations, general
   
   // Form schema (JSON Schema format)
   schema: jsonb('schema').notNull(),
@@ -628,6 +633,9 @@ export const forms = pgTable('forms', {
   maxSubmissions: integer('max_submissions'),
   submissionCount: integer('submission_count').default(0),
   
+  // Usage tracking
+  usageCount: integer('usage_count').default(0),
+  
   // Linked template (optional - generate document from form)
   linkedTemplateId: uuid('linked_template_id').references(() => templates.id),
   
@@ -638,6 +646,7 @@ export const forms = pgTable('forms', {
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (table) => ({
   orgIdx: index('form_org_idx').on(table.organizationId),
+  categoryIdx: index('form_category_idx').on(table.category),
 }));
 
 
@@ -664,6 +673,57 @@ export const formSubmissions = pgTable('form_submissions', {
   formIdx: index('submission_form_idx').on(table.formId),
 }));
 
+// FORM INSTANCES (created from form templates with workflow)
+export const formInstances = pgTable('form_instances', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  organizationId: uuid('organization_id').references(() => organizations.id, { onDelete: 'cascade' }).notNull(),
+  formId: uuid('form_id').references(() => forms.id, { onDelete: 'cascade' }).notNull(),
+  
+  name: text('name').notNull(),
+  status: formInstanceStatusEnum('status').default('draft'),
+  
+  // Dates
+  dueDate: timestamp('due_date'),
+  completedAt: timestamp('completed_at'),
+  
+  // Generated document (when workflow completes)
+  generatedDocumentId: uuid('generated_document_id').references(() => documents.id),
+  
+  createdBy: uuid('created_by').references(() => users.id).notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('form_instance_org_idx').on(table.organizationId),
+  formIdx: index('form_instance_form_idx').on(table.formId),
+  statusIdx: index('form_instance_status_idx').on(table.status),
+}));
+
+// FORM WORKFLOW STEPS (ordered steps for form instances)
+export const formWorkflowSteps = pgTable('form_workflow_steps', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  formInstanceId: uuid('form_instance_id').references(() => formInstances.id, { onDelete: 'cascade' }).notNull(),
+  
+  stepOrder: integer('step_order').notNull(),
+  action: workflowActionEnum('action').notNull(),
+  
+  // Assignment
+  assignedTo: uuid('assigned_to').references(() => users.id).notNull(),
+  
+  // Status
+  status: workflowStepStatusEnum('status').default('pending'),
+  completedAt: timestamp('completed_at'),
+  notes: text('notes'),
+  
+  // Auto-linked task
+  taskId: uuid('task_id').references(() => tasks.id),
+  
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  instanceIdx: index('workflow_step_instance_idx').on(table.formInstanceId),
+  assigneeIdx: index('workflow_step_assignee_idx').on(table.assignedTo),
+}));
+
 // TASKS
 export const tasks = pgTable('tasks', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -672,6 +732,9 @@ export const tasks = pgTable('tasks', {
   title: text('title').notNull(),
   description: text('description'),
   
+  // Task type
+  taskType: text('task_type').default('general'), // general, fill, review, approve, sign
+  
   // Assignment
   assignedTo: uuid('assigned_to').references(() => users.id),
   assignedTeam: uuid('assigned_team').references(() => teams.id),
@@ -679,6 +742,8 @@ export const tasks = pgTable('tasks', {
   // Related entities
   relatedDocumentId: uuid('related_document_id').references(() => documents.id),
   relatedFolderId: uuid('related_folder_id').references(() => folders.id),
+  relatedFormId: uuid('related_form_id'),
+  relatedFormInstanceId: uuid('related_form_instance_id'),
   
   // Status & Priority
   status: taskStatusEnum('status').default('pending'),
@@ -1155,6 +1220,54 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
     references: [documents.id],
   }),
   comments: many(taskComments),
+}));
+
+export const formsRelations = relations(forms, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [forms.organizationId],
+    references: [organizations.id],
+  }),
+  creator: one(users, {
+    fields: [forms.createdBy],
+    references: [users.id],
+  }),
+  linkedTemplate: one(templates, {
+    fields: [forms.linkedTemplateId],
+    references: [templates.id],
+  }),
+  instances: many(formInstances),
+  submissions: many(formSubmissions),
+}));
+
+export const formInstancesRelations = relations(formInstances, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [formInstances.organizationId],
+    references: [organizations.id],
+  }),
+  form: one(forms, {
+    fields: [formInstances.formId],
+    references: [forms.id],
+  }),
+  creator: one(users, {
+    fields: [formInstances.createdBy],
+    references: [users.id],
+  }),
+  workflowSteps: many(formWorkflowSteps),
+}));
+
+export const formWorkflowStepsRelations = relations(formWorkflowSteps, ({ one }) => ({
+  formInstance: one(formInstances, {
+    fields: [formWorkflowSteps.formInstanceId],
+    references: [formInstances.id],
+  }),
+  assignee: one(users, {
+    fields: [formWorkflowSteps.assignedTo],
+    references: [users.id],
+  }),
+  task: one(tasks, {
+    fields: [formWorkflowSteps.taskId],
+    references: [tasks.id],
+  }),
 }));
 
 

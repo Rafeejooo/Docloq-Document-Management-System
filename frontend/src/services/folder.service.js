@@ -1,0 +1,43 @@
+// Folder Service - API calls for folder management
+
+import api from './api';
+
+const folderService = {
+  // Get all folders (flat list)
+  getAllFolders: async () => {
+    const response = await api.get('/folders');
+    return response.data;
+  },
+
+  // Get single folder with documents and children
+  getFolder: async (id) => {
+    const response = await api.get(`/folders/${id}`);
+    return response.data;
+  },
+
+  // Create folder
+  createFolder: async ({ name, parentId, color, icon, description }) => {
+    const response = await api.post('/folders', { name, parentId, color, icon, description });
+    return response.data;
+  },
+
+  // Update folder
+  updateFolder: async (id, data) => {
+    const response = await api.put(`/folders/${id}`, data);
+    return response.data;
+  },
+
+  // Delete folder (soft-delete)
+  deleteFolder: async (id) => {
+    const response = await api.delete(`/folders/${id}`);
+    return response.data;
+  },
+
+  // Move document to folder (or root if folderId is null)
+  moveDocument: async (documentId, folderId) => {
+    const response = await api.post('/folders/move-document', { documentId, folderId });
+    return response.data;
+  },
+};
+
+export default folderService;

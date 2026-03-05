@@ -5,25 +5,29 @@ import multer from 'multer';
 import { 
   getAllDocuments, 
   getDocument, 
-  uploadDocument, 
+  uploadDocument,
+  uploadDocumentSimple,
   serveDocument,
   downloadDocument, 
+  downloadDocumentDecrypted,
   deleteDocument,
   getOnlyOfficeConfig,
-  onlyOfficeCallback
+  onlyOfficeCallback,
+  getDocumentVersions,
+  verifyDocument,
+  verifyByShortCode,
 } from '../controllers/document.controller.js';
 import { optionalAuth, authenticate } from '../middlewares/auth.middleware.js';
 
 const router = Router();
 
-// Configure multer for memory storage (temporary)
+// Configure multer for memory storage
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit
+    fileSize: parseInt(process.env.MAX_FILE_SIZE_MB || '50', 10) * 1024 * 1024,
   },
   fileFilter: (req, file, cb) => {
-    // Allow office documents, PDFs, and text files
     const allowedMimes = [
       // Word
       'application/msword',
@@ -36,6 +40,9 @@ const upload = multer({
       'application/vnd.openxmlformats-officedocument.presentationml.presentation',
       // PDF
       'application/pdf',
+      // Images
+      'image/png',
+      'image/jpeg',
       // Text
       'text/plain',
       // OpenDocument
@@ -56,16 +63,22 @@ const upload = multer({
   },
 });
 
-// Routes - using optionalAuth for testing (change to requireAuth for production)
+// === Public / optional-auth routes ===
 router.get('/', optionalAuth, getAllDocuments);
+router.get('/verify', verifyByShortCode);              // Public QR code verification by short code
 router.get('/:id', optionalAuth, getDocument);
-router.post('/upload', optionalAuth, upload.single('file'), uploadDocument);
-router.get('/:id/file', serveDocument); // No auth for OnlyOffice to access
-router.get('/:id/download', optionalAuth, downloadDocument);
+router.get('/:id/file', serveDocument);                // No auth — OnlyOffice must access this
+
+// === Authenticated routes ===
+router.post('/upload', optionalAuth, upload.single('file'), uploadDocument);                  // Full pipeline
+router.post('/upload-simple', optionalAuth, upload.single('file'), uploadDocumentSimple);     // Legacy simple upload
+router.get('/:id/versions', optionalAuth, getDocumentVersions);
+router.get('/:id/download', optionalAuth, downloadDocumentDecrypted);                         // Decrypt + download
+router.post('/:id/verify', optionalAuth, upload.single('file'), verifyDocument);              // Verify document
 router.delete('/:id', optionalAuth, deleteDocument);
 
-// OnlyOffice specific routes
+// === OnlyOffice specific routes ===
 router.get('/:id/onlyoffice-config', optionalAuth, getOnlyOfficeConfig);
-router.post('/:id/callback', onlyOfficeCallback); // No auth - OnlyOffice callback
+router.post('/:id/callback', onlyOfficeCallback);      // No auth — OnlyOffice callback
 
 export default router;

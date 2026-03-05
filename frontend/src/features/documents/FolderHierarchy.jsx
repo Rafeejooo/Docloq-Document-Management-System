@@ -1,298 +1,219 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragOverlay,
-} from "@dnd-kit/core";
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  useSortable,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { useNavigate } from "react-router-dom";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
+import folderService from "@/services/folder.service";
+import documentService from "@/services/document.service";
 
-
-const folderDocuments = {
-  "1": [
-    { id: "doc-1", name: "Master Agreement 2025.pdf", type: "PDF", date: "Dec 28, 2025" },
-    { id: "doc-2", name: "Vendor Contract.docx", type: "DOCX", date: "Dec 25, 2025" },
-  ],
-  "1-1": [
-    { id: "doc-3", name: "Active Contract A.pdf", type: "PDF", date: "Dec 20, 2025" },
-    { id: "doc-4", name: "Active Contract B.pdf", type: "PDF", date: "Dec 18, 2025" },
-  ],
-  "2": [
-    { id: "doc-5", name: "Q4 Financial Report.xlsx", type: "XLSX", date: "Dec 15, 2025" },
-    { id: "doc-6", name: "Budget 2026.xlsx", type: "XLSX", date: "Dec 10, 2025" },
-  ],
-  "2-1": [
-    { id: "doc-7", name: "Invoice #1234.pdf", type: "PDF", date: "Dec 22, 2025" },
-    { id: "doc-8", name: "Invoice #1235.pdf", type: "PDF", date: "Dec 23, 2025" },
-  ],
-};
-
-// Sortable Folder Item Component
-function SortableFolderItem({ 
-  folder, 
-  depth = 0, 
-  expandedFolders, 
-  toggleExpand, 
-  onAddSubfolder,
-  onDelete,
-  onViewDocs,
-  onMoveToFolder,
-  allFolders,
-  globalIsDragging, 
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: folder.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+// ══════════════════════════════════════════════
+// Helpers
+// ══════════════════════════════════════════════
+function buildTree(flat) {
+  const map = {};
+  const roots = [];
+  flat.forEach((f) => { map[f.id] = { ...f, children: [] }; });
+  flat.forEach((f) => {
+    if (f.parentId && map[f.parentId]) map[f.parentId].children.push(map[f.id]);
+    else roots.push(map[f.id]);
+  });
+  const sort = (nodes) => {
+    nodes.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || a.name.localeCompare(b.name));
+    nodes.forEach((n) => sort(n.children));
   };
+  sort(roots);
+  return { roots, map };
+}
 
-  const isExpanded = expandedFolders.includes(folder.id);
-  const hasChildren = folder.children && folder.children.length > 0;
-  const [showMoveMenu, setShowMoveMenu] = useState(false);
-  const moveMenuRef = useRef(null);
+function countAll(nodes) {
+  return nodes.reduce((s, n) => s + 1 + countAll(n.children), 0);
+}
 
-  // Close move menu when global drag starts
-  useEffect(() => {
-    if (globalIsDragging) {
-      setShowMoveMenu(false);
+function getMaxDepth(nodes, d = 1) {
+  if (!nodes.length) return 0;
+  return Math.max(...nodes.map((n) => (n.children.length ? getMaxDepth(n.children, d + 1) : d)));
+}
+
+function countEmpty(nodes) {
+  return nodes.reduce((s, n) => s + ((n.documentCount || 0) === 0 ? 1 : 0) + countEmpty(n.children), 0);
+}
+
+function filterTree(nodes, q) {
+  if (!q) return nodes;
+  const lower = q.toLowerCase();
+  return nodes.reduce((acc, node) => {
+    const children = filterTree(node.children, q);
+    if (node.name.toLowerCase().includes(lower) || children.length) {
+      acc.push({ ...node, children });
     }
-  }, [globalIsDragging]);
-
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (moveMenuRef.current && !moveMenuRef.current.contains(event.target)) {
-        setShowMoveMenu(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return acc;
   }, []);
+}
 
-  
-  const getAvailableFolders = (items, excludeId, currentPath = "") => {
-    const result = [];
-    items.forEach(f => {
-      if (f.id !== excludeId) {
-        const path = currentPath ? `${currentPath} / ${f.name}` : f.name;
-        result.push({ id: f.id, name: f.name, path });
-        if (f.children && f.children.length > 0) {
-          result.push(...getAvailableFolders(f.children, excludeId, path));
-        }
-      }
-    });
-    return result;
+function getFileTypeLabel(mimeType, filename) {
+  const ext = (filename || "").split(".").pop().toLowerCase();
+  if (ext === "pdf" || mimeType?.includes("pdf")) return "PDF";
+  if (["docx", "doc"].includes(ext) || mimeType?.includes("word")) return "DOCX";
+  if (["xlsx", "xls"].includes(ext) || mimeType?.includes("sheet")) return "XLSX";
+  if (["pptx", "ppt"].includes(ext) || mimeType?.includes("presentation")) return "PPTX";
+  if (mimeType?.includes("image")) return "IMG";
+  return ext.toUpperCase() || "FILE";
+}
+
+function getFileTypeColor(label) {
+  const map = {
+    PDF: "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400",
+    DOCX: "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400",
+    XLSX: "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400",
+    PPTX: "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400",
+    IMG: "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400",
   };
+  return map[label] || "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400";
+}
 
-  const availableFolders = getAvailableFolders(allFolders, folder.id);
+function formatFileSize(bytes) {
+  if (!bytes) return "0 B";
+  const k = 1024, sizes = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+}
+
+function formatDate(d) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+// ══════════════════════════════════════════════
+// SVG Icons
+// ══════════════════════════════════════════════
+const ChevronRight = ({ className = "w-3.5 h-3.5" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+);
+const FolderIcon = ({ className = "w-4 h-4", style }) => (
+  <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+);
+const DocIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+);
+const PlusIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+);
+const TrashIcon = ({ className = "w-3.5 h-3.5" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+);
+const EditIcon = ({ className = "w-3.5 h-3.5" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+);
+const DownloadIcon = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+);
+const ExternalLinkIcon = ({ className = "w-3.5 h-3.5" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+);
+const SearchIcon = () => (
+  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+);
+const XIcon = ({ className = "w-5 h-5" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+);
+const SpinnerIcon = ({ className = "w-5 h-5" }) => (
+  <svg className={`animate-spin ${className}`} fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+);
+
+// ══════════════════════════════════════════════
+// FolderTreeItem – recursive tree node
+// ══════════════════════════════════════════════
+function FolderTreeItem({ folder, depth = 0, expanded, onToggle, onAddSub, onDelete, onRename, onViewDocs, onOpenInDocuments }) {
+  const hasChildren = folder.children?.length > 0;
+  const isExpanded = expanded.has(folder.id);
+  const docCount = folder.documentCount || 0;
+  const color = folder.color || "#6366f1";
 
   return (
-    <div ref={setNodeRef} style={{ ...style, marginLeft: depth > 0 ? `${depth * 24}px` : 0 }}>
-      <motion.div
-        layout
-        initial={{ opacity: 0, x: -10 }}
-        animate={{ opacity: 1, x: 0 }}
-        className={`group flex items-center gap-3 p-3 rounded-xl border-2 mb-2 transition-all bg-white dark:bg-slate-800 ${
-          isDragging 
-            ? "border-indigo-500 shadow-lg shadow-indigo-200 dark:shadow-indigo-900/30" 
-            : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
-        } ${depth > 0 ? "border-l-4 border-l-indigo-400" : ""}`}
+    <div>
+      {/* Row */}
+      <div
+        className={`group flex items-center gap-2 py-2.5 pr-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all ${isExpanded ? "bg-slate-50/50 dark:bg-slate-800/30" : ""}`}
+        style={{ paddingLeft: `${depth * 24 + 12}px` }}
       >
-        {/* Drag Handle */}
-        <div
-          {...attributes}
-          {...listeners}
-          className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-          </svg>
-        </div>
-
-        {/* Expand/Collapse */}
+        {/* Expand chevron */}
         <button
-          onClick={() => toggleExpand(folder.id)}
-          className={`w-6 h-6 rounded-lg flex items-center justify-center transition-colors ${
-            hasChildren 
-              ? "hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400" 
-              : "text-transparent cursor-default"
-          }`}
-          disabled={!hasChildren}
+          onClick={() => hasChildren && onToggle(folder.id)}
+          className={`w-5 h-5 flex items-center justify-center rounded transition-all flex-shrink-0 ${hasChildren ? "text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" : "invisible"}`}
         >
-          <motion.svg 
-            animate={{ rotate: isExpanded ? 90 : 0 }}
-            transition={{ duration: 0.2 }}
-            className="w-4 h-4" 
-            fill="none" 
-            stroke="currentColor" 
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </motion.svg>
+          <ChevronRight className={`w-3.5 h-3.5 transition-transform duration-200 ${isExpanded ? "rotate-90" : ""}`} />
         </button>
 
-        {/* Folder Icon */}
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
-          depth === 0 
-            ? "bg-gradient-to-br from-indigo-500 to-purple-600 text-white" 
-            : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-400"
-        }`}>
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-          </svg>
+        {/* Folder icon */}
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: `${color}18` }}>
+          <FolderIcon style={{ color }} className="w-4 h-4" />
         </div>
 
-        {/* Name */}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{folder.name}</p>
-          {hasChildren && (
-            <p className="text-xs text-slate-500 dark:text-slate-400">{folder.children.length} subfolder{folder.children.length !== 1 ? 's' : ''}</p>
-          )}
+        {/* Name + description */}
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => hasChildren ? onToggle(folder.id) : onViewDocs(folder)}>
+          <span className="text-sm font-medium text-slate-900 dark:text-white truncate block">{folder.name}</span>
+          {folder.description && <span className="text-[11px] text-slate-400 truncate block">{folder.description}</span>}
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center gap-1">
-          {/* View Documents */}
-          <button
-            onClick={() => onViewDocs(folder)}
-            className="p-2 rounded-lg bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
-            title="View documents"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+        {/* Document count badge */}
+        {docCount > 0 && (
+          <span className="px-2 py-0.5 text-[11px] rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 font-semibold flex-shrink-0" title={`${docCount} document${docCount > 1 ? "s" : ""}`}>
+            {docCount}
+          </span>
+        )}
+
+        {/* Children count */}
+        {hasChildren && (
+          <span className="px-1.5 py-0.5 text-[11px] rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 flex-shrink-0">
+            {folder.children.length}
+          </span>
+        )}
+
+        {/* Actions */}
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+          <button onClick={(e) => { e.stopPropagation(); onViewDocs(folder); }} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" title="View documents">
+            <DocIcon />
           </button>
-
-          {/* Add Subfolder - Hidden on mobile */}
-          <button
-            onClick={() => onAddSubfolder(folder.id)}
-            className="hidden sm:block p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-green-600 dark:hover:text-green-400 transition-colors"
-            title="Add subfolder"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
+          <button onClick={(e) => { e.stopPropagation(); onOpenInDocuments(folder.id); }} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors" title="Open in Documents">
+            <ExternalLinkIcon />
           </button>
-
-          {/* Move to Folder - Hidden on mobile */}
-          <div className="hidden sm:block relative" ref={moveMenuRef}>
-            <button
-              onClick={() => setShowMoveMenu(!showMoveMenu)}
-              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-              title="Move to folder"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-              </svg>
-            </button>
-            
-            <AnimatePresence>
-              {showMoveMenu && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                  className="absolute right-0 top-full mt-1 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-50 overflow-hidden"
-                >
-                  <div className="p-2 border-b border-slate-200 dark:border-slate-700">
-                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Move to folder</p>
-                  </div>
-                  <div className="max-h-48 overflow-y-auto">
-                    <button
-                      onClick={() => {
-                        onMoveToFolder(folder.id, null);
-                        setShowMoveMenu(false);
-                      }}
-                      className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
-                    >
-                      <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                      </svg>
-                      <span className="text-slate-700 dark:text-slate-300">Root Level</span>
-                    </button>
-                    {availableFolders.map(f => (
-                      <button
-                        key={f.id}
-                        onClick={() => {
-                          onMoveToFolder(folder.id, f.id);
-                          setShowMoveMenu(false);
-                        }}
-                        className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2"
-                      >
-                        <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                        </svg>
-                        <span className="text-slate-700 dark:text-slate-300 truncate">{f.path}</span>
-                      </button>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Delete */}
-          <button
-            onClick={() => onDelete(folder.id)}
-            className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-            title="Delete"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
+          <button onClick={(e) => { e.stopPropagation(); onAddSub(folder.id); }} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors" title="Add subfolder">
+            <PlusIcon className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); onRename(folder); }} className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 transition-colors" title="Rename">
+            <EditIcon />
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(folder.id, folder.name); }} className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors" title="Delete">
+            <TrashIcon />
           </button>
         </div>
-      </motion.div>
+      </div>
 
-      {/* Children */}
+      {/* Children (animated) */}
       <AnimatePresence>
         {isExpanded && hasChildren && (
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
+            className="overflow-hidden"
           >
-            <SortableContext items={folder.children.map(c => c.id)} strategy={verticalListSortingStrategy}>
-              {folder.children.map((child) => (
-                <SortableFolderItem
-                  key={child.id}
-                  folder={child}
-                  depth={depth + 1}
-                  expandedFolders={expandedFolders}
-                  toggleExpand={toggleExpand}
-                  onAddSubfolder={onAddSubfolder}
-                  onDelete={onDelete}
-                  onViewDocs={onViewDocs}
-                  onMoveToFolder={onMoveToFolder}
-                  allFolders={allFolders}
-                  globalIsDragging={globalIsDragging}
-                />
-              ))}
-            </SortableContext>
+            {folder.children.map((child) => (
+              <FolderTreeItem
+                key={child.id}
+                folder={child}
+                depth={depth + 1}
+                expanded={expanded}
+                onToggle={onToggle}
+                onAddSub={onAddSub}
+                onDelete={onDelete}
+                onRename={onRename}
+                onViewDocs={onViewDocs}
+                onOpenInDocuments={onOpenInDocuments}
+              />
+            ))}
           </motion.div>
         )}
       </AnimatePresence>
@@ -300,350 +221,186 @@ function SortableFolderItem({
   );
 }
 
-// Drag Overlay Item
-function DragOverlayItem({ folder }) {
-  return (
-    <div className="p-3 rounded-xl border-2 border-indigo-500 bg-white dark:bg-slate-800 shadow-2xl flex items-center gap-3">
-      <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-        </svg>
-      </div>
-      <p className="text-sm font-semibold text-slate-900 dark:text-white">{folder.name}</p>
-    </div>
-  );
-}
-
+// ══════════════════════════════════════════════
+// Main FolderHierarchy Page
+// ══════════════════════════════════════════════
 export default function FolderHierarchy() {
+  const navigate = useNavigate();
+
+  // ── Data ──
+  const [flatFolders, setFlatFolders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // ── UI ──
   const [searchQuery, setSearchQuery] = useState("");
-  const [showAddFolderModal, setShowAddFolderModal] = useState(false);
-  const [selectedParent, setSelectedParent] = useState(null);
+  const [expanded, setExpanded] = useState(new Set());
+
+  // ── Add Folder Modal ──
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addParentId, setAddParentId] = useState(null);
   const [newFolderName, setNewFolderName] = useState("");
-  const [expandedFolders, setExpandedFolders] = useState(["1", "2", "6"]);
-  const [activeId, setActiveId] = useState(null);
+  const [newFolderColor, setNewFolderColor] = useState("#6366f1");
+
+  // ── Rename Modal ──
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [renameTarget, setRenameTarget] = useState(null);
+  const [renameName, setRenameName] = useState("");
+
+  // ── View Documents Modal ──
   const [showDocsModal, setShowDocsModal] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState(null);
+  const [folderDocs, setFolderDocs] = useState([]);
+  const [docsLoading, setDocsLoading] = useState(false);
 
-  const [folders, setFolders] = useState([
-    {
-      id: "1",
-      name: "Contracts",
-      children: [
-        { id: "1-1", name: "Active Contracts", children: [] },
-        { id: "1-2", name: "Expired Contracts", children: [] },
-        { 
-          id: "1-3", 
-          name: "Templates", 
-          children: [
-            { id: "1-3-1", name: "NDA Templates", children: [] },
-            { id: "1-3-2", name: "Service Agreements", children: [] },
-          ] 
-        },
-      ],
-    },
-    {
-      id: "2",
-      name: "Financial",
-      children: [
-        { id: "2-1", name: "Invoices", children: [] },
-        { id: "2-2", name: "Reports", children: [] },
-        { id: "2-3", name: "Budgets", children: [] },
-      ],
-    },
-    {
-      id: "3",
-      name: "HR Documents",
-      children: [],
-    },
-    {
-      id: "4",
-      name: "Legal",
-      children: [],
-    },
-    {
-      id: "5",
-      name: "Marketing",
-      children: [],
-    },
-    {
-      id: "6",
-      name: "Reports",
-      children: [
-        { id: "6-1", name: "Q1 2025", children: [] },
-        { id: "6-2", name: "Q2 2025", children: [] },
-      ],
-    },
-  ]);
+  // ── Loading state ──
+  const [actionLoading, setActionLoading] = useState(false);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
+  const FOLDER_COLORS = ["#6366f1", "#ec4899", "#f59e0b", "#10b981", "#8b5cf6", "#06b6d4", "#ef4444", "#84cc16"];
 
-  // Find folder by ID in nested structure
-  const findFolder = (items, id) => {
-    for (const folder of items) {
-      if (folder.id === id) return folder;
-      if (folder.children && folder.children.length > 0) {
-        const found = findFolder(folder.children, id);
-        if (found) return found;
-      }
+  // ── Fetch folders ──
+  const fetchFolders = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await folderService.getAllFolders();
+      setFlatFolders(res.data || []);
+      setError(null);
+    } catch (err) {
+      setError("Failed to load folders");
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-    return null;
-  };
+  }, []);
 
-  // Find parent of a folder
-  const findParent = (items, id, parent = null) => {
-    for (const folder of items) {
-      if (folder.id === id) return parent;
-      if (folder.children && folder.children.length > 0) {
-        const found = findParent(folder.children, id, folder);
-        if (found !== undefined) return found;
-      }
-    }
-    return undefined;
-  };
+  useEffect(() => { fetchFolders(); }, [fetchFolders]);
 
-  // Get all folder IDs for sortable context
-  const getAllFolderIds = (items) => {
-    const ids = [];
-    items.forEach(folder => {
-      ids.push(folder.id);
-      if (folder.children && folder.children.length > 0) {
-        ids.push(...getAllFolderIds(folder.children));
-      }
+  // ── Derived data ──
+  const { roots: tree, map: folderMap } = useMemo(() => buildTree(flatFolders), [flatFolders]);
+  const filteredTree = useMemo(() => filterTree(tree, searchQuery), [tree, searchQuery]);
+
+  const stats = useMemo(() => ({
+    rootFolders: tree.length,
+    totalFolders: flatFolders.length,
+    maxDepth: tree.length ? getMaxDepth(tree) : 0,
+    emptyFolders: countEmpty(tree),
+    totalDocs: flatFolders.reduce((s, f) => s + (f.documentCount || 0), 0),
+  }), [tree, flatFolders]);
+
+  // ── Toggle expand ──
+  const toggleExpand = useCallback((id) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
     });
-    return ids;
-  };
+  }, []);
 
-  const countAllFolders = (items) => {
-    let count = items.length;
-    items.forEach(folder => {
-      if (folder.children) {
-        count += countAllFolders(folder.children);
-      }
-    });
-    return count;
-  };
+  const expandAll = () => setExpanded(new Set(flatFolders.map((f) => f.id)));
+  const collapseAll = () => setExpanded(new Set());
 
-  const countEmptyFolders = (items) => {
-    let count = 0;
-    items.forEach(folder => {
-      if (!folder.children || folder.children.length === 0) {
-        count++;
-      } else {
-        count += countEmptyFolders(folder.children);
-      }
-    });
-    return count;
-  };
-
-  const toggleExpand = (folderId) => {
-    setExpandedFolders(prev => 
-      prev.includes(folderId) 
-        ? prev.filter(id => id !== folderId)
-        : [...prev, folderId]
-    );
-  };
-
-  const handleAddFolder = () => {
-    if (!newFolderName.trim()) return;
-    
-    const newFolder = {
-      id: `folder-${Date.now()}`,
-      name: newFolderName,
-      children: [],
-    };
-
-    if (selectedParent) {
-      const addToChildren = (items) => {
-        return items.map(folder => {
-          if (folder.id === selectedParent) {
-            return { ...folder, children: [...folder.children, newFolder] };
-          }
-          if (folder.children && folder.children.length > 0) {
-            return { ...folder, children: addToChildren(folder.children) };
-          }
-          return folder;
-        });
-      };
-      setFolders(addToChildren(folders));
-      if (!expandedFolders.includes(selectedParent)) {
-        setExpandedFolders(prev => [...prev, selectedParent]);
-      }
-    } else {
-      setFolders(prev => [...prev, newFolder]);
+  // ── Create folder ──
+  const handleCreate = async () => {
+    if (!newFolderName.trim() || actionLoading) return;
+    try {
+      setActionLoading(true);
+      await folderService.createFolder({ name: newFolderName.trim(), parentId: addParentId, color: newFolderColor });
+      if (addParentId) setExpanded((prev) => new Set([...prev, addParentId]));
+      setShowAddModal(false);
+      setAddParentId(null);
+      setNewFolderName("");
+      setNewFolderColor("#6366f1");
+      await fetchFolders();
+    } catch (err) {
+      console.error("Create folder error:", err);
+    } finally {
+      setActionLoading(false);
     }
-
-    setNewFolderName("");
-    setSelectedParent(null);
-    setShowAddFolderModal(false);
   };
 
-  const handleDeleteFolder = (folderId) => {
-    const removeFolder = (items) => {
-      return items.filter(folder => folder.id !== folderId).map(folder => {
-        if (folder.children && folder.children.length > 0) {
-          return { ...folder, children: removeFolder(folder.children) };
-        }
-        return folder;
-      });
-    };
-    setFolders(removeFolder(folders));
-  };
-
-  const handleMoveToFolder = (folderId, targetParentId) => {
-    // Find and remove the folder
-    let movedFolder = null;
-    const removeFolder = (items) => {
-      return items.filter(folder => {
-        if (folder.id === folderId) {
-          movedFolder = { ...folder };
-          return false;
-        }
-        return true;
-      }).map(folder => {
-        if (folder.children && folder.children.length > 0) {
-          return { ...folder, children: removeFolder(folder.children) };
-        }
-        return folder;
-      });
-    };
-
-    let newFolders = removeFolder(folders);
-
-    if (movedFolder) {
-      if (targetParentId === null) {
-        // Move to root
-        newFolders = [...newFolders, movedFolder];
-      } else {
-        // Move to specific parent
-        const addToParent = (items) => {
-          return items.map(folder => {
-            if (folder.id === targetParentId) {
-              return { ...folder, children: [...(folder.children || []), movedFolder] };
-            }
-            if (folder.children && folder.children.length > 0) {
-              return { ...folder, children: addToParent(folder.children) };
-            }
-            return folder;
-          });
-        };
-        newFolders = addToParent(newFolders);
-        
-        // Expand target folder
-        if (!expandedFolders.includes(targetParentId)) {
-          setExpandedFolders(prev => [...prev, targetParentId]);
-        }
-      }
+  // ── Delete folder ──
+  const handleDelete = async (id, name) => {
+    if (!confirm(`Delete "${name}"? Documents inside will be moved to root.`)) return;
+    try {
+      setActionLoading(true);
+      await folderService.deleteFolder(id);
+      await fetchFolders();
+    } catch (err) {
+      console.error("Delete folder error:", err);
+    } finally {
+      setActionLoading(false);
     }
-
-    setFolders(newFolders);
   };
 
-  const handleViewDocs = (folder) => {
+  // ── Rename folder ──
+  const openRename = (folder) => {
+    setRenameTarget(folder);
+    setRenameName(folder.name);
+    setShowRenameModal(true);
+  };
+
+  const handleRename = async () => {
+    if (!renameName.trim() || !renameTarget || actionLoading) return;
+    try {
+      setActionLoading(true);
+      await folderService.updateFolder(renameTarget.id, { name: renameName.trim() });
+      setShowRenameModal(false);
+      setRenameTarget(null);
+      setRenameName("");
+      await fetchFolders();
+    } catch (err) {
+      console.error("Rename folder error:", err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // ── View documents ──
+  const handleViewDocs = async (folder) => {
     setSelectedFolder(folder);
     setShowDocsModal(true);
-  };
-
-  // Helper function to get all descendant folder IDs
-  const getAllDescendantIds = (folder) => {
-    const ids = [];
-    if (folder.children && folder.children.length > 0) {
-      folder.children.forEach(child => {
-        ids.push(child.id);
-        ids.push(...getAllDescendantIds(child));
-      });
-    }
-    return ids;
-  };
-
-  const handleDragStart = (event) => {
-    const draggedId = event.active.id;
-    setActiveId(draggedId);
-    
-    const draggedFolder = findFolder(folders, draggedId);
-    if (draggedFolder) {
-      const descendantIds = getAllDescendantIds(draggedFolder);
-      const idsToClose = [draggedId, ...descendantIds];
-      
-      setExpandedFolders(prev => 
-        prev.filter(id => !idsToClose.includes(id))
-      );
+    setDocsLoading(true);
+    setFolderDocs([]);
+    try {
+      const res = await folderService.getFolder(folder.id);
+      setFolderDocs(res.data?.documents || []);
+    } catch (err) {
+      console.error("Fetch docs error:", err);
+      setFolderDocs([]);
+    } finally {
+      setDocsLoading(false);
     }
   };
 
-  const handleDragEnd = (event) => {
-    const { active, over } = event;
-    setActiveId(null);
-
-    if (!over || active.id === over.id) return;
-
-    // Find the parent arrays containing active and over items
-    const activeParent = findParent(folders, active.id);
-    const overParent = findParent(folders, over.id);
-
-    if (activeParent === overParent) {
-      // Same parent - reorder within the same level
-      const parentArray = activeParent ? activeParent.children : folders;
-      const oldIndex = parentArray.findIndex(f => f.id === active.id);
-      const newIndex = parentArray.findIndex(f => f.id === over.id);
-
-      if (oldIndex !== -1 && newIndex !== -1) {
-        const newOrder = arrayMove(parentArray, oldIndex, newIndex);
-        
-        if (activeParent) {
-          // Update within a parent
-          const updateChildren = (items) => {
-            return items.map(folder => {
-              if (folder.id === activeParent.id) {
-                return { ...folder, children: newOrder };
-              }
-              if (folder.children && folder.children.length > 0) {
-                return { ...folder, children: updateChildren(folder.children) };
-              }
-              return folder;
-            });
-          };
-          setFolders(updateChildren(folders));
-        } else {
-          // Update root level
-          setFolders(newOrder);
-        }
-      }
+  // ── Download document ──
+  const handleDownload = async (doc) => {
+    try {
+      await documentService.downloadDocument(doc.id, doc.originalFilename);
+    } catch {
+      alert("Download failed");
     }
   };
 
-  const getFolderName = (folderId) => {
-    const folder = findFolder(folders, folderId);
-    return folder ? folder.name : "";
+  // ── Navigate to Documents page ──
+  const openInDocuments = (folderId) => {
+    navigate(`/documents?folder=${folderId}`);
   };
 
-  const getActiveFolder = () => {
-    return activeId ? findFolder(folders, activeId) : null;
-  };
+  // Lock scroll on modal
+  useEffect(() => {
+    const open = showAddModal || showRenameModal || showDocsModal;
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [showAddModal, showRenameModal, showDocsModal]);
 
-  const filteredFolders = folders.filter(folder =>
-    folder.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const docs = selectedFolder ? (folderDocuments[selectedFolder.id] || []) : [];
-
+  // ══════════════════════════════════════════
+  // Render
+  // ══════════════════════════════════════════
   return (
     <DashboardLayout>
       {/* Header */}
       <div className="mb-6">
-        <motion.h1 
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white mb-1"
-        >
+        <motion.h1 initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-white mb-1">
           Folder Hierarchy
         </motion.h1>
         <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm">
@@ -651,56 +408,16 @@ export default function FolderHierarchy() {
         </p>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         {[
-          { 
-            label: "Root Folders", 
-            value: folders.length, 
-            icon: (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
-            ),
-            color: "from-indigo-500 to-purple-600" 
-          },
-          { 
-            label: "Total Folders", 
-            value: countAllFolders(folders), 
-            icon: (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-            ),
-            color: "from-emerald-500 to-teal-600" 
-          },
-          { 
-            label: "Max Depth", 
-            value: 4, 
-            icon: (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            ),
-            color: "from-amber-500 to-orange-600" 
-          },
-          { 
-            label: "Empty Folders", 
-            value: countEmptyFolders(folders), 
-            icon: (
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-              </svg>
-            ),
-            color: "from-rose-500 to-pink-600" 
-          },
-        ].map((stat, index) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-          >
+          { label: "Root Folders", value: stats.rootFolders, color: "from-indigo-500 to-purple-600", icon: <FolderIcon className="w-5 h-5" /> },
+          { label: "Total Folders", value: stats.totalFolders, color: "from-emerald-500 to-teal-600", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg> },
+          { label: "Max Depth", value: stats.maxDepth, color: "from-amber-500 to-orange-600", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg> },
+          { label: "Empty Folders", value: stats.emptyFolders, color: "from-rose-500 to-pink-600", icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg> },
+          { label: "Total Documents", value: stats.totalDocs, color: "from-cyan-500 to-blue-600", icon: <DocIcon className="w-5 h-5" /> },
+        ].map((stat, i) => (
+          <motion.div key={stat.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}>
             <Card className="p-4" hover>
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.color} flex items-center justify-center text-white flex-shrink-0`}>
@@ -717,16 +434,9 @@ export default function FolderHierarchy() {
       </div>
 
       {/* Toolbar */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6"
-      >
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <SearchIcon />
           <input
             type="text"
             placeholder="Search folders..."
@@ -736,170 +446,142 @@ export default function FolderHierarchy() {
           />
         </div>
 
-        <button 
-          onClick={() => { setSelectedParent(null); setShowAddFolderModal(true); }}
-          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-700 hover:via-purple-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
-        >
-          <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-          </svg>
-          <span className="hidden sm:inline">Add Root Folder</span>
-          <span className="sm:hidden">Add Folder</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {flatFolders.length > 0 && (
+            <div className="flex p-1 rounded-xl bg-slate-100 dark:bg-slate-800">
+              <button onClick={expandAll} className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-all" title="Expand all">
+                Expand
+              </button>
+              <button onClick={collapseAll} className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-all" title="Collapse all">
+                Collapse
+              </button>
+            </div>
+          )}
+          <button
+            onClick={() => { setAddParentId(null); setShowAddModal(true); }}
+            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-700 hover:via-purple-700 hover:to-indigo-700 text-white text-xs sm:text-sm font-semibold shadow-lg shadow-purple-500/25 hover:shadow-purple-500/40 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <PlusIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Add Root Folder</span>
+            <span className="sm:hidden">Add</span>
+          </button>
+        </div>
       </motion.div>
 
-      {/* Info Banner */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25 }}
-        className="mb-6"
-      >
-        <Card className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border-indigo-200 dark:border-indigo-800">
-          <div className="flex items-start gap-3">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white flex-shrink-0">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-slate-900 dark:text-white mb-1">Drag & Drop to Reorganize</p>
-              <p className="text-xs text-slate-600 dark:text-slate-400">
-                Drag the handle (⋮⋮) to reorder folders. Use the move button to nest folders inside others.
-              </p>
-            </div>
-          </div>
-        </Card>
-      </motion.div>
-
-      {/* Folder Tree with DnD Kit */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
+      {/* Folder Tree */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
         <Card className="p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Folder Structure</h2>
-            <span className="text-xs text-slate-500 dark:text-slate-400">{filteredFolders.length} root folders</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              {filteredTree.length} root folder{filteredTree.length !== 1 ? "s" : ""}
+            </span>
           </div>
 
-          {filteredFolders.length === 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <SpinnerIcon className="w-8 h-8 text-indigo-500" />
+            </div>
+          ) : error ? (
+            <div className="text-center py-12">
+              <p className="text-sm text-red-500 mb-3">{error}</p>
+              <Button onClick={fetchFolders}>Retry</Button>
+            </div>
+          ) : filteredTree.length === 0 ? (
             <div className="text-center py-12">
               <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                </svg>
+                <FolderIcon className="w-6 h-6 text-slate-400" />
               </div>
-              <p className="text-sm font-medium text-slate-900 dark:text-white mb-1">No folders found</p>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Create a folder to get started</p>
+              <p className="text-sm font-medium text-slate-900 dark:text-white mb-1">
+                {searchQuery ? "No folders match your search" : "No folders yet"}
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+                {searchQuery ? "Try a different search term" : "Create a folder to get started"}
+              </p>
+              {!searchQuery && (
+                <button
+                  onClick={() => { setAddParentId(null); setShowAddModal(true); }}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium transition-colors"
+                >
+                  Create First Folder
+                </button>
+              )}
             </div>
           ) : (
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-            >
-              <SortableContext items={getAllFolderIds(folders)} strategy={verticalListSortingStrategy}>
-                {filteredFolders.map((folder) => (
-                  <SortableFolderItem
-                    key={folder.id}
-                    folder={folder}
-                    expandedFolders={expandedFolders}
-                    toggleExpand={toggleExpand}
-                    onAddSubfolder={(parentId) => {
-                      setSelectedParent(parentId);
-                      setShowAddFolderModal(true);
-                    }}
-                    onDelete={handleDeleteFolder}
-                    onViewDocs={handleViewDocs}
-                    onMoveToFolder={handleMoveToFolder}
-                    allFolders={folders}
-                    globalIsDragging={activeId !== null}
-                  />
-                ))}
-              </SortableContext>
-              
-              <DragOverlay>
-                {activeId && getActiveFolder() ? (
-                  <DragOverlayItem folder={getActiveFolder()} />
-                ) : null}
-              </DragOverlay>
-            </DndContext>
+            <div className="space-y-0.5">
+              {filteredTree.map((folder) => (
+                <FolderTreeItem
+                  key={folder.id}
+                  folder={folder}
+                  depth={0}
+                  expanded={expanded}
+                  onToggle={toggleExpand}
+                  onAddSub={(parentId) => { setAddParentId(parentId); setShowAddModal(true); }}
+                  onDelete={handleDelete}
+                  onRename={openRename}
+                  onViewDocs={handleViewDocs}
+                  onOpenInDocuments={openInDocuments}
+                />
+              ))}
+            </div>
           )}
         </Card>
       </motion.div>
 
-      {/* Add Folder Modal */}
+      {/* ═══════════════════════════════════════ */}
+      {/* Add Folder Modal                       */}
+      {/* ═══════════════════════════════════════ */}
       <AnimatePresence>
-        {showAddFolderModal && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50"
-          >
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-6 max-w-md w-full border border-slate-200 dark:border-slate-800"
-            >
+        {showAddModal && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-6 max-w-md w-full border border-slate-200 dark:border-slate-800">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                  {selectedParent ? "Add Subfolder" : "Add Root Folder"}
+                  {addParentId ? "Add Subfolder" : "Add Root Folder"}
                 </h2>
-                <button 
-                  onClick={() => { setShowAddFolderModal(false); setSelectedParent(null); setNewFolderName(""); }}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                <button onClick={() => { setShowAddModal(false); setAddParentId(null); setNewFolderName(""); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+                  <XIcon />
                 </button>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    Folder Name
-                  </label>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Folder Name</label>
                   <input
-                    type="text"
-                    value={newFolderName}
-                    onChange={(e) => setNewFolderName(e.target.value)}
+                    type="text" value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)}
                     placeholder="Enter folder name..."
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    autoFocus
-                    onKeyDown={(e) => e.key === "Enter" && handleAddFolder()}
+                    autoFocus onKeyDown={(e) => e.key === "Enter" && handleCreate()}
                   />
                 </div>
 
-                {selectedParent && (
+                {/* Color picker */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Color</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {FOLDER_COLORS.map((c) => (
+                      <button key={c} onClick={() => setNewFolderColor(c)}
+                        className={`w-8 h-8 rounded-lg transition-all ${newFolderColor === c ? "ring-2 ring-offset-2 ring-indigo-500 dark:ring-offset-slate-900 scale-110" : "hover:scale-105"}`}
+                        style={{ backgroundColor: c }} />
+                    ))}
+                  </div>
+                </div>
+
+                {addParentId && (
                   <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Adding subfolder to: <span className="font-semibold text-slate-900 dark:text-white">
-                        {getFolderName(selectedParent)}
-                      </span>
+                      Adding subfolder to: <span className="font-semibold text-slate-900 dark:text-white">{folderMap[addParentId]?.name || "Unknown"}</span>
                     </p>
                   </div>
                 )}
 
                 <div className="flex gap-3 pt-2">
-                  <Button 
-                    variant="outline" 
-                    className="flex-1"
-                    onClick={() => { setShowAddFolderModal(false); setSelectedParent(null); setNewFolderName(""); }}
-                  >
+                  <Button variant="outline" className="flex-1" onClick={() => { setShowAddModal(false); setAddParentId(null); setNewFolderName(""); }}>
                     Cancel
                   </Button>
-                  <Button 
-                    className="flex-1"
-                    onClick={handleAddFolder}
-                    disabled={!newFolderName.trim()}
-                  >
-                    Create Folder
+                  <Button className="flex-1" onClick={handleCreate} disabled={!newFolderName.trim() || actionLoading}>
+                    {actionLoading ? <SpinnerIcon className="w-4 h-4" /> : "Create Folder"}
                   </Button>
                 </div>
               </div>
@@ -908,89 +590,145 @@ export default function FolderHierarchy() {
         )}
       </AnimatePresence>
 
-      {/* Documents Modal */}
+      {/* ═══════════════════════════════════════ */}
+      {/* Rename Modal                           */}
+      {/* ═══════════════════════════════════════ */}
       <AnimatePresence>
-        {showDocsModal && selectedFolder && (
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50"
-          >
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-6 max-w-lg w-full border border-slate-200 dark:border-slate-800 max-h-[80vh] overflow-hidden flex flex-col"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                      {selectedFolder.name}
-                    </h2>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{docs.length} document{docs.length !== 1 ? 's' : ''}</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => { setShowDocsModal(false); setSelectedFolder(null); }}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+        {showRenameModal && renameTarget && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-6 max-w-md w-full border border-slate-200 dark:border-slate-800">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Rename Folder</h2>
+                <button onClick={() => { setShowRenameModal(false); setRenameTarget(null); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+                  <XIcon />
                 </button>
               </div>
 
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">New Name</label>
+                  <input
+                    type="text" value={renameName} onChange={(e) => setRenameName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    autoFocus onKeyDown={(e) => e.key === "Enter" && handleRename()}
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <Button variant="outline" className="flex-1" onClick={() => { setShowRenameModal(false); setRenameTarget(null); }}>
+                    Cancel
+                  </Button>
+                  <Button className="flex-1" onClick={handleRename} disabled={!renameName.trim() || renameName.trim() === renameTarget.name || actionLoading}>
+                    {actionLoading ? <SpinnerIcon className="w-4 h-4" /> : "Rename"}
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ═══════════════════════════════════════ */}
+      {/* View Documents Modal                   */}
+      {/* ═══════════════════════════════════════ */}
+      <AnimatePresence>
+        {showDocsModal && selectedFolder && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl p-6 max-w-lg w-full border border-slate-200 dark:border-slate-800 max-h-[80vh] overflow-hidden flex flex-col">
+
+              {/* Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${selectedFolder.color || "#6366f1"}20` }}>
+                    <FolderIcon className="w-5 h-5" style={{ color: selectedFolder.color || "#6366f1" }} />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{selectedFolder.name}</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                      {docsLoading ? "Loading..." : `${folderDocs.length} document${folderDocs.length !== 1 ? "s" : ""}`}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => openInDocuments(selectedFolder.id)}
+                    className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-indigo-600 transition-colors" title="Open in Documents page">
+                    <ExternalLinkIcon className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => { setShowDocsModal(false); setSelectedFolder(null); setFolderDocs([]); }}
+                    className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
+                    <XIcon />
+                  </button>
+                </div>
+              </div>
+
+              {/* Document List */}
               <div className="flex-1 overflow-y-auto">
-                {docs.length === 0 ? (
+                {docsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <SpinnerIcon className="w-6 h-6 text-indigo-500" />
+                  </div>
+                ) : folderDocs.length === 0 ? (
                   <div className="text-center py-12">
                     <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3">
-                      <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
+                      <DocIcon className="w-6 h-6 text-slate-400" />
                     </div>
                     <p className="text-sm font-medium text-slate-900 dark:text-white mb-1">No documents</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">This folder is empty</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">This folder is empty</p>
+                    <button onClick={() => openInDocuments(selectedFolder.id)}
+                      className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
+                      Open in Documents to upload
+                    </button>
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {docs.map((doc) => (
-                      <motion.div
-                        key={doc.id}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors cursor-pointer group"
-                      >
-                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-xs ${
-                          doc.type === 'PDF' ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' :
-                          doc.type === 'DOCX' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' :
-                          'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400'
-                        }`}>
-                          {doc.type}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{doc.name}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">{doc.date}</p>
-                        </div>
-                        <button className="p-2 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 transition-all">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
-                        </button>
-                      </motion.div>
-                    ))}
+                    {folderDocs.map((doc, idx) => {
+                      const typeLabel = getFileTypeLabel(doc.mimeType, doc.originalFilename);
+                      return (
+                        <motion.div
+                          key={doc.id}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: idx * 0.03 }}
+                          className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors group"
+                        >
+                          {/* File type badge */}
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-[11px] flex-shrink-0 ${getFileTypeColor(typeLabel)}`}>
+                            {typeLabel}
+                          </div>
+
+                          {/* File info */}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{doc.originalFilename}</p>
+                            <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                              <span>{formatFileSize(doc.fileSize)}</span>
+                              <span>·</span>
+                              <span>{formatDate(doc.createdAt)}</span>
+                            </div>
+                          </div>
+
+                          {/* Download */}
+                          <button
+                            onClick={() => handleDownload(doc)}
+                            className="p-2 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-all"
+                            title="Download"
+                          >
+                            <DownloadIcon />
+                          </button>
+                        </motion.div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
 
-              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
-                <Button className="w-full" onClick={() => { setShowDocsModal(false); setSelectedFolder(null); }}>
+              {/* Footer */}
+              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 flex gap-3">
+                <Button variant="outline" className="flex-1" onClick={() => openInDocuments(selectedFolder.id)}>
+                  Open in Documents
+                </Button>
+                <Button className="flex-1" onClick={() => { setShowDocsModal(false); setSelectedFolder(null); setFolderDocs([]); }}>
                   Close
                 </Button>
               </div>

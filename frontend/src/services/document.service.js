@@ -16,9 +16,10 @@ const documentService = {
   },
 
   // Upload document
-  uploadDocument: async (file, onProgress) => {
+  uploadDocument: async (file, onProgress, folderId) => {
     const formData = new FormData();
     formData.append('file', file);
+    if (folderId) formData.append('folderId', folderId);
 
     const response = await api.post('/documents/upload', formData, {
       headers: {
