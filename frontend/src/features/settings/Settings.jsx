@@ -31,6 +31,7 @@ export default function Settings() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showDeptDropdown, setShowDeptDropdown] = useState(false);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
+  const [showNewUserPassword, setShowNewUserPassword] = useState(false);
   const [showProfileDeptDropdown, setShowProfileDeptDropdown] = useState(false);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -109,7 +110,7 @@ export default function Settings() {
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
       </svg>
     )},
-    { id: "users", name: "User Management", mobileShort: "Users", icon: (
+    { id: "users", name: "User Management", mobileShort: "Users", adminOnly: true, icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
       </svg>
@@ -150,6 +151,8 @@ export default function Settings() {
     viewer: "Viewer"
   };
   const departments = ["Engineering", "Legal", "HR", "Marketing", "Finance", "Operations"];
+
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const filteredUsers = users.filter(user =>
     `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -325,7 +328,7 @@ export default function Settings() {
           {/* Mobile: Horizontal scrollable tabs */}
           <div className="lg:hidden overflow-x-auto pb-2 -mx-4 px-4">
             <div className="flex gap-2 min-w-max">
-              {tabs.map((tab) => (
+              {tabs.filter(tab => !tab.adminOnly || isAdmin).map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
@@ -356,7 +359,7 @@ export default function Settings() {
           {/* Desktop: Vertical tabs */}
           <Card className="p-2 hidden lg:block">
             <nav className="space-y-1">
-              {tabs.map((tab) => (
+              {tabs.filter(tab => !tab.adminOnly || isAdmin).map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
@@ -1022,14 +1025,31 @@ export default function Settings() {
                       </svg>
                     </div>
                     <input
-                      type="password"
+                      type={showNewUserPassword ? "text" : "password"}
                       value={newUserForm.password}
                       onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
-                      className="w-full pl-12 pr-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-500 transition-all text-slate-900 dark:text-slate-100 placeholder:text-slate-400"
+                      className="w-full pl-12 pr-12 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-500 transition-all text-slate-900 dark:text-slate-100 placeholder:text-slate-400"
                       placeholder="Min. 8 characters"
                       minLength={8}
                       required
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewUserPassword(!showNewUserPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                      tabIndex={-1}
+                    >
+                      {showNewUserPassword ? (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                        </svg>
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      )}
+                    </button>
                   </div>
                   <p className="text-xs text-slate-400">Minimum 8 characters</p>
                 </div>

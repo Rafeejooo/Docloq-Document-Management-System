@@ -74,7 +74,7 @@ export default function DashboardLayout({ children }) {
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
       </svg>
     )},
-    { name: "Role Management", href: "/roles", icon: (
+    { name: "Role Management", href: "/roles", adminOnly: true, icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
       </svg>
@@ -85,6 +85,8 @@ export default function DashboardLayout({ children }) {
       </svg>
     )},
   ];
+
+  const isUserAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const isActive = (path) => location.pathname === path;
 
@@ -131,7 +133,9 @@ export default function DashboardLayout({ children }) {
 
           {/* Navigation */}
           <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-            {navigation.map((item) => (
+            {navigation
+              .filter((item) => !item.adminOnly || isUserAdmin)
+              .map((item) => (
               <Link
                 key={item.name}
                 to={item.href}

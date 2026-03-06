@@ -15,25 +15,19 @@ import { eq, and, desc, asc, sql, or, inArray } from 'drizzle-orm';
 import path from 'path';
 
 // ──────────────────────────────────────────────
-// Helper: resolve orgId (dev fallback)
+// Helpers: extract auth info from JWT
 // ──────────────────────────────────────────────
-async function resolveOrgId(req) {
-  let orgId = req.user?.organizationId;
-  if (!orgId) {
-    const { organizations } = await import('../db/schema.js');
-    const [firstOrg] = await db.select().from(organizations).limit(1);
-    if (firstOrg) orgId = firstOrg.id;
-  }
-  return orgId;
+function resolveOrgId(req) {
+  return req.user?.organizationId || null;
 }
 
-async function resolveUserId(req) {
-  let userId = req.user?.id;
-  if (!userId) {
-    const [firstUser] = await db.select().from(users).limit(1);
-    if (firstUser) userId = firstUser.id;
-  }
-  return userId;
+function resolveUserId(req) {
+  return req.user?.userId || null;
+}
+
+function isAdmin(req) {
+  const role = req.user?.role;
+  return role === 'super_admin' || role === 'admin';
 }
 
 // ══════════════════════════════════════════════
@@ -43,15 +37,21 @@ async function resolveUserId(req) {
 // GET /api/tasks — list tasks (optional filters: status, assignedTo)
 export const getTasks = async (req, res) => {
   try {
-    const orgId = await resolveOrgId(req);
+    const orgId = resolveOrgId(req);
     if (!orgId) return res.status(400).json({ success: false, message: 'No organization found' });
 
+    const userId = resolveUserId(req);
     const { status, priority } = req.query;
 
     // Build conditions
     const conditions = [eq(tasks.organizationId, orgId)];
     if (status) conditions.push(eq(tasks.status, status));
     if (priority) conditions.push(eq(tasks.priority, priority));
+
+    // Non-admin users only see tasks assigned to them
+    if (!isAdmin(req) && userId) {
+      conditions.push(eq(tasks.assignedTo, userId));
+    }
 
     const allTasks = await db
       .select({
@@ -145,6 +145,12 @@ export const getTask = async (req, res) => {
 
     if (!row) return res.status(404).json({ success: false, message: 'Task not found' });
 
+    // Non-admin users can only view tasks assigned to them
+    const userId = resolveUserId(req);
+    if (!isAdmin(req) && row.task.assignedTo !== userId) {
+      return res.status(403).json({ success: false, message: 'Access denied. This task is not assigned to you.' });
+    }
+
     // Get comments
     const comments = await db
       .select({
@@ -178,13 +184,13 @@ export const getTask = async (req, res) => {
 // POST /api/tasks — create task
 export const createTask = async (req, res) => {
   try {
-    const orgId = await resolveOrgId(req);
+    const orgId = resolveOrgId(req);
     if (!orgId) return res.status(400).json({ success: false, message: 'No organization found' });
 
     const { title, description, taskType, assignedTo, priority, dueDate, relatedDocumentId, relatedFormId, checklist } = req.body;
     if (!title) return res.status(400).json({ success: false, message: 'Title is required' });
 
-    const createdBy = await resolveUserId(req);
+    const createdBy = resolveUserId(req);
 
     const [task] = await db.insert(tasks).values({
       organizationId: orgId,
@@ -244,6 +250,12 @@ export const completeTask = async (req, res) => {
 
     const [task] = await db.select().from(tasks).where(eq(tasks.id, id));
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+
+    // Only the assignee or admin can complete a task
+    const userId = resolveUserId(req);
+    if (!isAdmin(req) && task.assignedTo !== userId) {
+      return res.status(403).json({ success: false, message: 'Access denied. Only the assigned user can complete this task.' });
+    }
 
     // Mark task completed
     const [updated] = await db.update(tasks).set({
@@ -318,7 +330,7 @@ export const addTaskComment = async (req, res) => {
     const { content } = req.body;
     if (!content) return res.status(400).json({ success: false, message: 'Content is required' });
 
-    const createdBy = await resolveUserId(req);
+    const createdBy = resolveUserId(req);
 
     const [comment] = await db.insert(taskComments).values({
       taskId: id,
@@ -345,6 +357,21 @@ export const getTaskDocumentConfig = async (req, res) => {
     // Get task + linked workflow step
     const [task] = await db.select().from(tasks).where(eq(tasks.id, id));
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+
+    // Only the assignee or admin can access the document config
+    const currentUserId = resolveUserId(req);
+    if (!isAdmin(req) && task.assignedTo !== currentUserId) {
+      return res.status(403).json({ success: false, message: 'Access denied. This task is not assigned to you.' });
+    }
+
+    // Get user details for OnlyOffice editor
+    let userName = req.user?.email || 'User';
+    if (currentUserId) {
+      const [userRecord] = await db.select({ firstName: users.firstName, lastName: users.lastName }).from(users).where(eq(users.id, currentUserId));
+      if (userRecord?.firstName) {
+        userName = `${userRecord.firstName}${userRecord.lastName ? ' ' + userRecord.lastName : ''}`;
+      }
+    }
 
     const docId = task.relatedDocumentId;
     if (!docId) return res.status(404).json({ success: false, message: 'No document linked to this task' });
@@ -384,8 +411,8 @@ export const getTaskDocumentConfig = async (req, res) => {
         lang: 'en',
         callbackUrl: mode === 'edit' ? `${backendUrlDocker}/api/documents/${doc.id}/callback` : undefined,
         user: {
-          id: req.user?.id || 'guest',
-          name: req.user?.firstName ? `${req.user.firstName} ${req.user.lastName || ''}`.trim() : 'Guest User',
+          id: currentUserId,
+          name: userName,
         },
         customization: {
           autosave: false,
@@ -456,6 +483,13 @@ export const submitTaskAction = async (req, res) => {
 
     const [task] = await db.select().from(tasks).where(eq(tasks.id, id));
     if (!task) return res.status(404).json({ success: false, message: 'Task not found' });
+
+    // Only the assignee or admin can submit a task action
+    const currentUserId = resolveUserId(req);
+    if (!isAdmin(req) && task.assignedTo !== currentUserId) {
+      return res.status(403).json({ success: false, message: 'Access denied. Only the assigned user can submit this task.' });
+    }
+
     if (task.status === 'completed') return res.status(400).json({ success: false, message: 'Task already completed' });
     if (task.status === 'pending') return res.status(400).json({ success: false, message: 'Task is not yet active' });
 
@@ -509,7 +543,7 @@ export const submitTaskAction = async (req, res) => {
 
       // Save rejection comment
       if (notes) {
-        const userId = await resolveUserId(req);
+        const userId = resolveUserId(req);
         await db.insert(taskComments).values({
           taskId: id,
           content: `Rejected: ${notes}`,
@@ -532,7 +566,7 @@ export const submitTaskAction = async (req, res) => {
       }
 
       // Also save as comment
-      const userId = await resolveUserId(req);
+      const userId = resolveUserId(req);
       await db.insert(taskComments).values({
         taskId: id,
         content: `Review notes: ${notes}`,

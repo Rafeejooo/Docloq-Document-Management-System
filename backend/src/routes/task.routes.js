@@ -12,8 +12,12 @@ import {
   getTaskDocumentConfig,
   submitTaskAction,
 } from '../controllers/task.controller.js';
+import { authenticate } from '../middlewares/auth.middleware.js';
 
 const router = Router();
+
+// All task routes require authentication
+router.use(authenticate);
 
 // GET    /api/tasks              — list tasks (filter: ?status=pending&priority=high)
 // POST   /api/tasks              — create task

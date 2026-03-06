@@ -512,6 +512,20 @@ export default function Tasks() {
                       <p className="text-sm text-slate-500 dark:text-slate-400">
                         Open the document, make your edits, save, then mark as complete.
                       </p>
+                      {/* Show Open & Edit button directly here if doc config is available */}
+                      {taskDocConfig && !showEditor && (
+                        <button onClick={openEditor}
+                          className="w-full px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 mb-2">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                          Open & Edit Document
+                        </button>
+                      )}
+                      {docConfigLoading && (
+                        <div className="flex items-center justify-center gap-2 py-3 text-sm text-slate-500">
+                          <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                          Loading document...
+                        </div>
+                      )}
                       <button onClick={handleSubmitFill} disabled={submitting}
                         className="w-full px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-semibold shadow-lg shadow-blue-500/25 transition-all flex items-center justify-center gap-2">
                         {submitting ? (
@@ -530,6 +544,20 @@ export default function Tasks() {
                       <p className="text-sm text-slate-500 dark:text-slate-400">
                         Open the document, add your signature, save, then submit.
                       </p>
+                      {/* Show Open & Sign button directly here if doc config is available */}
+                      {taskDocConfig && !showEditor && (
+                        <button onClick={openEditor}
+                          className="w-full px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 mb-2">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                          Open & Sign Document
+                        </button>
+                      )}
+                      {docConfigLoading && (
+                        <div className="flex items-center justify-center gap-2 py-3 text-sm text-slate-500">
+                          <div className="w-5 h-5 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+                          Loading document...
+                        </div>
+                      )}
                       <button onClick={handleSubmitSign} disabled={submitting}
                         className="w-full px-4 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-semibold shadow-lg shadow-violet-500/25 transition-all flex items-center justify-center gap-2">
                         {submitting ? (
@@ -548,6 +576,13 @@ export default function Tasks() {
                       <p className="text-sm text-slate-500 dark:text-slate-400">
                         View the document, then add your review notes. The filler will see your feedback if rejected.
                       </p>
+                      {taskDocConfig && !showEditor && (
+                        <button onClick={openEditor}
+                          className="w-full px-4 py-3 rounded-xl bg-slate-700 hover:bg-slate-800 text-white font-semibold shadow-lg shadow-slate-500/25 transition-all flex items-center justify-center gap-2">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                          View Document
+                        </button>
+                      )}
                       <textarea
                         value={reviewNotes}
                         onChange={(e) => setReviewNotes(e.target.value)}
@@ -573,6 +608,13 @@ export default function Tasks() {
                       <p className="text-sm text-slate-500 dark:text-slate-400">
                         Review the document, then approve or reject. A reason is required when rejecting.
                       </p>
+                      {taskDocConfig && !showEditor && (
+                        <button onClick={openEditor}
+                          className="w-full px-4 py-3 rounded-xl bg-slate-700 hover:bg-slate-800 text-white font-semibold shadow-lg shadow-slate-500/25 transition-all flex items-center justify-center gap-2">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                          View Document
+                        </button>
+                      )}
                       <textarea
                         value={reviewNotes}
                         onChange={(e) => setReviewNotes(e.target.value)}

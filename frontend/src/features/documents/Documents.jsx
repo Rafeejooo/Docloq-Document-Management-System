@@ -436,6 +436,14 @@ export default function Documents() {
   const currentFolderIdRef = useRef(currentFolderId);        // stable ref for container drop
   currentFolderIdRef.current = currentFolderId;              // keep in sync
 
+  // ── External File Drag & Drop (from OS / desktop) ──
+  const [externalDragOver, setExternalDragOver] = useState(false);
+  const externalDragCounter = useRef(0);
+  const [isDirectUploading, setIsDirectUploading] = useState(false);
+  const [directUploadProgress, setDirectUploadProgress] = useState(0);
+  const [directUploadResults, setDirectUploadResults] = useState([]);
+  const [showDirectUploadToast, setShowDirectUploadToast] = useState(false);
+
   const showDragToast = useCallback((msg, type = "success") => {
     setDragToast({ msg, type });
     setTimeout(() => setDragToast(null), 2500);
@@ -495,12 +503,86 @@ export default function Documents() {
     setDropTargetId(null);
   }, []);
 
+  // ── Check if a drag event carries external files (from OS) ──
+  const hasExternalFiles = useCallback((e) => {
+    if (e.dataTransfer?.types) {
+      return e.dataTransfer.types.indexOf("Files") !== -1 && !dragItemRef.current;
+    }
+    return false;
+  }, []);
+
+  // ── Handle files dropped from OS / desktop ──
+  const handleExternalFileDrop = useCallback(async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setExternalDragOver(false);
+    externalDragCounter.current = 0;
+
+    const files = Array.from(e.dataTransfer.files);
+    if (!files.length) return;
+
+    // Filter accepted file types
+    const acceptedExts = [".pdf", ".docx", ".doc", ".xlsx", ".xls", ".pptx", ".ppt", ".png", ".jpg", ".jpeg", ".gif", ".txt", ".csv"];
+    const validFiles = files.filter((f) => {
+      const ext = "." + f.name.split(".").pop().toLowerCase();
+      return acceptedExts.includes(ext);
+    });
+
+    if (!validFiles.length) {
+      showDragToast("No supported files found. Accepted: PDF, DOCX, XLSX, PPTX, Images", "error");
+      return;
+    }
+
+    // Direct upload — skip modal
+    setIsDirectUploading(true);
+    setDirectUploadProgress(0);
+    setDirectUploadResults([]);
+    setShowDirectUploadToast(true);
+
+    const results = [];
+    for (let i = 0; i < validFiles.length; i++) {
+      const file = validFiles[i];
+      try {
+        const res = await documentService.uploadDocument(
+          file,
+          (p) => setDirectUploadProgress(Math.round(((i + p / 100) / validFiles.length) * 100)),
+          currentFolderIdRef.current
+        );
+        results.push({ name: file.name, success: true, data: res.data });
+      } catch (err) {
+        results.push({ name: file.name, success: false, error: err.message });
+      }
+    }
+
+    setDirectUploadResults(results);
+    setDirectUploadProgress(100);
+    setIsDirectUploading(false);
+    await refreshAll();
+
+    const successCount = results.filter((r) => r.success).length;
+    const failCount = results.length - successCount;
+    if (failCount === 0) {
+      showDragToast(`${successCount} file${successCount > 1 ? "s" : ""} uploaded successfully`);
+    } else {
+      showDragToast(`${successCount} uploaded, ${failCount} failed`, "error");
+    }
+
+    // Auto-hide the upload toast after 4s
+    setTimeout(() => setShowDirectUploadToast(false), 4000);
+  }, [showDragToast]);
+
   // Drop on empty area (the container) — move doc/folder to CURRENT folder
   const handleDropOnContainer = useCallback(async (e) => {
     if (e) { e.preventDefault(); e.stopPropagation(); }
     clearTimeout(hoverTimerRef.current);
     setDropTargetId(null);
     setContainerDragOver(false);
+
+    // If this is an external file drop, route to upload handler
+    if (!dragItemRef.current) {
+      handleExternalFileDrop(e);
+      return;
+    }
 
     const item = dragItemRef.current;
     if (!item) return;
@@ -784,6 +866,23 @@ export default function Documents() {
     return () => { document.body.style.overflow = ""; };
   }, [showUploadModal, showCreateFolderModal, showDocumentModal, showOnlyOffice, showMoveModal]);
 
+  // Prevent browser from opening files when dropped outside the drop zone
+  useEffect(() => {
+    const preventDefaults = (e) => {
+      // Only prevent if the target is NOT inside the document container drop zone
+      // This prevents accidental file opening in the browser
+      if (e.dataTransfer?.types?.indexOf("Files") !== -1) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener("dragover", preventDefaults);
+    window.addEventListener("drop", preventDefaults);
+    return () => {
+      window.removeEventListener("dragover", preventDefaults);
+      window.removeEventListener("drop", preventDefaults);
+    };
+  }, []);
+
   // ── Custom Select ──
   const CustomSelect = ({ value, options, onChange, dropdownId }) => {
     const isOpen = openDropdown === dropdownId;
@@ -995,22 +1094,51 @@ export default function Documents() {
           </div>
         )}
 
-        {/* ════ Documents Section with drop zone (Google Drive style) ════ */}
+        {/* ════ Documents Section with drop zone (Google Drive style + external file upload) ════ */}
         <div
           className="relative"
-          onDragOver={(e) => { if (dragItemRef.current) { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = "move"; } }}
-          onDragEnter={(e) => { if (dragItemRef.current) { e.preventDefault(); containerDragCounter.current++; setContainerDragOver(true); } }}
-          onDragLeave={(e) => { containerDragCounter.current--; if (containerDragCounter.current <= 0) { containerDragCounter.current = 0; setContainerDragOver(false); } }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            // Internal drag → move cursor
+            if (dragItemRef.current) {
+              e.dataTransfer.dropEffect = "move";
+            }
+            // External file drag from OS → copy cursor
+            else if (hasExternalFiles(e)) {
+              e.dataTransfer.dropEffect = "copy";
+            }
+          }}
+          onDragEnter={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (dragItemRef.current) {
+              containerDragCounter.current++;
+              setContainerDragOver(true);
+            } else if (hasExternalFiles(e)) {
+              externalDragCounter.current++;
+              setExternalDragOver(true);
+            }
+          }}
+          onDragLeave={(e) => {
+            if (dragItemRef.current) {
+              containerDragCounter.current--;
+              if (containerDragCounter.current <= 0) { containerDragCounter.current = 0; setContainerDragOver(false); }
+            } else {
+              externalDragCounter.current--;
+              if (externalDragCounter.current <= 0) { externalDragCounter.current = 0; setExternalDragOver(false); }
+            }
+          }}
           onDrop={handleDropOnContainer}
         >
-          {/* Google Drive style overlay — only when dragged item is NOT already in the current folder */}
+          {/* Internal move overlay — only when dragged item is NOT already in the current folder */}
           <AnimatePresence>
             {dragItem && containerDragOver && !dropTargetId && (() => {
               const cur = currentFolderIdRef.current || null;
               const itemFolder = dragItem.type === "document"
                 ? (dragItem.data?.folderId || null)
                 : (dragItem.data?.parentId || null);
-              return itemFolder !== cur; // different origin → show overlay
+              return itemFolder !== cur;
             })() && (
               <motion.div
                 initial={{ opacity: 0 }}
@@ -1029,6 +1157,34 @@ export default function Documents() {
                 </p>
                 <p className="text-sm text-indigo-500 dark:text-indigo-400">
                   {currentFolderIdRef.current ? "Into this folder" : "Into root level"}
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* External file upload overlay — Google Drive style */}
+          <AnimatePresence>
+            {externalDragOver && !dragItem && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
+                className="absolute inset-0 z-30 rounded-2xl border-3 border-dashed border-emerald-500 bg-emerald-50/90 dark:bg-emerald-500/10 backdrop-blur-[2px] flex flex-col items-center justify-center pointer-events-none"
+              >
+                <div className="w-20 h-20 rounded-2xl bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center mb-4">
+                  <svg className="w-10 h-10 text-emerald-600 dark:text-emerald-400 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                </div>
+                <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300 mb-1">
+                  Drop files to upload
+                </p>
+                <p className="text-sm text-emerald-600 dark:text-emerald-400 mb-2">
+                  {currentFolderIdRef.current ? `Upload to: ${getFolderName(currentFolderIdRef.current)}` : "Upload to: Root"}
+                </p>
+                <p className="text-xs text-emerald-500 dark:text-emerald-400/60">
+                  PDF, DOCX, XLSX, PPTX, Images — Max 50MB
                 </p>
               </motion.div>
             )}
@@ -1054,7 +1210,7 @@ export default function Documents() {
                 </svg>
               </div>
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">No documents here</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Upload files or move documents into this folder</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Drag files here from your computer, or click upload</p>
               <button onClick={() => setShowUploadModal(true)} className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm transition-all">
                 Upload Documents
               </button>
@@ -1318,12 +1474,28 @@ export default function Documents() {
                 <AnimatePresence mode="wait">
                   {uploadStep === 0 && (
                     <motion.div key="select" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4">
-                      <label className="block border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-8 text-center hover:border-indigo-400 transition-colors cursor-pointer group">
+                      <label
+                        className="block border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-8 text-center hover:border-indigo-400 transition-colors cursor-pointer group"
+                        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.add("border-indigo-500", "bg-indigo-50", "dark:bg-indigo-500/10"); }}
+                        onDragLeave={(e) => { e.currentTarget.classList.remove("border-indigo-500", "bg-indigo-50", "dark:bg-indigo-500/10"); }}
+                        onDrop={(e) => {
+                          e.preventDefault(); e.stopPropagation();
+                          e.currentTarget.classList.remove("border-indigo-500", "bg-indigo-50", "dark:bg-indigo-500/10");
+                          const files = Array.from(e.dataTransfer.files);
+                          if (files.length) {
+                            setRealFiles((p) => [...p, ...files]);
+                            setUploadedFiles((p) => [...p, ...files.map((file, i) => ({
+                              id: Date.now() + i, name: file.name, size: formatFileSize(file.size),
+                              type: file.name.split(".").pop().toLowerCase(), file,
+                            }))]);
+                          }
+                        }}
+                      >
                         <input type="file" multiple className="hidden" onChange={handleFileSelect} accept=".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.png,.jpg,.jpeg,.gif,.txt,.csv" />
                         <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
                           <IconCloud />
                         </div>
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white mb-1">Click to select files</p>
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white mb-1">Drag files here or click to select</p>
                         <p className="text-xs text-slate-400">PDF, DOCX, XLSX, PPTX, Images (Max 50MB)</p>
                       </label>
                       {uploadedFiles.length > 0 && (
@@ -1551,6 +1723,63 @@ export default function Documents() {
                 </div>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ══════════════ DIRECT UPLOAD PROGRESS (from drag-drop) ══════════════ */}
+      <AnimatePresence>
+        {(isDirectUploading || showDirectUploadToast) && (
+          <motion.div
+            initial={{ opacity: 0, y: 30, x: 0 }}
+            animate={{ opacity: 1, y: 0, x: 0 }}
+            exit={{ opacity: 0, y: 30 }}
+            className="fixed bottom-20 right-6 z-50 w-80 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden"
+          >
+            <div className="px-4 py-3 flex items-center gap-3">
+              {isDirectUploading ? (
+                <>
+                  <div className="w-9 h-9 rounded-xl bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center shrink-0">
+                    <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">Uploading files...</p>
+                    <p className="text-xs text-slate-500">Encrypting and processing</p>
+                  </div>
+                  <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{directUploadProgress}%</span>
+                </>
+              ) : (
+                <>
+                  <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center shrink-0">
+                    <IconCheck className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                      {directUploadResults.filter((r) => r.success).length} file{directUploadResults.filter((r) => r.success).length !== 1 ? "s" : ""} uploaded
+                    </p>
+                    {directUploadResults.some((r) => !r.success) && (
+                      <p className="text-xs text-red-500">{directUploadResults.filter((r) => !r.success).length} failed</p>
+                    )}
+                  </div>
+                  <button onClick={() => setShowDirectUploadToast(false)} className="w-7 h-7 rounded-lg flex items-center justify-center hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    <IconX className="w-4 h-4 text-slate-400" />
+                  </button>
+                </>
+              )}
+            </div>
+            {isDirectUploading && (
+              <div className="h-1 bg-slate-100 dark:bg-slate-800">
+                <motion.div
+                  className="h-full bg-indigo-600 rounded-r-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${directUploadProgress}%` }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
