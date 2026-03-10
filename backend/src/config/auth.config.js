@@ -6,8 +6,9 @@ export const authConfig = {
   // JWT Settings
   jwt: {
     secret: process.env.JWT_SECRET || 'docloq-super-secret-key-change-in-production',
-    expiresIn: '7d',
-    refreshExpiresIn: '30d',
+    expiresIn: '12h',                    // Absolute expiry: 12 jam
+    refreshExpiresIn: '12h',              // Refresh juga 12 jam (same session)
+    idleTimeout: 3 * 60 * 60 * 1000,     // Idle timeout: 3 jam dalam ms
   },
   
   // Password Settings
@@ -18,7 +19,8 @@ export const authConfig = {
   
   // Session Settings
   session: {
-    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 hari dalam ms
+    maxAge: 12 * 60 * 60 * 1000, // 12 jam dalam ms (absolute)
+    idleTimeout: 3 * 60 * 60 * 1000, // 3 jam idle timeout
   },
   
   // hCaptcha Settings

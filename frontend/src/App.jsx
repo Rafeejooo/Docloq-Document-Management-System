@@ -2,22 +2,30 @@ import { useEffect } from "react";
 import { RouterProvider } from "react-router-dom";
 import { router } from "@/app/routes";
 import { ThemeProvider } from "@/app/providers/ThemeProvider";
+import useIdleTimeout from "@/hooks/useIdleTimeout";
 import AOS from "aos";
 import "aos/dist/aos.css";
+
+function IdleTimeoutProvider({ children }) {
+  useIdleTimeout();
+  return children;
+}
 
 export default function App() {
   useEffect(() => {
     AOS.init({
-      duration: 500, // Reduced from 1000ms for snappier animations
+      duration: 500,
       once: true,
       easing: "ease-out-cubic",
-      disable: window.innerWidth < 768, // Disable on mobile for better performance
+      disable: window.innerWidth < 768,
     });
   }, []);
 
   return (
     <ThemeProvider>
-      <RouterProvider router={router} />
+      <IdleTimeoutProvider>
+        <RouterProvider router={router} />
+      </IdleTimeoutProvider>
     </ThemeProvider>
   );
 }

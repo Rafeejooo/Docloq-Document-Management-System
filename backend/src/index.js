@@ -88,10 +88,9 @@ app.use((err, req, res, next) => {
 });
 
 // Start Server - Listen on 0.0.0.0 to allow Docker container access via host.docker.internal
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[DocLoq] Server running on http://0.0.0.0:${PORT}`);
-  console.log(`[DocLoq] Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`[DocLoq] hCaptcha: ${process.env.HCAPTCHA_ENABLED === 'true' ? 'Enabled' : 'Disabled'}`);
-});
+const server = await app.listen(PORT, '0.0.0.0');
+console.log(`[DocLoq] Server running on http://0.0.0.0:${PORT}`);
+console.log(`[DocLoq] Environment: ${process.env.NODE_ENV || 'development'}`);
+console.log(`[DocLoq] hCaptcha: ${process.env.HCAPTCHA_ENABLED === 'true' ? 'Enabled' : 'Disabled'}`);
 
 export default app;

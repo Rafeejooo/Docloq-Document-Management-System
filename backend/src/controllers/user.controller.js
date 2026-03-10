@@ -130,7 +130,7 @@ export const createUser = async (req, res) => {
       firstName, 
       lastName, 
       role = 'user',
-      department,
+      departmentId,
       position,
       phone,
     } = req.body;
@@ -194,7 +194,7 @@ export const createUser = async (req, res) => {
       firstName,
       lastName,
       role,
-      department,
+      departmentId: departmentId || null,
       position,
       phone,
       isActive: true,
@@ -234,7 +234,7 @@ export const updateUser = async (req, res) => {
       firstName, 
       lastName, 
       role,
-      department,
+      departmentId,
       position,
       phone,
       isActive,
@@ -297,7 +297,7 @@ export const updateUser = async (req, res) => {
     if (firstName !== undefined) updateData.firstName = firstName;
     if (lastName !== undefined) updateData.lastName = lastName;
     if (role !== undefined) updateData.role = role;
-    if (department !== undefined) updateData.department = department;
+    if (departmentId !== undefined) updateData.departmentId = departmentId || null;
     if (position !== undefined) updateData.position = position;
     if (phone !== undefined) updateData.phone = phone;
     if (isActive !== undefined) updateData.isActive = isActive;
@@ -313,7 +313,7 @@ export const updateUser = async (req, res) => {
         firstName: users.firstName,
         lastName: users.lastName,
         role: users.role,
-        department: users.department,
+        departmentId: users.departmentId,
         position: users.position,
         phone: users.phone,
         isActive: users.isActive,

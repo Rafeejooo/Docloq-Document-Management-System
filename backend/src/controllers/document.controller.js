@@ -141,76 +141,84 @@ export const uploadDocument = async (req, res) => {
 };
 
 // ============================================================
-// Upload simple (legacy, for OnlyOffice direct saving)
+// Upload simple — now routes through the FULL security pipeline
 // Supports ?convertToDocx=true to auto-convert PDF uploads to DOCX
 // ============================================================
 export const uploadDocumentSimple = async (req, res) => {
   try {
-    await ensureUploadDir();
-
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file uploaded' });
     }
 
-    let { originalname, mimetype, size, buffer } = req.file;
+    let fileObj = { ...req.file };
     const convertToDocx = req.query.convertToDocx === 'true' || req.body.convertToDocx === 'true';
 
-    // PDF → DOCX conversion if requested or if file is PDF
-    if (convertToDocx && (mimetype === 'application/pdf' || path.extname(originalname).toLowerCase() === '.pdf')) {
+    // PDF → DOCX conversion if requested
+    if (convertToDocx && (fileObj.mimetype === 'application/pdf' || path.extname(fileObj.originalname).toLowerCase() === '.pdf')) {
       console.log('[UploadSimple] Converting PDF to DOCX...');
 
-      // Save temp PDF for OnlyOffice to access
+      await ensureUploadDir();
       const tempFilename = `temp_${randomUUID()}.pdf`;
       const tempPath = path.join(UPLOAD_DIR, tempFilename);
-      await fs.writeFile(tempPath, buffer);
+      await fs.writeFile(tempPath, fileObj.buffer);
 
       try {
         const backendUrlDocker = process.env.BACKEND_URL_DOCKER || 'http://host.docker.internal:3000';
         const tempFileUrl = `${backendUrlDocker}/uploads/${tempFilename}`;
 
         const { url: convertedUrl } = await convertDocument(tempFileUrl, 'pdf', 'docx');
-        buffer = await downloadFromUrl(convertedUrl);
-        size = buffer.length;
-        mimetype = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-        originalname = originalname.replace(/\.pdf$/i, '.docx');
+        const convertedBuffer = await downloadFromUrl(convertedUrl);
+        fileObj = {
+          ...fileObj,
+          buffer: convertedBuffer,
+          size: convertedBuffer.length,
+          mimetype: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          originalname: fileObj.originalname.replace(/\.pdf$/i, '.docx'),
+        };
         console.log('[UploadSimple] PDF→DOCX conversion successful');
       } finally {
         try { await fs.unlink(tempPath); } catch {}
       }
     }
 
-    const fileExt = path.extname(originalname);
-    const uniqueFilename = `${randomUUID()}${fileExt}`;
-    const filePath = path.join(UPLOAD_DIR, uniqueFilename);
-    await fs.writeFile(filePath, buffer);
-
-    let orgId = req.user?.organizationId;
+    // Resolve user + org
     let userId = req.user?.id;
+    let organizationId = req.user?.organizationId;
+    const folderId = req.body?.folderId || null;
 
-    if (!orgId || !userId) {
-      const { organizations, users } = await import('../db/schema.js');
-      const [firstOrg] = await db.select().from(organizations).limit(1);
-      const [firstUser] = await db.select().from(users).limit(1);
-      if (firstOrg) orgId = firstOrg.id;
-      if (firstUser) userId = firstUser.id;
+    if (!userId || !organizationId) {
+      try {
+        const { organizations, users } = await import('../db/schema.js');
+        const [firstOrg] = await db.select().from(organizations).limit(1);
+        const [firstUser] = await db.select().from(users).limit(1);
+        if (firstOrg) organizationId = firstOrg.id;
+        if (firstUser) userId = firstUser.id;
+      } catch (e) {
+        console.warn('Could not resolve org/user:', e.message);
+      }
     }
 
-    if (!orgId || !userId) {
-      try { await fs.unlink(filePath); } catch {}
+    if (!userId || !organizationId) {
       return res.status(400).json({ success: false, message: 'No organization or user found.' });
     }
 
-    const [newDoc] = await db.insert(documents).values({
-      organizationId: orgId,
-      filename: uniqueFilename,
-      originalFilename: originalname,
-      mimeType: mimetype,
-      fileSize: size,
-      ownerId: userId,
-      status: 'active',
-    }).returning();
+    // Run the FULL 14-step security pipeline (encryption, hashing, scan, honeytokens, QR)
+    const result = await uploadPipeline(fileObj, userId, organizationId, folderId);
 
-    res.status(201).json({ success: true, message: 'Document uploaded (simple)', data: newDoc });
+    if (!result.success) {
+      return res.status(422).json({
+        success: false,
+        message: result.message,
+        warnings: result.warnings,
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Document uploaded and processed successfully',
+      data: result.data,
+      warnings: result.warnings,
+    });
   } catch (error) {
     console.error('Simple upload error:', error);
     res.status(500).json({ success: false, message: 'Failed to upload document' });

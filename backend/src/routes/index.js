@@ -10,6 +10,9 @@ import formRoutes from './form.routes.js';
 import taskRoutes from './task.routes.js';
 import adminRoutes from './admin.routes.js';
 import trashRoutes from './trash.routes.js';
+import chatbotRoutes from './chatbot.routes.js';
+import dashboardRoutes from './dashboard.routes.js';
+import departmentRoutes from './department.routes.js';
 
 const router = Router();
 
@@ -23,6 +26,9 @@ router.use('/forms', formRoutes);
 router.use('/tasks', taskRoutes);
 router.use('/admin', adminRoutes);
 router.use('/trash', trashRoutes);
+router.use('/chatbot', chatbotRoutes);
+router.use('/dashboard', dashboardRoutes);
+router.use('/departments', departmentRoutes);
 
 // Health Check
 router.get('/health', (req, res) => {

@@ -474,7 +474,7 @@ export default function Trash() {
                         checked={selectedIds.length === filtered.length && filtered.length > 0}
                         onChange={toggleAll}
                       />
-                      />
+                      
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                       Name
@@ -512,7 +512,7 @@ export default function Trash() {
                             checked={selectedIds.includes(item.id)}
                             onChange={() => toggleSelect(item.id)}
                           />
-                          />
+                          
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="flex items-center gap-3">

@@ -21,7 +21,7 @@ export const authenticate = async (req, res, next) => {
 
     const token = authHeader.replace('Bearer ', '');
 
-    // Verify token
+    // Verify token (checks absolute expiry via JWT exp claim)
     let decoded;
     try {
       decoded = jwt.verify(token, authConfig.jwt.secret);
@@ -58,6 +58,28 @@ export const authenticate = async (req, res, next) => {
         code: 'SESSION_INVALID',
       });
     }
+
+    // Check idle timeout (3 hours)
+    const idleTimeout = authConfig.session.idleTimeout || 3 * 60 * 60 * 1000;
+    const lastActivity = session.lastActivityAt ? new Date(session.lastActivityAt) : new Date(session.createdAt);
+    const idleMs = Date.now() - lastActivity.getTime();
+
+    if (idleMs > idleTimeout) {
+      // Session idle too long — invalidate it
+      await db.delete(userSessions).where(eq(userSessions.id, session.id));
+      return res.status(401).json({
+        success: false,
+        message: 'Session expired due to inactivity',
+        code: 'IDLE_TIMEOUT',
+      });
+    }
+
+    // Update last activity timestamp (non-blocking)
+    db.update(userSessions)
+      .set({ lastActivityAt: new Date() })
+      .where(eq(userSessions.id, session.id))
+      .then(() => {})
+      .catch(() => {});
 
     // Attach user info to request
     req.user = decoded;

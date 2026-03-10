@@ -254,9 +254,8 @@ export const completeLogin = async (req, res) => {
     // Generate tokens
     const { accessToken, refreshToken } = generateTokens(user);
 
-    // Calculate expiry
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + (rememberMe ? 30 : 7));
+    // Calculate expiry — absolute 12 hours
+    const expiresAt = new Date(Date.now() + authConfig.session.maxAge);
 
     // Create session
     await db.insert(userSessions).values({
@@ -266,6 +265,7 @@ export const completeLogin = async (req, res) => {
       refreshToken: refreshToken,
       userAgent: req.headers['user-agent'],
       ipAddress: req.ip || req.connection.remoteAddress,
+      lastActivityAt: new Date(),
       expiresAt: expiresAt,
     });
 
@@ -297,6 +297,7 @@ export const completeLogin = async (req, res) => {
         accessToken,
         refreshToken,
         expiresAt,
+        idleTimeout: authConfig.session.idleTimeout,
       },
     });
   } catch (error) {

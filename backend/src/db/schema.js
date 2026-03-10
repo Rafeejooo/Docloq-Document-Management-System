@@ -60,6 +60,24 @@ export const organizations = pgTable('organizations', {
   slugIdx: uniqueIndex('org_slug_idx').on(table.slug),
 }));
 
+// Departments
+export const departments = pgTable('departments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  organizationId: uuid('organization_id').references(() => organizations.id, { onDelete: 'cascade' }).notNull(),
+  
+  name: text('name').notNull(),
+  description: text('description'),
+  color: varchar('color', { length: 7 }), // Hex color for UI
+  
+  createdBy: uuid('created_by'),
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('dept_org_idx').on(table.organizationId),
+  orgNameIdx: uniqueIndex('dept_org_name_idx').on(table.organizationId, table.name),
+}));
+
 
 // Users & Authentication
 export const users = pgTable('users', {
@@ -73,6 +91,11 @@ export const users = pgTable('users', {
   firstName: text('first_name'),
   lastName: text('last_name'),
   avatarUrl: text('avatar_url'),
+  phone: text('phone'),
+  position: text('position'),
+  
+  // Department
+  departmentId: uuid('department_id').references(() => departments.id, { onDelete: 'set null' }),
   
   // Role & Status
   role: userRoleEnum('role').default('user'),
@@ -106,6 +129,7 @@ export const userSessions = pgTable('user_sessions', {
   userAgent: text('user_agent'),
   ipAddress: text('ip_address'),
   
+  lastActivityAt: timestamp('last_activity_at').defaultNow(), // Idle timeout tracking
   expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({

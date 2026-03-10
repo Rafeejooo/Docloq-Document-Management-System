@@ -22,5 +22,9 @@ router.post('/refresh-token', refreshToken);
 // Protected Routes
 router.post('/logout', authenticate, logout);
 router.get('/me', authenticate, getMe);
+router.post('/heartbeat', authenticate, (req, res) => {
+  // lastActivityAt is already updated by authenticate middleware
+  res.json({ success: true, message: 'Session active' });
+});
 
 export default router;

@@ -258,8 +258,16 @@ export const uploadPipeline = async (file, userId, organizationId, folderId = nu
     log(10, 'Encrypting file...');
     await updateTempStatus(sessionId, 'processing', 'encryption');
 
+    // If honeytokens were injected into text, encrypt the modified text.
+    // Otherwise encrypt the original file buffer.
+    let bufferToEncrypt = file.buffer;
+    if (honeytokenResult && honeytokenResult.modifiedText) {
+      bufferToEncrypt = Buffer.from(honeytokenResult.modifiedText, 'utf-8');
+      log(10, 'Encrypting honeytoken-modified content');
+    }
+
     const keyData = generateDocumentKey();
-    const encResult = encryptFile(file.buffer, keyData.plaintextKey, keyData.iv);
+    const encResult = encryptFile(bufferToEncrypt, keyData.plaintextKey, keyData.iv);
 
     // ──────────────────────────────────────────────
     // STEP 11: STORE — persist encrypted file

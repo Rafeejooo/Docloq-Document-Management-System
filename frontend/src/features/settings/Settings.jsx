@@ -9,6 +9,7 @@ import useAuthStore from "../../app/store/auth.store";
 import { authService } from "../../services/auth.service";
 import userService from "../../services/user.service";
 import totpService from "../../services/totp.service";
+import departmentService from "../../services/department.service";
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -38,6 +39,18 @@ export default function Settings() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [usersLoading, setUsersLoading] = useState(false);
+
+  // Department management state
+  const [departmentsList, setDepartmentsList] = useState([]);
+  const [deptsLoading, setDeptsLoading] = useState(false);
+  const [showDeptModal, setShowDeptModal] = useState(false);
+  const [editingDept, setEditingDept] = useState(null);
+  const [deptForm, setDeptForm] = useState({ name: "", description: "", color: "#6366f1" });
+  const [showMembersModal, setShowMembersModal] = useState(false);
+  const [deptMembers, setDeptMembers] = useState({ department: null, members: [] });
+  const [deptMembersLoading, setDeptMembersLoading] = useState(false);
+  const [showDeleteDeptModal, setShowDeleteDeptModal] = useState(false);
+  const [deletingDept, setDeletingDept] = useState(null);
 
   // Fetch 2FA status on mount
   useEffect(() => {
@@ -71,7 +84,7 @@ export default function Settings() {
     email: "",
     password: "",
     phone: "",
-    department: "",
+    departmentId: "",
     position: "",
     role: "user",
   });
@@ -84,7 +97,15 @@ export default function Settings() {
     if (activeTab === "users") {
       fetchUsers();
     }
+    if (activeTab === "departments") {
+      fetchDepartments();
+    }
   }, [activeTab]);
+
+  // Fetch departments on mount (needed for user management dropdown too)
+  useEffect(() => {
+    fetchDepartments();
+  }, []);
 
   const fetchUsers = async () => {
     setUsersLoading(true);
@@ -104,6 +125,77 @@ export default function Settings() {
     }
   };
 
+  const fetchDepartments = async () => {
+    setDeptsLoading(true);
+    try {
+      const response = await departmentService.getDepartments();
+      if (response.success) {
+        setDepartmentsList(response.data);
+      }
+    } catch (error) {
+      console.error("Error fetching departments:", error);
+    } finally {
+      setDeptsLoading(false);
+    }
+  };
+
+  const handleCreateDept = async (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setErrorMessage("");
+    try {
+      const fn = editingDept 
+        ? departmentService.updateDepartment(editingDept.id, deptForm)
+        : departmentService.createDepartment(deptForm);
+      const response = await fn;
+      if (response.success) {
+        await fetchDepartments();
+        setShowDeptModal(false);
+        setEditingDept(null);
+        setDeptForm({ name: "", description: "", color: "#6366f1" });
+        setShowSaveSuccess(true);
+        setTimeout(() => setShowSaveSuccess(false), 3000);
+      }
+    } catch (error) {
+      setErrorMessage(error.message || "Failed to save department");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteDept = async () => {
+    if (!deletingDept) return;
+    setIsLoading(true);
+    try {
+      const response = await departmentService.deleteDepartment(deletingDept.id);
+      if (response.success) {
+        await fetchDepartments();
+        setShowDeleteDeptModal(false);
+        setDeletingDept(null);
+      }
+    } catch (error) {
+      setErrorMessage(error.message || "Failed to delete department");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const fetchDeptMembers = async (dept) => {
+    setDeptMembersLoading(true);
+    setShowMembersModal(true);
+    setDeptMembers({ department: dept, members: [] });
+    try {
+      const response = await departmentService.getDepartmentMembers(dept.id);
+      if (response.success) {
+        setDeptMembers(response.data);
+      }
+    } catch (error) {
+      console.error("Error fetching department members:", error);
+    } finally {
+      setDeptMembersLoading(false);
+    }
+  };
+
   const tabs = [
     { id: "profile", name: "Profile", mobileShort: "Profile", icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -113,6 +205,11 @@ export default function Settings() {
     { id: "users", name: "User Management", mobileShort: "Users", adminOnly: true, icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+      </svg>
+    )},
+    { id: "departments", name: "Departments", mobileShort: "Depts", adminOnly: true, icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
       </svg>
     )},
     { id: "security", name: "Security", mobileShort: "Security", icon: (
@@ -150,14 +247,14 @@ export default function Settings() {
     auditor: "Auditor",
     viewer: "Viewer"
   };
-  const departments = ["Engineering", "Legal", "HR", "Marketing", "Finance", "Operations"];
+  const departments = departmentsList.map(d => d.name);
 
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const filteredUsers = users.filter(user =>
     `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (user.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (user.department || '').toLowerCase().includes(searchQuery.toLowerCase())
+    (departmentsList.find(d => d.id === user.departmentId)?.name || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleProfileUpdate = (e) => {
@@ -180,7 +277,7 @@ export default function Settings() {
         firstName: newUserForm.firstName,
         lastName: newUserForm.lastName,
         role: newUserForm.role,
-        department: newUserForm.department,
+        departmentId: newUserForm.departmentId || undefined,
         position: newUserForm.position,
         phone: newUserForm.phone,
       });
@@ -196,7 +293,7 @@ export default function Settings() {
           email: "",
           password: "",
           phone: "",
-          department: "",
+          departmentId: "",
           position: "",
           role: "user",
         });
@@ -550,7 +647,7 @@ export default function Settings() {
                 </Card>
                 <Card className="p-4" hover>
                   <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Departments</p>
-                  <p className="text-2xl font-semibold text-blue-600">{[...new Set(users.map(u => u.department))].length}</p>
+                  <p className="text-2xl font-semibold text-blue-600">{departmentsList.length}</p>
                 </Card>
               </div>
 
@@ -621,7 +718,7 @@ export default function Settings() {
                             <p className="text-xs text-slate-500 dark:text-slate-400">{user.phone || '-'}</p>
                           </td>
                           <td className="px-6 py-4 hidden lg:table-cell">
-                            <p className="text-sm text-slate-900 dark:text-white">{user.department || '-'}</p>
+                            <p className="text-sm text-slate-900 dark:text-white">{departmentsList.find(d => d.id === user.departmentId)?.name || '-'}</p>
                             <p className="text-xs text-slate-500 dark:text-slate-400">{user.position || '-'}</p>
                           </td>
                           <td className="px-6 py-4">
@@ -841,6 +938,120 @@ export default function Settings() {
                 </div>
               </div>
             </Card>
+          )}
+
+          {/* Departments Tab */}
+          {activeTab === "departments" && (
+            <div className="space-y-4">
+              {/* Header */}
+              <Card className="p-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">Department Management</h2>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Manage organizational departments</p>
+                  </div>
+                  <Button 
+                    onClick={() => { setEditingDept(null); setDeptForm({ name: "", description: "", color: "#6366f1" }); setShowDeptModal(true); setErrorMessage(""); }}
+                    className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0 flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                    </svg>
+                    <span>Add Department</span>
+                  </Button>
+                </div>
+              </Card>
+
+              {/* Departments Grid */}
+              {deptsLoading ? (
+                <Card className="p-12">
+                  <div className="flex items-center justify-center gap-3">
+                    <svg className="w-5 h-5 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    <span className="text-sm text-slate-500">Loading departments...</span>
+                  </div>
+                </Card>
+              ) : departmentsList.length === 0 ? (
+                <Card className="p-12">
+                  <div className="text-center">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                      <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                    </div>
+                    <p className="text-sm font-medium text-slate-900 dark:text-white mb-1">No departments yet</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Create your first department to organize your team</p>
+                  </div>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {departmentsList.map((dept, index) => (
+                    <motion.div
+                      key={dept.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <Card className="p-5 hover:shadow-lg transition-shadow" hover>
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <div 
+                              className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                              style={{ backgroundColor: (dept.color || '#6366f1') + '20' }}
+                            >
+                              <svg className="w-5 h-5" style={{ color: dept.color || '#6366f1' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                              </svg>
+                            </div>
+                            <div>
+                              <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{dept.name}</h3>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">{dept.description || 'No description'}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => { setEditingDept(dept); setDeptForm({ name: dept.name, description: dept.description || "", color: dept.color || "#6366f1" }); setShowDeptModal(true); setErrorMessage(""); }}
+                              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              title="Edit"
+                            >
+                              <svg className="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => { setDeletingDept(dept); setShowDeleteDeptModal(true); setErrorMessage(""); }}
+                              className="p-2 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                              title="Delete"
+                            >
+                              <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <button
+                            onClick={() => fetchDeptMembers(dept)}
+                            className="flex items-center gap-2 text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 font-medium transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                            </svg>
+                            {dept.memberCount || 0} member{(dept.memberCount || 0) !== 1 ? 's' : ''}
+                          </button>
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: dept.color || '#6366f1' }} />
+                            <span className="text-xs text-slate-400">{new Date(dept.createdAt).toLocaleDateString()}</span>
+                          </div>
+                        </div>
+                      </Card>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           {/* Notifications Tab */}
@@ -1088,8 +1299,8 @@ export default function Settings() {
                         onClick={() => { setShowDeptDropdown(!showDeptDropdown); setShowRoleDropdown(false); }}
                         className={`w-full px-4 py-3 rounded-xl border-2 ${showDeptDropdown ? 'border-indigo-500' : 'border-slate-200 dark:border-slate-700'} bg-slate-50 dark:bg-slate-800/50 focus:outline-none transition-all text-left flex items-center justify-between`}
                       >
-                        <span className={newUserForm.department ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400'}>
-                          {newUserForm.department || 'Select...'}
+                        <span className={newUserForm.departmentId ? 'text-slate-900 dark:text-slate-100' : 'text-slate-400'}>
+                          {newUserForm.departmentId ? departmentsList.find(d => d.id === newUserForm.departmentId)?.name || 'Select...' : 'Select...'}
                         </span>
                         <svg className={`w-5 h-5 text-slate-400 transition-transform ${showDeptDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -1103,23 +1314,30 @@ export default function Settings() {
                             exit={{ opacity: 0, y: -10 }}
                             className="absolute z-20 top-full left-0 right-0 mt-2 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 overflow-hidden"
                           >
-                            {departments.map((dept) => (
-                              <button
-                                key={dept}
-                                type="button"
-                                onClick={() => { setNewUserForm({ ...newUserForm, department: dept }); setShowDeptDropdown(false); }}
-                                className={`w-full px-4 py-2.5 text-left text-sm hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors flex items-center justify-between ${
-                                  newUserForm.department === dept ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'
-                                }`}
-                              >
-                                {dept}
-                                {newUserForm.department === dept && (
-                                  <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                  </svg>
-                                )}
-                              </button>
-                            ))}
+                            {departmentsList.length === 0 ? (
+                              <div className="px-4 py-3 text-sm text-slate-400 text-center">No departments yet</div>
+                            ) : (
+                              departmentsList.map((dept) => (
+                                <button
+                                  key={dept.id}
+                                  type="button"
+                                  onClick={() => { setNewUserForm({ ...newUserForm, departmentId: dept.id }); setShowDeptDropdown(false); }}
+                                  className={`w-full px-4 py-2.5 text-left text-sm hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors flex items-center justify-between ${
+                                    newUserForm.departmentId === dept.id ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-300'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    {dept.color && <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: dept.color }} />}
+                                    {dept.name}
+                                  </div>
+                                  {newUserForm.departmentId === dept.id && (
+                                    <svg className="w-4 h-4 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  )}
+                                </button>
+                              ))
+                            )}
                           </motion.div>
                         )}
                       </AnimatePresence>
@@ -1861,6 +2079,242 @@ export default function Settings() {
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Department Add/Edit Modal */}
+      <AnimatePresence>
+        {showDeptModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+            onClick={() => setShowDeptModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-md w-full border border-slate-200 dark:border-slate-800 overflow-hidden"
+            >
+              <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-white">{editingDept ? 'Edit Department' : 'Add Department'}</h2>
+                      <p className="text-xs text-white/70">{editingDept ? 'Update department details' : 'Create a new department'}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowDeptModal(false)} className="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <form onSubmit={handleCreateDept} className="p-6 space-y-5">
+                {errorMessage && (
+                  <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
+                    <p className="text-sm text-red-600 dark:text-red-400">{errorMessage}</p>
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Department Name</label>
+                  <input
+                    type="text"
+                    value={deptForm.name}
+                    onChange={(e) => setDeptForm({ ...deptForm, name: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-500 transition-all text-slate-900 dark:text-slate-100 placeholder:text-slate-400"
+                    placeholder="e.g. Engineering"
+                    required
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Description</label>
+                  <textarea
+                    value={deptForm.description}
+                    onChange={(e) => setDeptForm({ ...deptForm, description: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-500 transition-all text-slate-900 dark:text-slate-100 placeholder:text-slate-400 resize-none"
+                    placeholder="Brief description of the department..."
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Color</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={deptForm.color}
+                      onChange={(e) => setDeptForm({ ...deptForm, color: e.target.value })}
+                      className="w-10 h-10 rounded-lg border-2 border-slate-200 dark:border-slate-700 cursor-pointer"
+                    />
+                    <div className="flex gap-2">
+                      {['#6366f1', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#3b82f6', '#ef4444', '#6b7280'].map(c => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setDeptForm({ ...deptForm, color: c })}
+                          className={`w-7 h-7 rounded-full transition-all ${deptForm.color === c ? 'ring-2 ring-offset-2 ring-slate-900 dark:ring-white dark:ring-offset-slate-900' : ''}`}
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button type="button" onClick={() => setShowDeptModal(false)} className="flex-1 px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-all" disabled={isLoading}>
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={isLoading} className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-medium transition-all shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 disabled:opacity-50">
+                    {isLoading ? (
+                      <>
+                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" /></svg>
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        {editingDept ? 'Update' : 'Create'}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Department Modal */}
+      <AnimatePresence>
+        {showDeleteDeptModal && deletingDept && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+            onClick={() => setShowDeleteDeptModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl p-6 max-w-sm w-full"
+            >
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                  <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </div>
+                <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">Delete Department</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">
+                  Are you sure you want to delete <span className="font-medium text-slate-900 dark:text-white">{deletingDept.name}</span>? This action cannot be undone.
+                </p>
+                {errorMessage && (
+                  <p className="text-sm text-red-600 dark:text-red-400 mt-3">{errorMessage}</p>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <Button variant="secondary" onClick={() => { setShowDeleteDeptModal(false); setErrorMessage(""); }} className="flex-1">Cancel</Button>
+                <Button variant="danger" onClick={handleDeleteDept} className="flex-1" disabled={isLoading}>
+                  {isLoading ? 'Deleting...' : 'Delete'}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* View Department Members Modal */}
+      <AnimatePresence>
+        {showMembersModal && deptMembers.department && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+            onClick={() => setShowMembersModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-hidden border border-slate-200 dark:border-slate-800"
+            >
+              <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: (deptMembers.department.color || '#6366f1') + '20' }}>
+                      <svg className="w-5 h-5" style={{ color: deptMembers.department.color || '#6366f1' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{deptMembers.department.name}</h2>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{deptMembers.members.length} member{deptMembers.members.length !== 1 ? 's' : ''}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowMembersModal(false)} className="p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                    <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[calc(80vh-100px)]">
+                {deptMembersLoading ? (
+                  <div className="flex items-center justify-center py-8 gap-3">
+                    <svg className="w-5 h-5 animate-spin text-indigo-500" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    <span className="text-sm text-slate-500">Loading members...</span>
+                  </div>
+                ) : deptMembers.members.length === 0 ? (
+                  <div className="text-center py-8">
+                    <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                      <svg className="w-7 h-7 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                      </svg>
+                    </div>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">No members in this department</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {deptMembers.members.map((member) => (
+                      <div key={member.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
+                          {`${member.firstName?.[0] || ''}${member.lastName?.[0] || ''}`.toUpperCase() || 'U'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
+                            {member.firstName} {member.lastName}
+                          </p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{member.position || member.email}</p>
+                        </div>
+                        <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${getRoleBadgeColor(member.role)}`}>
+                          {getRoleLabel(member.role)}
+                        </span>
+                        <span className={`px-2 py-1 rounded-lg text-xs font-medium ${member.isActive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                          {member.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </DashboardLayout>
   );
 }

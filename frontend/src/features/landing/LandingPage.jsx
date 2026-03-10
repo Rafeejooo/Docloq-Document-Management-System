@@ -1,8 +1,13 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion';
+import { motion, useScroll, useTransform, AnimatePresence, useMotionValue, useSpring } from 'framer-motion';
 import AOS from 'aos';
 import 'aos/dist/aos.css';
+import RotatingGlobe from '@/components/ui/RotatingGlobe';
+import InteractiveRobotSpline from '@/components/ui/InteractiveRobotSpline';
+import { ContainerScroll } from '@/components/ui/ContainerScrollAnimation';
+import DisplayCards from '@/components/ui/DisplayCards';
+import { SparklesCore } from '@/components/ui/SparklesCore';
 
 // Throttle helper for performance
 const throttle = (func, limit) => {
@@ -398,27 +403,44 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section ref={heroRef} className="relative min-h-screen flex items-center justify-center pt-20">
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      <section ref={heroRef} className="relative min-h-screen flex items-center justify-center pt-20 overflow-hidden">
+        {/* Globe Background — centered, large, subtle */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.7 }}
+            animate={{ opacity: 0.2, scale: 1 }}
+            transition={{ duration: 2, delay: 0.5, ease: "easeOut" }}
+            className="pointer-events-auto"
+          >
+            <RotatingGlobe width={900} height={900} />
+          </motion.div>
+        </div>
+
+        {/* Radial gradient overlay for depth */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_20%,rgb(2,6,23)_75%)]" />
+
+        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
           <div className="text-center">
             {/* Badge */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-white/5 border border-white/10 mb-8"
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="inline-flex items-center gap-3 px-5 py-2.5 rounded-full bg-white/5 border border-white/10 mb-10 backdrop-blur-sm"
             >
               <span className="flex items-center gap-2 text-sm text-violet-400 font-medium">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500" />
+                </span>
                 AI-Powered
               </span>
               <span className="w-px h-4 bg-white/20" />
               <span className="flex items-center gap-2 text-sm text-emerald-400 font-medium">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                </svg>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" style={{ animationDelay: '0.5s' }} />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                </span>
                 Blockchain-Secured
               </span>
             </motion.div>
@@ -428,14 +450,14 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.1 }}
-              className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold leading-tight mb-8"
+              className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold leading-[1.05] mb-8 tracking-tight"
             >
-              <span className="text-white">Stop Worrying</span>
+              <span className="text-white">Document Intelligence</span>
               <br />
-              <span className="relative">
-                <span className="absolute -inset-2 bg-gradient-to-r from-violet-600 via-purple-600 to-cyan-600 blur-2xl opacity-30" />
-                <span className="relative bg-gradient-to-r from-violet-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
-                 Just Use Docloq
+              <span className="relative inline-block mt-2">
+                <span className="absolute -inset-3 bg-linear-to-r from-violet-600 via-purple-600 to-cyan-600 blur-3xl opacity-25" />
+                <span className="relative bg-linear-to-r from-violet-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                  Reimagined.
                 </span>
               </span>
             </motion.h1>
@@ -445,12 +467,11 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.2 }}
-              className="text-xl md:text-2xl text-slate-400 max-w-2xl mx-auto mb-12 leading-relaxed"
+              className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-14 leading-relaxed"
             >
-              Transform how you manage documents with <span className="text-violet-400 font-medium">AI-powered insights</span> and 
-              <span className="text-emerald-400 font-medium"> blockchain-verified authenticity</span>. 
-              <br className="hidden sm:block" />
-              One platform. Total confidence.
+              The all-in-one platform for <span className="text-violet-400 font-medium">AI-powered analysis</span>,{' '}
+              <span className="text-emerald-400 font-medium">blockchain verification</span>, and 
+              intelligent document management.
             </motion.p>
 
             {/* CTA Buttons */}
@@ -464,9 +485,9 @@ export default function LandingPage() {
                 to="/contact"
                 className="group relative inline-flex items-center"
               >
-                <div className="absolute -inset-1 bg-gradient-to-r from-violet-600 via-purple-600 to-cyan-600 rounded-xl blur-lg opacity-70 group-hover:opacity-100 transition duration-300 group-hover:duration-200" />
-                <span className="relative flex items-center px-8 py-4 bg-gradient-to-r from-violet-600 via-purple-600 to-cyan-600 rounded-xl text-lg font-semibold text-white shadow-2xl">
-                  Request Access
+                <div className="absolute -inset-1 bg-linear-to-r from-violet-600 via-purple-600 to-cyan-600 rounded-2xl blur-lg opacity-60 group-hover:opacity-100 transition duration-300" />
+                <span className="relative flex items-center px-8 py-4 bg-linear-to-r from-violet-600 via-purple-600 to-cyan-600 rounded-2xl text-lg font-semibold text-white shadow-2xl">
+                  Get Started Free
                   <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
                   </svg>
@@ -474,9 +495,9 @@ export default function LandingPage() {
               </Link>
               <Link
                 to="/login"
-                className="group flex items-center px-8 py-4 rounded-xl text-lg font-semibold text-white border border-white/20 hover:bg-white/5 transition-all duration-300"
+                className="group flex items-center px-8 py-4 rounded-2xl text-lg font-semibold text-white border border-white/15 hover:bg-white/5 hover:border-white/30 transition-all duration-300 backdrop-blur-sm"
               >
-                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 mr-2 text-slate-400 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -484,141 +505,287 @@ export default function LandingPage() {
               </Link>
             </motion.div>
 
+            {/* Trusted by badge */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.8, duration: 0.6 }}
+              className="mt-16 flex items-center justify-center gap-3 text-sm text-slate-500"
+            >
+              <div className="flex -space-x-2">
+                {['bg-violet-500', 'bg-cyan-500', 'bg-emerald-500', 'bg-amber-500'].map((bg, i) => (
+                  <div key={i} className={`w-7 h-7 rounded-full ${bg} border-2 border-slate-950 flex items-center justify-center text-white text-xs font-bold`}>
+                    {String.fromCharCode(65 + i)}
+                  </div>
+                ))}
+              </div>
+              <span>Trusted by <span className="text-slate-300 font-medium">150+</span> enterprise teams</span>
+            </motion.div>
           </div>
         </div>
       </section>
 
-      {/* Why Docloq Section */}
-      <section className="relative py-24 overflow-hidden">
-        {/* Background accent */}
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-violet-950/20 to-transparent" />
-        
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <motion.h2
+      {/* What is Docloq — ContainerScroll Section */}
+      <ContainerScroll
+        titleComponent={
+          <>
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
               viewport={{ once: true }}
-              className="text-4xl md:text-5xl font-bold text-white mb-4"
+              className="inline-flex items-center px-4 py-2 rounded-full bg-cyan-500/10 border border-cyan-500/20 mb-6"
             >
-              Why <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">Docloq</span>?
-            </motion.h2>
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              viewport={{ once: true }}
-              className="text-slate-400 max-w-xl mx-auto"
-            >
-              The smarter way to manage, analyze, and verify your documents
-            </motion.p>
+              <svg className="w-4 h-4 mr-2 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-sm text-cyan-400">About the Platform</span>
+            </motion.div>
+            <h2 className="text-4xl md:text-[3.5rem] font-bold text-white leading-tight">
+              What is{' '}
+              <span className="bg-linear-to-r from-violet-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                Docloq
+              </span>
+              {'?'}
+            </h2>
+            <p className="text-lg text-slate-400 max-w-2xl mx-auto mt-4">
+              An intelligent document management platform that combines AI analysis,
+              blockchain verification, and enterprise security into one seamless experience.
+            </p>
+          </>
+        }
+      >
+        {/* Card Content — Visual platform overview */}
+        <div className="h-full w-full p-6 md:p-10 flex flex-col gap-6 overflow-hidden">
+          {/* Top bar */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-linear-to-br from-violet-600 to-cyan-600 flex items-center justify-center text-white font-bold text-lg shadow-lg">
+                D
+              </div>
+              <div>
+                <span className="text-white font-semibold text-lg">Docloq Platform</span>
+                <p className="text-slate-500 text-xs">Documents That Think & Prove</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="px-3 py-1.5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-medium flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                All Systems Active
+              </span>
+            </div>
           </div>
 
-          {/* Main Grid */}
-          <div className="grid lg:grid-cols-3 gap-8">
-            {/* Left - Free Card (Large) */}
-            <motion.div
-              initial={{ opacity: 0, x: -30 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6 }}
-              viewport={{ once: true }}
-              className="lg:row-span-2 relative group"
-            >
-              <div className="absolute -inset-0.5 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-3xl blur opacity-30 group-hover:opacity-50 transition duration-500" />
-              <div className="relative h-full p-8 bg-gradient-to-br from-emerald-950/80 to-slate-900/80 backdrop-blur-sm rounded-3xl border border-emerald-500/30 overflow-hidden">
-                {/* Decorative circles */}
-                <div className="absolute -top-20 -right-20 w-40 h-40 bg-emerald-500/10 rounded-full blur-3xl" />
-                <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-cyan-500/10 rounded-full blur-3xl" />
-                
-                <div className="relative z-10">
-                  <div className="inline-flex items-center px-4 py-2 rounded-full bg-emerald-500/20 border border-emerald-500/30 mb-6">
-                    <span className="text-emerald-400 text-sm font-semibold">✨ Start Free Today</span>
-                  </div>
-                  
-                  <h3 className="text-3xl md:text-4xl font-bold text-white mb-4">
-                    Free to Use,
-                    <br />
-                    <span className="text-emerald-400">Powerful by Design</span>
-                  </h3>
-                  
-                  <p className="text-slate-300 mb-8 leading-relaxed">
-                    Get started with Docloq completely free. Access AI analysis, blockchain verification, 
-                    and all core features without paying a dime.
-                  </p>
-
-                  <div className="space-y-3">
-                    {["AI Document Analysis", "Blockchain Verification", "Smart Chatbot", "Task Management"].map((feature, i) => (
-                      <div key={i} className="flex items-center gap-3">
-                        <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                          <svg className="w-3 h-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                        <span className="text-slate-300 text-sm">{feature}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <Link
-                    to="/contact"
-                    className="mt-8 inline-flex items-center px-6 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-xl text-white font-semibold hover:from-emerald-400 hover:to-cyan-400 transition-all"
-                  >
-                    Request Access
-                    <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                    </svg>
-                  </Link>
+          {/* Main content grid */}
+          <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* AI Module */}
+            <div className="rounded-2xl bg-violet-500/10 border border-violet-500/20 p-5 flex flex-col">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-violet-500/20 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                  </svg>
                 </div>
+                <h4 className="text-white font-semibold text-sm">AI Engine</h4>
               </div>
+              <div className="space-y-2 flex-1">
+                <div className="flex justify-between text-xs"><span className="text-slate-400">Analysis</span><span className="text-violet-400 font-bold">98%</span></div>
+                <div className="w-full h-1.5 rounded-full bg-slate-800"><div className="h-full rounded-full bg-violet-500" style={{ width: '98%' }} /></div>
+                <div className="flex justify-between text-xs"><span className="text-slate-400">Summary</span><span className="text-violet-400 font-bold">95%</span></div>
+                <div className="w-full h-1.5 rounded-full bg-slate-800"><div className="h-full rounded-full bg-violet-500/70" style={{ width: '95%' }} /></div>
+                <div className="flex justify-between text-xs"><span className="text-slate-400">Extraction</span><span className="text-violet-400 font-bold">99%</span></div>
+                <div className="w-full h-1.5 rounded-full bg-slate-800"><div className="h-full rounded-full bg-violet-500/50" style={{ width: '99%' }} /></div>
+              </div>
+              <div className="mt-3 text-center">
+                <span className="text-2xl font-bold text-violet-400">50+</span>
+                <p className="text-[10px] text-slate-500">Languages Supported</p>
+              </div>
+            </div>
+
+            {/* Blockchain Module */}
+            <div className="rounded-2xl bg-cyan-500/10 border border-cyan-500/20 p-5 flex flex-col">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+                <h4 className="text-white font-semibold text-sm">Blockchain</h4>
+              </div>
+              <div className="space-y-3 flex-1">
+                {[
+                  { hash: '0x7a3f...', status: 'Verified', color: 'text-cyan-400' },
+                  { hash: '0x9b2e...', status: 'Verified', color: 'text-cyan-400' },
+                  { hash: '0xc4d1...', status: 'Pending', color: 'text-amber-400' },
+                ].map((block, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-slate-900/60 border border-white/5">
+                    <span className="text-xs font-mono text-slate-400">{block.hash}</span>
+                    <span className={`text-[10px] font-semibold ${block.color}`}>{block.status}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 text-center">
+                <span className="text-2xl font-bold text-cyan-400">SHA-256</span>
+                <p className="text-[10px] text-slate-500">Hash Algorithm</p>
+              </div>
+            </div>
+
+            {/* Security Module */}
+            <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-5 flex flex-col">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+                <h4 className="text-white font-semibold text-sm">Security</h4>
+              </div>
+              <div className="space-y-2 flex-1">
+                {[
+                  { label: 'AES-256 Encryption', icon: '🔐', active: true },
+                  { label: 'Honeytoken Traps', icon: '🪤', active: true },
+                  { label: 'OSINT Scanner', icon: '🔍', active: true },
+                  { label: 'Secure Wiping', icon: '🗑️', active: true },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-1.5 rounded-lg bg-slate-900/60 border border-white/5">
+                    <span className="text-xs text-slate-300 flex items-center gap-2">
+                      <span className="text-sm">{item.icon}</span>
+                      {item.label}
+                    </span>
+                    <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 text-center">
+                <span className="text-2xl font-bold text-emerald-400">100%</span>
+                <p className="text-[10px] text-slate-500">Tamper Detection</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom status bar */}
+          <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-white/5 border border-white/5">
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-violet-400 animate-pulse" />
+                <span className="text-xs text-slate-400">AI Active</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                <span className="text-xs text-slate-400">Chain Synced</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-xs text-slate-400">Secure</span>
+              </div>
+            </div>
+            <span className="text-xs text-slate-500">v2.0 • 99.9% Uptime</span>
+          </div>
+        </div>
+      </ContainerScroll>
+
+      {/* DoKi AI Spotlight Section */}
+      <section className="relative py-32 overflow-hidden">
+        {/* Background effects */}
+        <div className="absolute inset-0 bg-linear-to-b from-transparent via-fuchsia-950/10 to-transparent" />
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-violet-600/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-fuchsia-600/5 rounded-full blur-3xl" />
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Left — 3D Robot */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.8 }}
+              viewport={{ once: true }}
+              className="relative aspect-square max-w-lg mx-auto lg:mx-0"
+            >
+              {/* Glow behind robot */}
+              <div className="absolute inset-10 bg-linear-to-br from-violet-600/20 via-fuchsia-600/20 to-cyan-600/20 rounded-full blur-3xl" />
+
+              <InteractiveRobotSpline
+                scene="https://prod.spline.design/PyzDhpQ9E5f1E3MT/scene.splinecode"
+                className="w-full h-full relative z-10"
+              />
             </motion.div>
 
-            {/* Right - Feature Cards (2x2 Grid) */}
-            {[
-              {
-                icon: "⚡",
-                title: "Lightning Fast",
-                desc: "AI analysis in seconds, not hours",
-                gradient: "from-violet-500 to-purple-500",
-              },
-              {
-                icon: "🔐",
-                title: "Blockchain Secured",
-                desc: "Tamper-proof document verification",
-                gradient: "from-cyan-500 to-blue-500",
-              },
-              {
-                icon: "🧠",
-                title: "AI-Powered",
-                desc: "Smart insights & summaries",
-                gradient: "from-fuchsia-500 to-pink-500",
-              },
-              {
-                icon: "🎯",
-                title: "All-in-One",
-                desc: "Everything you need, one platform",
-                gradient: "from-amber-500 to-orange-500",
-              },
-            ].map((item, index) => (
+            {/* Right — Content */}
+            <div>
               <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
+                transition={{ duration: 0.6 }}
                 viewport={{ once: true }}
-                className="group relative p-6 bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-white/5 hover:border-white/20 transition-all duration-300"
               >
-                <div className={`absolute inset-0 bg-gradient-to-br ${item.gradient} opacity-0 group-hover:opacity-5 rounded-2xl transition-opacity duration-300`} />
-                <span className="text-3xl mb-4 block">{item.icon}</span>
-                <h3 className="text-xl font-bold text-white mb-2">{item.title}</h3>
-                <p className="text-slate-400 text-sm">{item.desc}</p>
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-fuchsia-500/10 border border-fuchsia-500/20 mb-6">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-fuchsia-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-fuchsia-500" />
+                  </span>
+                  <span className="text-sm text-fuchsia-400 font-medium">Meet DoKi</span>
+                </div>
+                <h2 className="text-4xl md:text-5xl font-bold text-white mb-6 leading-tight">
+                  Your AI-Powered<br />
+                  <span className="bg-linear-to-r from-fuchsia-400 via-violet-400 to-cyan-400 bg-clip-text text-transparent">
+                    Document Assistant
+                  </span>
+                </h2>
+                <p className="text-slate-400 text-lg leading-relaxed mb-10">
+                  DoKi is more than a chatbot — it's your intelligent companion that understands 
+                  your documents deeply. Ask complex questions, get instant summaries, and discover 
+                  insights you'd otherwise miss.
+                </p>
               </motion.div>
-            ))}
+
+              {/* Feature list */}
+              <div className="space-y-5">
+                {[
+                  {
+                    title: 'Natural Language Q&A',
+                    desc: 'Ask questions about any document in plain language and get precise answers',
+                    iconBg: 'bg-violet-500/15 border-violet-500/25',
+                    iconColor: 'text-violet-400',
+                  },
+                  {
+                    title: 'Instant Summarization',
+                    desc: 'Get comprehensive document summaries at any detail level you need',
+                    iconBg: 'bg-fuchsia-500/15 border-fuchsia-500/25',
+                    iconColor: 'text-fuchsia-400',
+                  },
+                  {
+                    title: 'Smart Recommendations',
+                    desc: 'Receive actionable insights and suggestions based on document analysis',
+                    iconBg: 'bg-cyan-500/15 border-cyan-500/25',
+                    iconColor: 'text-cyan-400',
+                  },
+                ].map((feat, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: 30 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5, delay: i * 0.1 }}
+                    viewport={{ once: true }}
+                    className="group flex items-start gap-4 p-4 -mx-4 rounded-2xl hover:bg-white/5 transition-colors duration-300"
+                  >
+                    <div className={`mt-1 w-10 h-10 rounded-xl ${feat.iconBg} border flex items-center justify-center shrink-0`}>
+                      <svg className={`w-5 h-5 ${feat.iconColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h4 className="text-white font-semibold mb-1">{feat.title}</h4>
+                      <p className="text-slate-400 text-sm leading-relaxed">{feat.desc}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Stats Section */}
+      {/* Stats Section
       <section className="relative py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
@@ -671,13 +838,13 @@ export default function LandingPage() {
             ))}
           </div>
         </div>
-      </section>
+      </section> */}
 
-      {/* Features Section */}
+      {/* Features Section — DisplayCards */}
       <section id="features" className="relative py-32">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Section Header */}
-          <div className="text-center mb-20">
+          <div className="text-center mb-16">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -696,7 +863,7 @@ export default function LandingPage() {
             >
               <span className="text-white">Everything You Need to</span>
               <br />
-              <span className="bg-gradient-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">
+              <span className="bg-linear-to-r from-violet-400 to-cyan-400 bg-clip-text text-transparent">
                 Master Your Documents
               </span>
             </motion.h2>
@@ -711,46 +878,81 @@ export default function LandingPage() {
             </motion.p>
           </div>
 
-          {/* Features Grid */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((feature, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                viewport={{ once: true }}
-                className="group relative"
-              >
-                <div className="absolute -inset-0.5 bg-gradient-to-r opacity-0 group-hover:opacity-100 rounded-2xl blur transition duration-500"
-                  style={{ backgroundImage: `linear-gradient(to right, var(--tw-gradient-stops))` }}
-                />
-                <div className={`absolute -inset-0.5 bg-gradient-to-r ${feature.gradient} opacity-0 group-hover:opacity-30 rounded-2xl blur-xl transition duration-500`} />
-                <div className="relative h-full p-8 bg-slate-900/80 backdrop-blur-sm rounded-2xl border border-white/5 group-hover:border-white/10 transition-all duration-500">
-                  {/* Icon */}
-                  <div className={`inline-flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-r ${feature.gradient} mb-6 text-white shadow-lg`}>
-                    {feature.icon}
-                  </div>
-                  
-                  {/* Content */}
-                  <h3 className="text-xl font-bold text-white mb-3 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-slate-300 group-hover:bg-clip-text transition-all duration-300">
-                    {feature.title}
-                  </h3>
-                  <p className="text-slate-400 leading-relaxed">
-                    {feature.description}
-                  </p>
-
-                  {/* Arrow */}
-                  <div className="mt-6 flex items-center text-sm font-medium text-slate-500 group-hover:text-white transition-colors">
-                    <span>Learn more</span>
-                    <svg className="w-4 h-4 ml-2 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                    </svg>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          {/* 6 Feature Cards Grid */}
+          <DisplayCards cards={[
+            {
+              icon: (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                </svg>
+              ),
+              title: "AI Document Analysis",
+              description: "Leverage cutting-edge AI to automatically analyze, extract insights, and categorize your documents with unprecedented accuracy.",
+              date: "Powered by AI",
+              gradient: "from-violet-500 via-purple-500 to-fuchsia-500",
+              titleClassName: "text-violet-400",
+            },
+            {
+              icon: (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+              ),
+              title: "Smart Chatbot Assistant",
+              description: "Get instant answers about your documents with our intelligent AI chatbot. Ask questions, get summaries, and extract key information effortlessly.",
+              date: "DoKi Intelligence",
+              gradient: "from-cyan-500 via-blue-500 to-indigo-500",
+              titleClassName: "text-cyan-400",
+            },
+            {
+              icon: (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              ),
+              title: "Blockchain Verification",
+              description: "Immutable document authenticity powered by blockchain technology. Every document gets a unique cryptographic hash stored on-chain for tamper-proof verification.",
+              date: "On-chain Proof",
+              gradient: "from-emerald-500 via-green-500 to-teal-500",
+              titleClassName: "text-emerald-400",
+            },
+            {
+              icon: (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                </svg>
+              ),
+              title: "OSINT Tracker",
+              description: "Monitor the web for leaked documents and sensitive data. Stay ahead of threats with real-time open-source intelligence tracking.",
+              date: "Real-time Scanning",
+              gradient: "from-amber-500 via-orange-500 to-red-500",
+              titleClassName: "text-amber-400",
+            },
+            {
+              icon: (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              ),
+              title: "Role Management",
+              description: "Granular access control with customizable roles and permissions. Ensure the right people have access to the right documents.",
+              date: "Access Control",
+              gradient: "from-pink-500 via-rose-500 to-red-500",
+              titleClassName: "text-pink-400",
+            },
+            {
+              icon: (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+              ),
+              title: "Task & Workflow",
+              description: "Streamline your document workflows with integrated task management. Assign, track, and complete document-related tasks efficiently.",
+              date: "Workflow Engine",
+              gradient: "from-indigo-500 via-purple-500 to-pink-500",
+              titleClassName: "text-indigo-400",
+            },
+          ]} />
         </div>
       </section>
 
@@ -1206,11 +1408,26 @@ export default function LandingPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="relative py-32">
-        <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-gradient-to-r from-violet-600/20 via-purple-600/20 to-cyan-600/20" />
-          <div className="absolute inset-0 bg-slate-950/80" />
+      <section className="relative py-32 overflow-hidden">
+        {/* Sparkles background */}
+        <div className="absolute inset-0 w-full h-full">
+          <SparklesCore
+            id="ctaSparkles"
+            background="transparent"
+            minSize={0.4}
+            maxSize={1.4}
+            particleDensity={80}
+            className="w-full h-full"
+            particleColor="#a78bfa"
+            speed={1}
+          />
         </div>
+        {/* Gradient overlays */}
+        <div className="absolute inset-0 bg-linear-to-b from-slate-950 via-transparent to-slate-950" />
+        <div className="absolute inset-0">
+          <div className="absolute inset-0 bg-linear-to-r from-violet-600/10 via-purple-600/10 to-cyan-600/10" />
+        </div>
+
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
@@ -1221,10 +1438,19 @@ export default function LandingPage() {
             <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6">
               Ready to Transform Your
               <br />
-              <span className="bg-gradient-to-r from-violet-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+              <span className="bg-linear-to-r from-violet-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
                 Document Workflow?
               </span>
             </h2>
+
+            {/* Sparkle line accent */}
+            <div className="w-[20rem] md:w-[30rem] mx-auto h-10 relative mb-8">
+              <div className="absolute inset-x-10 top-0 bg-linear-to-r from-transparent via-violet-500 to-transparent h-[2px] w-3/4 blur-sm" />
+              <div className="absolute inset-x-10 top-0 bg-linear-to-r from-transparent via-violet-500 to-transparent h-px w-3/4" />
+              <div className="absolute inset-x-20 top-0 bg-linear-to-r from-transparent via-cyan-500 to-transparent h-[5px] w-1/4 blur-sm" />
+              <div className="absolute inset-x-20 top-0 bg-linear-to-r from-transparent via-cyan-500 to-transparent h-px w-1/4" />
+            </div>
+
             <p className="text-xl text-slate-400 mb-10 max-w-2xl mx-auto">
               Join organizations who have revolutionized their document management. 
               Contact us to request access.
@@ -1234,8 +1460,8 @@ export default function LandingPage() {
                 to="/contact"
                 className="group relative inline-flex items-center justify-center"
               >
-                <div className="absolute -inset-1 bg-gradient-to-r from-violet-600 via-purple-600 to-cyan-600 rounded-xl blur-lg opacity-70 group-hover:opacity-100 transition duration-300" />
-                <span className="relative flex items-center px-10 py-5 bg-gradient-to-r from-violet-600 via-purple-600 to-cyan-600 rounded-xl text-lg font-semibold text-white">
+                <div className="absolute -inset-1 bg-linear-to-r from-violet-600 via-purple-600 to-cyan-600 rounded-xl blur-lg opacity-70 group-hover:opacity-100 transition duration-300" />
+                <span className="relative flex items-center px-10 py-5 bg-linear-to-r from-violet-600 via-purple-600 to-cyan-600 rounded-xl text-lg font-semibold text-white">
                   Request Access
                   <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />

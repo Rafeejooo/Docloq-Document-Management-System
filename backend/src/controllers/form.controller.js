@@ -19,6 +19,7 @@ import { randomUUID } from 'crypto';
 import { createBlankDocx, convertDocument, downloadFromUrl } from '../services/conversion.service.js';
 import { downloadFile, uploadFile } from '../services/storage.service.js';
 import { decryptFile, encryptFile as encryptFileService, generateDocumentKey } from '../services/encryption.service.js';
+import { uploadPipeline } from '../services/upload-pipeline.service.js';
 
 const UPLOAD_DIR = path.join(process.cwd(), 'uploads');
 const ensureUploadDir = async () => {
@@ -646,25 +647,24 @@ export const getOrgUsers = async (req, res) => {
 //  Creates document-backed templates that open in OnlyOffice
 // ══════════════════════════════════════════════
 
-// Helper: create a document record from a buffer
+// Helper: create a document record via the full security pipeline
 async function createDocumentRecord(orgId, userId, filename, buffer, mimeType) {
-  await ensureUploadDir();
-  const ext = path.extname(filename);
-  const uniqueFilename = `${randomUUID()}${ext}`;
-  const filePath = path.join(UPLOAD_DIR, uniqueFilename);
-  await fs.writeFile(filePath, buffer);
+  // Build a multer-compatible file object
+  const fileObj = {
+    originalname: filename,
+    mimetype: mimeType,
+    buffer,
+    size: buffer.length,
+  };
 
-  const [newDoc] = await db.insert(documents).values({
-    organizationId: orgId,
-    filename: uniqueFilename,
-    originalFilename: filename,
-    mimeType,
-    fileSize: buffer.length,
-    ownerId: userId,
-    status: 'active',
-  }).returning();
+  // Run the full 14-step security pipeline
+  const result = await uploadPipeline(fileObj, userId, orgId, null);
 
-  return newDoc;
+  if (!result.success) {
+    throw new Error(result.message || 'Upload pipeline failed for template document');
+  }
+
+  return result.data.document;
 }
 
 // POST /api/forms/templates/create-blank

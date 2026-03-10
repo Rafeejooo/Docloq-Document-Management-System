@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useTheme } from "@/app/providers/ThemeProvider";
 import { motion, AnimatePresence } from "framer-motion";
-import AIAssistant from "@/components/ai-assistant/AIAssistant";
+import DokiWidget from "@/components/chatbot/DokiWidget";
 import { useAuthStore } from "@/app/store/auth.store";
 import { authService } from "@/services/auth.service";
 
@@ -358,8 +358,8 @@ export default function DashboardLayout({ children }) {
         )}
       </AnimatePresence>
 
-      {/* AI Assistant - Available on all pages */}
-      <AIAssistant />
+      {/* DoKi Chatbot - Available on all pages */}
+      <DokiWidget />
     </div>
   );
 }
