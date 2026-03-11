@@ -13,6 +13,8 @@ import trashRoutes from './trash.routes.js';
 import chatbotRoutes from './chatbot.routes.js';
 import dashboardRoutes from './dashboard.routes.js';
 import departmentRoutes from './department.routes.js';
+import signingRoutes from './signing.routes.js';
+import roleRoutes from './role.routes.js';
 
 const router = Router();
 
@@ -29,6 +31,8 @@ router.use('/trash', trashRoutes);
 router.use('/chatbot', chatbotRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/departments', departmentRoutes);
+router.use('/signing', signingRoutes);
+router.use('/roles', roleRoutes);
 
 // Health Check
 router.get('/health', (req, res) => {

@@ -38,7 +38,7 @@ const StatCard = ({ title, value, change, icon, color, subtext }) => (
         </span>
       )}
     </div>
-    <h3 className="text-2xl font-bold text-white mb-1">{value}</h3>
+    <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">{value}</h3>
     <p className="text-sm text-slate-400">{title}</p>
     {subtext && <p className="text-xs text-slate-500 mt-1">{subtext}</p>}
   </div>
@@ -122,7 +122,7 @@ export default function AdminDashboard() {
               </svg>
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white">DocLoq</h1>
+              <h1 className="text-lg font-bold text-slate-900 dark:text-white">DocLoq</h1>
               <p className="text-xs text-red-400">Admin Portal</p>
             </div>
           </div>
@@ -163,7 +163,7 @@ export default function AdminDashboard() {
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
                 activeTab === item.id
                   ? 'bg-red-500/10 text-red-400 border border-red-500/20'
-                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                  : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-100 dark:hover:bg-slate-800/50 hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               {item.icon}
@@ -176,12 +176,12 @@ export default function AdminDashboard() {
         <div className="p-4 border-t border-slate-800/50">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center">
-              <span className="text-sm font-bold text-white">
+              <span className="text-sm font-bold text-slate-900 dark:text-white">
                 {admin?.firstName?.[0] || admin?.email?.[0]?.toUpperCase() || 'A'}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-900 dark:text-white truncate">
                 {admin?.firstName} {admin?.lastName}
               </p>
               <p className="text-xs text-slate-500 truncate">{admin?.email}</p>
@@ -203,7 +203,7 @@ export default function AdminDashboard() {
       <main className="ml-64 p-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-white mb-2">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">
             {activeTab === 'overview' && 'Dashboard Overview'}
             {activeTab === 'users' && 'User Management'}
             {activeTab === 'payments' && 'Payment History'}
@@ -355,7 +355,7 @@ export default function AdminDashboard() {
               {/* Recent Users */}
               <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white">Recent Users</h3>
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Recent Users</h3>
                   <button 
                     onClick={() => setActiveTab('users')}
                     className="text-sm text-red-400 hover:text-red-300 transition-colors"
@@ -367,12 +367,12 @@ export default function AdminDashboard() {
                   {users.slice(0, 5).map(user => (
                     <div key={user.id} className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-xl">
                       <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center">
-                        <span className="text-sm font-bold text-white">
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">
                           {user.firstName?.[0] || user.email[0].toUpperCase()}
                         </span>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate">
+                        <p className="text-sm font-medium text-slate-900 dark:text-slate-900 dark:text-white truncate">
                           {user.firstName} {user.lastName}
                         </p>
                         <p className="text-xs text-slate-500 truncate">{user.email}</p>
@@ -392,7 +392,7 @@ export default function AdminDashboard() {
               {/* Recent Payments */}
               <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-white">Recent Payments</h3>
+                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Recent Payments</h3>
                   <button 
                     onClick={() => setActiveTab('payments')}
                     className="text-sm text-red-400 hover:text-red-300 transition-colors"
@@ -415,7 +415,7 @@ export default function AdminDashboard() {
                         </svg>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate">
+                        <p className="text-sm font-medium text-slate-900 dark:text-slate-900 dark:text-white truncate">
                           {formatCurrency(payment.amount, payment.currency)}
                         </p>
                         <p className="text-xs text-slate-500 truncate">{payment.description}</p>
@@ -444,7 +444,7 @@ export default function AdminDashboard() {
               <div className="p-5 border-b border-slate-800/50">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-lg font-semibold text-white">Client Organizations</h3>
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Client Organizations</h3>
                     <p className="text-sm text-slate-400 mt-1">View registered organizations and their usage statistics</p>
                   </div>
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg">
@@ -473,12 +473,12 @@ export default function AdminDashboard() {
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-700 to-slate-800 flex items-center justify-center">
-                              <span className="text-sm font-bold text-white">
+                              <span className="text-sm font-bold text-slate-900 dark:text-white">
                                 {client.name?.[0]?.toUpperCase() || 'O'}
                               </span>
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-white">{client.name}</p>
+                              <p className="text-sm font-medium text-slate-900 dark:text-white">{client.name}</p>
                               <p className="text-xs text-slate-500">@{client.slug}</p>
                             </div>
                           </div>
@@ -526,7 +526,7 @@ export default function AdminDashboard() {
                   </svg>
                 </div>
                 <div>
-                  <h4 className="text-sm font-semibold text-white mb-1">Document Security Policy</h4>
+                  <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-1">Document Security Policy</h4>
                   <p className="text-sm text-slate-400">
                     For security and privacy compliance, administrators cannot access the contents of client documents. 
                     Only aggregate statistics (document count, storage size) are visible. 
@@ -559,12 +559,12 @@ export default function AdminDashboard() {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center">
-                            <span className="text-sm font-bold text-white">
+                            <span className="text-sm font-bold text-slate-900 dark:text-white">
                               {user.firstName?.[0] || user.email[0].toUpperCase()}
                             </span>
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-white">
+                            <p className="text-sm font-medium text-slate-900 dark:text-white">
                               {user.firstName} {user.lastName}
                             </p>
                             <p className="text-xs text-slate-500">{user.email}</p>
@@ -629,12 +629,12 @@ export default function AdminDashboard() {
                     <tr key={payment.id} className="hover:bg-slate-800/30 transition-colors">
                       <td className="px-6 py-4">
                         <div>
-                          <p className="text-sm font-medium text-white">{payment.description}</p>
+                          <p className="text-sm font-medium text-slate-900 dark:text-white">{payment.description}</p>
                           <p className="text-xs text-slate-500">{payment.transactionId}</p>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-sm font-semibold text-white">
+                        <span className="text-sm font-semibold text-slate-900 dark:text-white">
                           {formatCurrency(payment.amount, payment.currency)}
                         </span>
                       </td>
@@ -691,7 +691,7 @@ export default function AdminDashboard() {
                   {activity.map((log, index) => (
                     <tr key={log.id || index} className="hover:bg-slate-800/30 transition-colors">
                       <td className="px-6 py-4">
-                        <span className="text-sm font-mono text-white">{log.endpoint}</span>
+                        <span className="text-sm font-mono text-slate-900 dark:text-white">{log.endpoint}</span>
                       </td>
                       <td className="px-6 py-4">
                         <span className={`text-xs font-semibold px-2 py-1 rounded ${

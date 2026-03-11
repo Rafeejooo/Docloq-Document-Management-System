@@ -199,7 +199,7 @@ function PermissionDropdown({ value, onChange, compact = false }) {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-1 z-50 min-w-[140px] bg-slate-800 border border-slate-700 rounded-xl shadow-xl overflow-hidden animate-fade-in">
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-[140px] bg-slate-200 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl overflow-hidden animate-fade-in">
           {PERMISSION_LEVELS.map((perm) => (
             <button
               key={perm.id}
@@ -452,7 +452,7 @@ export default function RoleManagement() {
             </svg>
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Role Management</h1>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Role Management</h1>
             <p className="text-slate-400 text-sm">Create custom roles with granular document permissions</p>
           </div>
         </div>
@@ -466,11 +466,11 @@ export default function RoleManagement() {
             className="animate-fade-in-up"
             style={{ animationDelay: `${index * 50}ms` }}
           >
-            <div className="relative overflow-hidden rounded-2xl bg-slate-800/50 border border-slate-700/50 p-5 hover:border-slate-600/50 transition-all group">
+            <div className="relative overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 p-5 hover:border-slate-600/50 transition-all group">
               <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-indigo-500/10 to-transparent rounded-full -translate-y-1/2 translate-x-1/2" />
               <div className="relative">
                 <p className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-1">{stat.label}</p>
-                <p className="text-3xl font-bold text-white">{stat.value}</p>
+                <p className="text-3xl font-bold text-slate-900 dark:text-white">{stat.value}</p>
               </div>
             </div>
           </div>
@@ -488,7 +488,7 @@ export default function RoleManagement() {
             placeholder="Search roles..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 pr-4 py-3 text-sm rounded-xl border border-slate-700 bg-slate-800/50 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-full sm:w-72 transition-all"
+            className="pl-10 pr-4 py-3 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-full sm:w-72 transition-all"
           />
         </div>
         <button
@@ -514,7 +514,7 @@ export default function RoleManagement() {
               className="animate-fade-in-up"
               style={{ animationDelay: `${150 + index * 50}ms` }}
             >
-              <div className={`group relative overflow-hidden rounded-2xl bg-slate-800/50 border border-slate-700/50 hover:border-slate-600/50 transition-all hover:shadow-xl hover:shadow-black/20`}>
+              <div className={`group relative overflow-hidden rounded-2xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 hover:border-slate-600/50 transition-all hover:shadow-xl hover:shadow-black/20`}>
                 {/* Gradient accent */}
                 <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${colors.gradient}`} />
                 
@@ -528,7 +528,7 @@ export default function RoleManagement() {
                         </svg>
                       </div>
                       <div>
-                        <h3 className="text-base font-semibold text-white">{role.name}</h3>
+                        <h3 className="text-base font-semibold text-slate-900 dark:text-white">{role.name}</h3>
                         <p className="text-xs text-slate-400">{role.members} members</p>
                       </div>
                     </div>
@@ -573,7 +573,7 @@ export default function RoleManagement() {
                   </div>
 
                   {/* Footer */}
-                  <div className="flex items-center justify-between pt-4 border-t border-slate-700/50">
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-700/50">
                     <span className="text-xs text-slate-500">
                       {role.createdAt}
                     </span>
@@ -596,13 +596,13 @@ export default function RoleManagement() {
         {/* Empty State */}
         {filteredRoles.length === 0 && (
           <div className="col-span-full">
-            <div className="rounded-2xl bg-slate-800/50 border border-slate-700/50 p-12 text-center">
+            <div className="rounded-2xl bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50 p-12 text-center">
               <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-slate-700/50 flex items-center justify-center">
                 <svg className="w-8 h-8 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">No roles found</h3>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">No roles found</h3>
               <p className="text-sm text-slate-400 mb-4">
                 {searchQuery ? "Try a different search term" : "Create your first role to get started"}
               </p>
@@ -622,9 +622,9 @@ export default function RoleManagement() {
       {/* Create/Edit Role Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-slate-700/50 animate-fade-in-up overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border border-slate-200 dark:border-slate-700/50 animate-fade-in-up overflow-hidden">
             {/* Modal Header */}
-            <div className="px-6 py-5 border-b border-slate-700/50 shrink-0 bg-slate-800/50">
+            <div className="px-6 py-5 border-b border-slate-200 dark:border-slate-700/50 shrink-0 bg-slate-100 dark:bg-slate-800/50">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${getColorClasses(formData.color).gradient} flex items-center justify-center shadow-lg`}>
@@ -633,7 +633,7 @@ export default function RoleManagement() {
                     </svg>
                   </div>
                   <div>
-                    <h2 className="text-xl font-bold text-white">
+                    <h2 className="text-xl font-bold text-slate-900 dark:text-white">
                       {modalMode === "create" ? "Create New Role" : "Edit Role"}
                     </h2>
                     <p className="text-sm text-slate-400">
@@ -666,7 +666,7 @@ export default function RoleManagement() {
                       value={formData.name}
                       onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                       placeholder="e.g., Finance Team"
-                      className="w-full px-4 py-3 rounded-xl border border-slate-700 bg-slate-800/50 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                     />
                   </div>
 
@@ -679,7 +679,7 @@ export default function RoleManagement() {
                       onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                       placeholder="What is this role for?"
                       rows={3}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-700 bg-slate-800/50 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none transition-all"
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none transition-all"
                     />
                   </div>
 
@@ -709,7 +709,7 @@ export default function RoleManagement() {
                       Assign Users
                       <span className="ml-2 text-xs font-normal text-slate-500">({formData.assignedUsers.length} selected)</span>
                     </label>
-                    <div className="space-y-1.5 max-h-40 overflow-y-auto rounded-xl border border-slate-700 bg-slate-800/30 p-2">
+                    <div className="space-y-1.5 max-h-40 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/30 p-2">
                       {USERS.map((user) => (
                         <label
                           key={user.id}
@@ -725,11 +725,11 @@ export default function RoleManagement() {
                             onChange={() => toggleUserAssignment(user.id)}
                             className="w-4 h-4 rounded border-slate-600 bg-slate-700 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-0"
                           />
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center text-xs font-semibold text-white">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center text-xs font-semibold text-slate-900 dark:text-white">
                             {user.avatar}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-white truncate">{user.name}</p>
+                            <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{user.name}</p>
                             <p className="text-xs text-slate-500 truncate">{user.email}</p>
                           </div>
                         </label>
@@ -738,7 +738,7 @@ export default function RoleManagement() {
                   </div>
 
                   {/* Permission Legend */}
-                  <div className="p-4 rounded-xl bg-slate-800/30 border border-slate-700/50">
+                  <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700/50">
                     <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Permission Levels</p>
                     <div className="space-y-2.5">
                       {PERMISSION_LEVELS.filter(p => p.id !== "none").map((perm) => (
@@ -774,20 +774,20 @@ export default function RoleManagement() {
                         placeholder="Search documents..."
                         value={permissionSearch}
                         onChange={(e) => setPermissionSearch(e.target.value)}
-                        className="pl-9 pr-4 py-2 text-sm rounded-lg border border-slate-700 bg-slate-800/50 text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-52 transition-all"
+                        className="pl-9 pr-4 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 w-52 transition-all"
                       />
                     </div>
                   </div>
 
-                  <div className="rounded-xl border border-slate-700/50 overflow-hidden max-h-[420px] overflow-y-auto bg-slate-800/30">
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-700/50 overflow-hidden max-h-[420px] overflow-y-auto bg-slate-50 dark:bg-slate-800/30">
                     {filteredFolders.map((folder) => {
                       const isExpanded = expandedFolders.includes(folder.id);
                       const folderPerm = getPermission(folder.id);
                       
                       return (
-                        <div key={folder.id} className="border-b border-slate-700/50 last:border-b-0">
+                        <div key={folder.id} className="border-b border-slate-200 dark:border-slate-700/50 last:border-b-0">
                           {/* Folder Row */}
-                          <div className="flex items-center gap-3 p-3.5 bg-slate-800/50 hover:bg-slate-700/30 transition-colors">
+                          <div className="flex items-center gap-3 p-3.5 bg-slate-100 dark:bg-slate-800/50 hover:bg-slate-700/30 transition-colors">
                             <button
                               onClick={() => toggleFolderExpand(folder.id)}
                               className="p-1.5 rounded-lg hover:bg-slate-600/50 transition-colors"
@@ -807,7 +807,7 @@ export default function RoleManagement() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                               </svg>
                             </div>
-                            <span className="flex-1 text-sm font-medium text-white">
+                            <span className="flex-1 text-sm font-medium text-slate-900 dark:text-white">
                               {folder.name}
                             </span>
                             <span className="text-xs text-slate-500 mr-2">
@@ -829,7 +829,7 @@ export default function RoleManagement() {
                                 return (
                                   <div
                                     key={doc.id}
-                                    className="flex items-center gap-3 px-4 py-3 pl-14 border-t border-slate-700/30 hover:bg-slate-800/30 transition-colors"
+                                    className="flex items-center gap-3 px-4 py-3 pl-14 border-t border-slate-200 dark:border-slate-700/30 hover:bg-slate-50 dark:bg-slate-800/30 transition-colors"
                                   >
                                     <div className="w-7 h-7 rounded-lg bg-slate-700/50 flex items-center justify-center">
                                       <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -862,7 +862,7 @@ export default function RoleManagement() {
                   </div>
 
                   {/* Quick Stats */}
-                  <div className="flex flex-wrap items-center gap-4 mt-4 p-3 rounded-xl bg-slate-800/30 border border-slate-700/50">
+                  <div className="flex flex-wrap items-center gap-4 mt-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/30 border border-slate-200 dark:border-slate-700/50">
                     <span className="text-xs text-slate-500 font-medium">Permissions set:</span>
                     {(() => {
                       const counts = countPermissions(formData.permissions);
@@ -886,10 +886,10 @@ export default function RoleManagement() {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-slate-700/50 flex gap-3 shrink-0 bg-slate-800/30">
+            <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700/50 flex gap-3 shrink-0 bg-slate-50 dark:bg-slate-800/30">
               <button
                 onClick={handleCloseModal}
-                className="flex-1 px-4 py-3 rounded-xl border border-slate-700 text-slate-300 font-medium hover:bg-slate-800 transition-colors"
+                className="flex-1 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-300 font-medium hover:bg-slate-200 dark:bg-slate-800 transition-colors"
               >
                 Cancel
               </button>
@@ -908,14 +908,14 @@ export default function RoleManagement() {
       {/* Delete Confirmation Modal */}
       {showDeleteModal && roleToDelete && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md border border-slate-700/50 animate-fade-in-up overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700/50 animate-fade-in-up overflow-hidden">
             <div className="p-6 text-center">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-500/10 flex items-center justify-center">
                 <svg className="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">Delete Role</h3>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Delete Role</h3>
               <p className="text-slate-400 mb-6">
                 Are you sure you want to delete <span className="text-white font-semibold">"{roleToDelete.name}"</span>? 
                 This will remove all {roleToDelete.members} members from this role.
@@ -923,7 +923,7 @@ export default function RoleManagement() {
               <div className="flex gap-3">
                 <button
                   onClick={() => { setShowDeleteModal(false); setRoleToDelete(null); }}
-                  className="flex-1 px-4 py-3 rounded-xl border border-slate-700 text-slate-300 font-medium hover:bg-slate-800 transition-colors"
+                  className="flex-1 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-300 font-medium hover:bg-slate-200 dark:bg-slate-800 transition-colors"
                 >
                   Cancel
                 </button>

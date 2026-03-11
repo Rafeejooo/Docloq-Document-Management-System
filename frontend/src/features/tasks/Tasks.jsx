@@ -3,12 +3,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Card from "@/components/ui/Card";
 import OnlyOfficeEditor from "@/components/onlyoffice/OnlyOfficeEditor";
+import SigningPanel from "@/features/tasks/SigningPanel";
 import taskService from "@/services/task.service";
 
 // ── Config ───────────────────────────────────
 const taskTypeConfig = {
   sign: {
-    label: "Sign", action: "Sign Document", color: "violet", mode: "edit",
+    label: "Sign", action: "Sign Document", color: "violet", mode: "view",
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -171,6 +172,8 @@ export default function Tasks() {
   const [showEditor, setShowEditor] = useState(false);
   const [docConfigLoading, setDocConfigLoading] = useState(false);
   const [workflowContext, setWorkflowContext] = useState(null);
+  const [signedDocumentInfo, setSignedDocumentInfo] = useState(null);
+  const [viewingSignedDoc, setViewingSignedDoc] = useState(false);
 
   // Review/Approve action state
   const [reviewNotes, setReviewNotes] = useState("");
@@ -209,7 +212,7 @@ export default function Tasks() {
       setSelectedTask(task);
     }
 
-    // Fetch document config + workflow context
+    // Fetch document config + workflow context (for all task statuses — completed tasks get view mode)
     if (task.relatedDocumentId) {
       setDocConfigLoading(true);
       try {
@@ -217,6 +220,7 @@ export default function Tasks() {
         if (dcRes.success) {
           setTaskDocConfig(dcRes.data.config);
           setWorkflowContext(dcRes.data.workflowContext);
+          setSignedDocumentInfo(dcRes.data.signedDocumentInfo || null);
         }
       } catch (err) {
         console.error("Failed to fetch doc config:", err);
@@ -232,12 +236,19 @@ export default function Tasks() {
     setSelectedTask(null);
     setTaskDocConfig(null);
     setWorkflowContext(null);
+    setSignedDocumentInfo(null);
+    setViewingSignedDoc(false);
     setReviewNotes("");
   };
 
   // ─── Open OnlyOffice editor ─────────────────
-  const openEditor = () => {
-    if (taskDocConfig) setShowEditor(true);
+  const openEditor = (useSignedDoc = false) => {
+    setViewingSignedDoc(useSignedDoc);
+    if (useSignedDoc && signedDocumentInfo?.signedConfig) {
+      setShowEditor(true);
+    } else if (taskDocConfig) {
+      setShowEditor(true);
+    }
   };
 
   const closeEditor = () => {
@@ -376,15 +387,23 @@ export default function Tasks() {
   // ══════════════════════════════════════════════
 
   // ─── OnlyOffice Full-screen Editor ──────────
-  if (showEditor && taskDocConfig && selectedTask) {
-    return (
-      <OnlyOfficeEditor
-        config={taskDocConfig}
-        documentName={selectedTask.documentName || selectedTask.title}
-        documentId={selectedTask.relatedDocumentId}
-        onClose={closeEditor}
-      />
-    );
+  if (showEditor && selectedTask) {
+    const editorConfig = viewingSignedDoc && signedDocumentInfo?.signedConfig
+      ? signedDocumentInfo.signedConfig
+      : taskDocConfig;
+
+    if (editorConfig) {
+      return (
+        <OnlyOfficeEditor
+          config={editorConfig}
+          documentName={viewingSignedDoc
+            ? `Signed - ${selectedTask.documentName || selectedTask.title}`
+            : selectedTask.documentName || selectedTask.title}
+          documentId={selectedTask.relatedDocumentId}
+          onClose={() => { setShowEditor(false); setViewingSignedDoc(false); }}
+        />
+      );
+    }
   }
 
   // ─── Task Detail View ───────────────────────
@@ -456,26 +475,36 @@ export default function Tasks() {
                       <svg className="w-6 h-6 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">{selectedTask.documentName || "Document"}</p>
+                      <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 truncate">
+                        {isDone && selectedTask.taskType === "sign" && signedDocumentInfo
+                          ? `Signed - ${selectedTask.documentName || "Document"}`
+                          : selectedTask.documentName || "Document"}
+                      </p>
                       <p className="text-xs text-slate-400">
-                        {cfg.mode === "edit" ? "You have edit access" : "View only access"}
+                        {isActive && cfg.mode === "edit" ? "You have edit access" : "View only access"}
                       </p>
                     </div>
 
-                    {/* Open Document button — only for active tasks */}
-                    {isActive && taskDocConfig && (
-                      <button onClick={openEditor}
+                    {/* Open Document button — available for all status */}
+                    {taskDocConfig && (
+                      <button onClick={() => openEditor(isDone && selectedTask.taskType === "sign" && signedDocumentInfo ? true : false)}
                         className={`px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl flex items-center gap-2 ${
-                          cfg.mode === "edit"
+                          isActive && cfg.mode === "edit"
                             ? "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-500/25"
+                            : isDone && selectedTask.taskType === "sign" && signedDocumentInfo
+                            ? "bg-violet-600 hover:bg-violet-700 text-white shadow-violet-500/25"
                             : "bg-slate-700 hover:bg-slate-800 text-white shadow-slate-500/25"
                         }`}>
-                        {cfg.mode === "edit" ? (
+                        {isActive && cfg.mode === "edit" ? (
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                         ) : (
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                         )}
-                        {cfg.mode === "edit" ? "Open & Edit" : "View Document"}
+                        {isActive && cfg.mode === "edit"
+                          ? "Open & Edit"
+                          : isDone && selectedTask.taskType === "sign" && signedDocumentInfo
+                          ? "Lihat Dokumen Bertandatangan"
+                          : "View Document"}
                       </button>
                     )}
 
@@ -483,6 +512,16 @@ export default function Tasks() {
                       <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
                     )}
                   </div>
+
+                  {/* For completed sign tasks — show link to view original */}
+                  {isDone && selectedTask.taskType === "sign" && signedDocumentInfo && taskDocConfig && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <button onClick={() => openEditor(false)}
+                        className="text-xs text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors underline">
+                        Lihat dokumen asli (tanpa tanda tangan)
+                      </button>
+                    </div>
+                  )}
 
                   {/* Pending info */}
                   {isPending && (
@@ -514,7 +553,7 @@ export default function Tasks() {
                       </p>
                       {/* Show Open & Edit button directly here if doc config is available */}
                       {taskDocConfig && !showEditor && (
-                        <button onClick={openEditor}
+                        <button onClick={() => openEditor(false)}
                           className="w-full px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 mb-2">
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                           Open & Edit Document
@@ -538,36 +577,12 @@ export default function Tasks() {
                     </div>
                   )}
 
-                  {/* Sign: edit + submit */}
+                  {/* Sign: DocuSeal signing panel */}
                   {selectedTask.taskType === "sign" && (
-                    <div className="space-y-3">
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Open the document, add your signature, save, then submit.
-                      </p>
-                      {/* Show Open & Sign button directly here if doc config is available */}
-                      {taskDocConfig && !showEditor && (
-                        <button onClick={openEditor}
-                          className="w-full px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 mb-2">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                          Open & Sign Document
-                        </button>
-                      )}
-                      {docConfigLoading && (
-                        <div className="flex items-center justify-center gap-2 py-3 text-sm text-slate-500">
-                          <div className="w-5 h-5 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
-                          Loading document...
-                        </div>
-                      )}
-                      <button onClick={handleSubmitSign} disabled={submitting}
-                        className="w-full px-4 py-3 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white font-semibold shadow-lg shadow-violet-500/25 transition-all flex items-center justify-center gap-2">
-                        {submitting ? (
-                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                        )}
-                        Submit Signed Document
-                      </button>
-                    </div>
+                    <SigningPanel
+                      task={selectedTask}
+                      onComplete={() => { fetchTasks(); closeTaskDetail(); }}
+                    />
                   )}
 
                   {/* Review: view + notes */}
@@ -577,7 +592,7 @@ export default function Tasks() {
                         View the document, then add your review notes. The filler will see your feedback if rejected.
                       </p>
                       {taskDocConfig && !showEditor && (
-                        <button onClick={openEditor}
+                        <button onClick={() => openEditor(false)}
                           className="w-full px-4 py-3 rounded-xl bg-slate-700 hover:bg-slate-800 text-white font-semibold shadow-lg shadow-slate-500/25 transition-all flex items-center justify-center gap-2">
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                           View Document
@@ -609,7 +624,7 @@ export default function Tasks() {
                         Review the document, then approve or reject. A reason is required when rejecting.
                       </p>
                       {taskDocConfig && !showEditor && (
-                        <button onClick={openEditor}
+                        <button onClick={() => openEditor(false)}
                           className="w-full px-4 py-3 rounded-xl bg-slate-700 hover:bg-slate-800 text-white font-semibold shadow-lg shadow-slate-500/25 transition-all flex items-center justify-center gap-2">
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                           View Document
@@ -661,7 +676,7 @@ export default function Tasks() {
                         <svg className="w-6 h-6 text-rose-600 dark:text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                       )}
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <p className={`font-semibold ${isDone ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}`}>
                         {isDone ? "Task Completed" : "Task Rejected"}
                       </p>
@@ -670,6 +685,19 @@ export default function Tasks() {
                       </p>
                     </div>
                   </div>
+
+                  {/* For completed sign tasks — view signed document */}
+                  {isDone && selectedTask.taskType === "sign" && signedDocumentInfo?.signedDocumentUrl && (
+                    <div className="mt-4 pt-4 border-t border-emerald-200 dark:border-emerald-500/20">
+                      <a href={signedDocumentInfo.signedDocumentUrl} target="_blank" rel="noopener noreferrer"
+                        className="w-full px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-medium text-sm transition-all flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-700">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Unduh PDF Bertandatangan
+                      </a>
+                    </div>
+                  )}
                 </Card>
               )}
 
@@ -791,7 +819,7 @@ export default function Tasks() {
         </div>
 
         {/* Main Grid */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 xl:gap-8">
+        <div className="flex flex-col-reverse xl:grid xl:grid-cols-3 gap-6 xl:gap-8">
           {/* Tasks Column */}
           <div className="xl:col-span-2 space-y-4 sm:space-y-6">
             {/* Tabs + Filters */}
@@ -969,8 +997,8 @@ export default function Tasks() {
           </div>
 
           {/* Calendar Sidebar */}
-          <div className="hidden xl:block xl:col-span-1">
-            <Card className="p-5 sticky top-6">
+          <div className="xl:col-span-1">
+            <Card className="p-4 sm:p-5 xl:sticky xl:top-6">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white">Calendar</h3>
                 <div className="flex items-center gap-1">
@@ -999,7 +1027,7 @@ export default function Tasks() {
                 {calendarData.map((dayData, idx) => (
                   <button key={idx} disabled={!dayData.day}
                     onClick={() => dayData.date && setSelectedCalendarDate(selectedCalendarDate === dayData.date ? null : dayData.date)}
-                    className={`relative aspect-square rounded-lg flex flex-col items-center justify-center text-sm transition-all ${
+                    className={`relative aspect-square rounded-lg flex flex-col items-center justify-center text-xs sm:text-sm transition-all ${
                       !dayData.day ? "cursor-default"
                       : dayData.isToday ? "bg-indigo-600 text-white font-bold"
                       : selectedCalendarDate === dayData.date ? "bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-semibold"
@@ -1008,7 +1036,7 @@ export default function Tasks() {
                     }`}>
                     {dayData.day}
                     {dayData.tasks?.length > 0 && (
-                      <div className="absolute bottom-1 flex gap-0.5">
+                      <div className="absolute bottom-0.5 sm:bottom-1 flex gap-0.5">
                         {dayData.tasks.slice(0, 3).map((t, i) => (
                           <span key={i} className={`w-1 h-1 rounded-full ${dayData.isToday ? "bg-white/70" : (priorityConfig[t.priority]?.color || "bg-indigo-500")}`} />
                         ))}
@@ -1018,8 +1046,8 @@ export default function Tasks() {
                 ))}
               </div>
 
-              {/* Upcoming */}
-              <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
+              {/* Upcoming — hidden on mobile for space, shown on larger screens */}
+              <div className="hidden sm:block mt-6 pt-5 border-t border-slate-100 dark:border-slate-800">
                 <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">Upcoming</h4>
                 <div className="space-y-2">
                   {allTasks

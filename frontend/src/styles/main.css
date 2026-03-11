@@ -12,6 +12,23 @@ body {
   transition: background 0.3s ease;
 }
 
+/* Smooth theme transitions */
+*,
+*::before,
+*::after {
+  transition-property: color, background-color, border-color, box-shadow;
+  transition-duration: 0.2s;
+  transition-timing-function: ease;
+}
+
+/* Opt out animations & transitions from transition override */
+[class*="animate-"],
+.no-theme-transition,
+[class*="transition-transform"],
+[class*="transition-all"] {
+  transition-property: all;
+}
+
 /* Glassmorphism Effect */
 .glass {
   @apply bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border border-white/20 dark:border-slate-700/20;

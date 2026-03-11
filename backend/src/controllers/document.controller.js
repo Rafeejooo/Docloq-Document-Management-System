@@ -8,7 +8,7 @@ import {
   auditLogs,
   trashItems,
 } from '../db/schema.js';
-import { eq, desc, and, isNull } from 'drizzle-orm';
+import { eq, desc, and, isNull, inArray } from 'drizzle-orm';
 import path from 'path';
 import fs from 'fs/promises';
 import { randomUUID } from 'crypto';
@@ -19,6 +19,8 @@ import { decryptFile, encryptFile as encryptFileService, generateDocumentKey } f
 import { verifyQRPayload } from '../services/qrcode.service.js';
 import { generateSHA256 } from '../services/hash.service.js';
 import { convertDocument, downloadFromUrl } from '../services/conversion.service.js';
+import { getAllUserPermissions, getUserPermissionLevel } from '../middlewares/permission.middleware.js';
+import { tasks } from '../db/schema.js';
 
 // ============================================================
 // Legacy: Upload directory for plain OnlyOffice files
@@ -39,6 +41,55 @@ export const getAllDocuments = async (req, res) => {
     const allDocs = await db.select().from(documents)
       .where(isNull(documents.deletedAt))
       .orderBy(desc(documents.createdAt));
+
+    // If user is authenticated, filter by permissions
+    const userId = req.user?.userId || req.user?.id;
+    const organizationId = req.user?.organizationId;
+
+    if (userId && organizationId) {
+      const { hasFullAccess, permissions } = await getAllUserPermissions(userId, organizationId);
+
+      if (!hasFullAccess) {
+        // Get documents that user has tasks assigned to (fill/sign/review/approve)
+        const userTasks = await db
+          .select({ relatedDocumentId: tasks.relatedDocumentId })
+          .from(tasks)
+          .where(
+            and(
+              eq(tasks.assignedTo, userId),
+              inArray(tasks.status, ['in_progress', 'pending'])
+            )
+          );
+        const taskDocIds = new Set(userTasks.map(t => t.relatedDocumentId).filter(Boolean));
+
+        // Filter documents: user can only see documents they have permission for
+        // Check both direct document permission and parent folder permission
+        const filteredDocs = allDocs.filter((doc) => {
+          // Check direct document permission
+          const docKey = `document:${doc.id}`;
+          if (permissions[docKey] && permissions[docKey] !== 'none') return true;
+
+          // Check folder permission (if document is in a folder)
+          if (doc.folderId) {
+            const folderKey = `folder:${doc.folderId}`;
+            if (permissions[folderKey] && permissions[folderKey] !== 'none') return true;
+          }
+
+          // Document owner always has access
+          if (doc.ownerId === userId) return true;
+
+          // User has an active task for this document
+          if (taskDocIds.has(doc.id)) return true;
+
+          return false;
+        });
+
+        return res.json({
+          success: true,
+          data: filteredDocs,
+        });
+      }
+    }
     
     res.json({
       success: true,
@@ -65,6 +116,38 @@ export const getDocument = async (req, res) => {
         success: false,
         message: 'Document not found',
       });
+    }
+
+    // Permission check for authenticated users
+    const userId = req.user?.userId || req.user?.id;
+    const organizationId = req.user?.organizationId;
+
+    if (userId && organizationId) {
+      // Owner always has access
+      if (doc.ownerId !== userId) {
+        const permLevel = await getUserPermissionLevel(userId, 'document', id, organizationId);
+        if (permLevel === 'none') {
+          // Also check if user has an active task for this document
+          const [userTask] = await db
+            .select({ id: tasks.id })
+            .from(tasks)
+            .where(
+              and(
+                eq(tasks.assignedTo, userId),
+                eq(tasks.relatedDocumentId, id),
+                inArray(tasks.status, ['in_progress', 'pending'])
+              )
+            )
+            .limit(1);
+
+          if (!userTask) {
+            return res.status(403).json({
+              success: false,
+              message: 'You do not have permission to access this document',
+            });
+          }
+        }
+      }
     }
     
     res.json({

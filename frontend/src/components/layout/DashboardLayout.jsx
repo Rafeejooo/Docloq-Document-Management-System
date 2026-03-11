@@ -120,13 +120,13 @@ export default function DashboardLayout({ children }) {
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         } lg:translate-x-0`}
       >
-        <div className="h-full w-64 bg-slate-900 dark:bg-slate-900 flex flex-col">
+        <div className="h-full w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col transition-colors duration-300">
           {/* Logo */}
           <div className="flex items-center gap-3 px-6 py-5">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-indigo-500/30">
               D
             </div>
-            <span className="text-xl font-bold text-white tracking-tight">
+            <span className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
               DocLoq
             </span>
           </div>
@@ -142,10 +142,10 @@ export default function DashboardLayout({ children }) {
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200 ${
                   isActive(item.href)
                     ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25"
-                    : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
-                <span className={isActive(item.href) ? "text-white" : "text-slate-500"}>{item.icon}</span>
+                <span className={isActive(item.href) ? "text-white" : "text-slate-400 dark:text-slate-500"}>{item.icon}</span>
                 <span>{item.name}</span>
               </Link>
             ))}
@@ -155,7 +155,7 @@ export default function DashboardLayout({ children }) {
           <div className="p-4 space-y-2">
             <button
               onClick={toggleTheme}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-slate-400 hover:bg-slate-800 hover:text-white transition-all duration-200"
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white transition-all duration-200"
             >
               {theme === "light" ? (
                 <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -169,17 +169,17 @@ export default function DashboardLayout({ children }) {
               <span>{theme === "light" ? "Dark Mode" : "Light Mode"}</span>
             </button>
             
-            <div className="border-t border-slate-800 pt-3">
+            <div className="border-t border-slate-200 dark:border-slate-800 pt-3">
               <div className="relative" ref={profileDropdownRef}>
                 <button
                   onClick={() => setShowProfileDropdown(!showProfileDropdown)}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800 transition-all duration-200"
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-200"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-slate-700 to-slate-600 flex items-center justify-center text-sm font-bold text-white">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 dark:from-slate-700 dark:to-slate-600 flex items-center justify-center text-sm font-bold text-white">
                     {userInitials}
                   </div>
                   <div className="flex-1 min-w-0 text-left">
-                    <p className="text-sm font-semibold text-white truncate">{displayName}</p>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{displayName}</p>
                     <p className="text-xs text-slate-500 truncate">{userEmail}</p>
                   </div>
                   <svg className={`w-5 h-5 text-slate-500 transition-transform duration-200 ${showProfileDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -195,13 +195,13 @@ export default function DashboardLayout({ children }) {
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -10, scale: 0.95 }}
                       transition={{ duration: 0.15 }}
-                      className="absolute bottom-full left-0 right-0 mb-2 bg-slate-800 rounded-xl shadow-xl border border-slate-700/50 overflow-hidden"
+                      className="absolute bottom-full left-0 right-0 mb-2 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700/50 overflow-hidden"
                     >
                       <div className="py-1">
                         <Link
                           to="/settings"
                           onClick={() => setShowProfileDropdown(false)}
-                          className="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                          className="flex items-center gap-3 px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white transition-colors"
                         >
                           <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -211,7 +211,7 @@ export default function DashboardLayout({ children }) {
                         <Link
                           to="/settings"
                           onClick={() => setShowProfileDropdown(false)}
-                          className="flex items-center gap-3 px-4 py-3 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
+                          className="flex items-center gap-3 px-4 py-3 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white transition-colors"
                         >
                           <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -219,10 +219,10 @@ export default function DashboardLayout({ children }) {
                           </svg>
                           <span>Settings</span>
                         </Link>
-                        <div className="border-t border-slate-700 my-1"></div>
+                        <div className="border-t border-slate-200 dark:border-slate-700 my-1"></div>
                         <button
                           onClick={() => { setShowProfileDropdown(false); setShowLogoutModal(true); }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-400 hover:bg-slate-700 hover:text-red-300 transition-colors"
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-slate-700 hover:text-red-600 dark:hover:text-red-300 transition-colors"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -240,12 +240,12 @@ export default function DashboardLayout({ children }) {
       </aside>
 
       {/* Mobile sidebar toggle */}
-      <div className="fixed top-0 left-0 right-0 z-30 lg:hidden bg-slate-900 px-4 py-3 flex items-center gap-3 shadow-lg">
+      <div className="fixed top-0 left-0 right-0 z-30 lg:hidden bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center gap-3 shadow-lg transition-colors duration-300">
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 transition-colors"
+          className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
         >
-          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 text-slate-700 dark:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
@@ -253,7 +253,7 @@ export default function DashboardLayout({ children }) {
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-black text-sm">
             D
           </div>
-          <span className="text-lg font-bold text-white">DocLoq</span>
+          <span className="text-lg font-bold text-slate-900 dark:text-white">DocLoq</span>
         </div>
       </div>
 

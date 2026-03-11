@@ -25,6 +25,10 @@ import AdminDashboard from "@/features/admin/AdminDashboardNew";
 import BlockchainSettings from "@/features/admin/BlockchainSettings";
 import AIManagement from "@/features/admin/AIManagement";
 
+// Error pages & guards
+import NotFound from "@/components/errors/NotFound";
+import RequirePermission from "@/app/guards/RequirePermission";
+
 export const router = createBrowserRouter([
   { path: "/", element: <LandingPage /> },
   { path: "/contact", element: <Contact /> },
@@ -40,7 +44,7 @@ export const router = createBrowserRouter([
   { path: "/verification", element: <Verification /> },
   { path: "/ai-analysis", element: <AIDocumentAnalysis /> },
   { path: "/chatbot", element: <Chatbot /> },
-  { path: "/roles", element: <RoleManagement /> },
+  { path: "/roles", element: <RequirePermission><RoleManagement /></RequirePermission> },
   { path: "/osint-tracker", element: <OSINTTracker /> },
   { path: "/settings", element: <Settings /> },
   
@@ -49,4 +53,7 @@ export const router = createBrowserRouter([
   { path: "/admin/dashboard", element: <AdminDashboard /> },
   { path: "/admin/blockchain", element: <BlockchainSettings /> },
   { path: "/admin/ai", element: <AIManagement /> },
+
+  // Catch-all 404
+  { path: "*", element: <NotFound /> },
 ]);

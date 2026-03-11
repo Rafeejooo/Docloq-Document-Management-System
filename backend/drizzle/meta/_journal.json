@@ -36,6 +36,13 @@
       "when": 1773244800000,
       "tag": "0004_departments_and_idle",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1773130588551,
+      "tag": "0005_fearless_tigra",
+      "breakpoints": true
     }
   ]
 }

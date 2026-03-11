@@ -7,6 +7,7 @@ import {
   users,
   documents,
   documentVersions,
+  documentSignatures,
   forms,
   formInstances,
   formWorkflowSteps,
@@ -380,8 +381,10 @@ export const getTaskDocumentConfig = async (req, res) => {
     if (!doc) return res.status(404).json({ success: false, message: 'Document not found' });
 
     // Determine mode based on task type
-    // fill = edit, sign = edit, review = view, approve = view
-    const mode = (task.taskType === 'fill' || task.taskType === 'sign') ? 'edit' : 'view';
+    // fill = edit (user needs to type/edit), sign = view (signing handled via DocuSeal, not OnlyOffice), review = view, approve = view
+    // For completed/cancelled tasks, always force view mode
+    const isCompleted = task.status === 'completed' || task.status === 'cancelled';
+    const mode = isCompleted ? 'view' : (task.taskType === 'fill' ? 'edit' : 'view');
 
     const ext = path.extname(doc.originalFilename || doc.filename).toLowerCase().slice(1);
     const backendUrlDocker = process.env.BACKEND_URL_DOCKER || 'http://host.docker.internal:3000';
@@ -402,7 +405,7 @@ export const getTaskDocumentConfig = async (req, res) => {
           download: true,
           print: true,
           review: false,
-          comment: task.taskType === 'review', // reviewers can add comments
+          comment: !isCompleted && task.taskType === 'review', // reviewers can add comments
         },
       },
       documentType,
@@ -415,10 +418,10 @@ export const getTaskDocumentConfig = async (req, res) => {
           name: userName,
         },
         customization: {
-          autosave: false,
-          forcesave: false,
+          autosave: !isCompleted && task.taskType === 'fill',
+          forcesave: !isCompleted && task.taskType === 'fill',
           chat: false,
-          comments: task.taskType === 'review',
+          comments: !isCompleted && task.taskType === 'review',
           help: false,
         },
       },
@@ -455,6 +458,39 @@ export const getTaskDocumentConfig = async (req, res) => {
       };
     }
 
+    // For completed sign tasks, include signed document info
+    let signedDocumentInfo = null;
+    if (isCompleted && task.taskType === 'sign') {
+      const [sigRecord] = await db.select().from(documentSignatures)
+        .where(eq(documentSignatures.taskId, task.id))
+        .orderBy(desc(documentSignatures.createdAt));
+      if (sigRecord && sigRecord.status === 'completed' && sigRecord.signedDocumentPath) {
+        signedDocumentInfo = {
+          signatureId: sigRecord.id,
+          signedDocumentUrl: sigRecord.signedDocumentUrl,
+          hasLocalFile: !!sigRecord.signedDocumentPath,
+          // OnlyOffice config for viewing the signed PDF
+          signedConfig: {
+            document: {
+              fileType: 'pdf',
+              key: `signed-${sigRecord.id}-${sigRecord.updatedAt?.getTime() || Date.now()}`,
+              title: `Signed - ${doc.originalFilename || doc.filename}`,
+              url: `${backendUrlDocker}/api/signing/${sigRecord.id}/file`,
+              permissions: { edit: false, download: true, print: true, review: false, comment: false },
+            },
+            documentType: 'pdf',
+            editorConfig: {
+              mode: 'view',
+              lang: 'en',
+              user: { id: currentUserId, name: userName },
+              customization: { autosave: false, forcesave: false, chat: false, comments: false, help: false },
+            },
+            type: 'desktop',
+          },
+        };
+      }
+    }
+
     res.json({
       success: true,
       data: {
@@ -464,6 +500,7 @@ export const getTaskDocumentConfig = async (req, res) => {
         onlyOfficeUrl: `${onlyOfficeUrl}/web-apps/apps/api/documents/api.js`,
         mode,
         workflowContext,
+        signedDocumentInfo,
       },
     });
   } catch (error) {

@@ -4,6 +4,7 @@ import { motion, useScroll, useTransform, AnimatePresence, useMotionValue, useSp
 import AOS from 'aos';
 import 'aos/dist/aos.css';
 import RotatingGlobe from '@/components/ui/RotatingGlobe';
+import HeroShutterText from '@/components/ui/HeroShutterText';
 import InteractiveRobotSpline from '@/components/ui/InteractiveRobotSpline';
 import { ContainerScroll } from '@/components/ui/ContainerScrollAnimation';
 import DisplayCards from '@/components/ui/DisplayCards';
@@ -445,22 +446,35 @@ export default function LandingPage() {
               </span>
             </motion.div>
 
-            {/* Main Heading */}
-            <motion.h1
+            {/* Main Heading — Shutter Text Animation */}
+            <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, delay: 0.1 }}
-              className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold leading-[1.05] mb-8 tracking-tight"
+              className="mb-8"
             >
-              <span className="text-white">Document Intelligence</span>
-              <br />
-              <span className="relative inline-block mt-2">
-                <span className="absolute -inset-3 bg-linear-to-r from-violet-600 via-purple-600 to-cyan-600 blur-3xl opacity-25" />
-                <span className="relative bg-linear-to-r from-violet-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
-                  Reimagined.
+              <HeroShutterText
+                text="DOCLOQ"
+                autoReplay
+                interval={8000}
+                accentColor="text-violet-400"
+              />
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.6 }}
+                className="text-center mt-2"
+              >
+                <span className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight">
+                  <span className="relative inline-block">
+                    <span className="absolute -inset-3 bg-linear-to-r from-violet-600 via-purple-600 to-cyan-600 blur-3xl opacity-25" />
+                    <span className="relative bg-linear-to-r from-violet-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                      All in One Document Intelligence.
+                    </span>
+                  </span>
                 </span>
-              </span>
-            </motion.h1>
+              </motion.div>
+            </motion.div>
 
             {/* Subheading */}
             <motion.p

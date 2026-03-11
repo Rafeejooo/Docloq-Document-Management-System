@@ -195,17 +195,17 @@ const StatCard = ({ title, value, subtitle, icon, color, delay = 0 }) => (
     animate={{ opacity: 1, y: 0 }}
     transition={{ delay, duration: 0.5 }}
     whileHover={{ y: -4, transition: { duration: 0.2 } }}
-    className="relative overflow-hidden bg-slate-900/60 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-5 group hover:border-cyan-500/20 transition-all duration-300"
+    className="relative overflow-hidden bg-white dark:bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200 dark:border-slate-200 dark:border-slate-800/50 rounded-2xl p-5 group hover:border-cyan-500/20 transition-all duration-300"
   >
     <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/5 rounded-full blur-2xl group-hover:bg-cyan-500/10 transition-all" />
     <div className="absolute bottom-0 left-0 h-px w-0 group-hover:w-full bg-linear-to-r from-cyan-500/40 to-transparent transition-all duration-500" />
     <div className="relative">
       <div className="flex items-center gap-3 mb-3">
-        <div className="p-2.5 rounded-xl bg-slate-800/80 border border-slate-700/50 group-hover:border-cyan-500/20 transition-all">
+        <div className="p-2.5 rounded-xl bg-slate-100 dark:bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-200 dark:border-slate-700/50 group-hover:border-cyan-500/20 transition-all">
           {icon}
         </div>
       </div>
-      <h3 className="text-2xl font-bold text-white mb-1">{value}</h3>
+      <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">{value}</h3>
       <p className="text-sm text-slate-400">{title}</p>
       {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
     </div>
@@ -216,12 +216,12 @@ const StatCard = ({ title, value, subtitle, icon, color, delay = 0 }) => (
 const QuickActionCard = ({ title, description, icon, href, color }) => (
   <Link
     to={href}
-    className="group relative overflow-hidden bg-slate-900/60 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-5 hover:border-cyan-500/20 transition-all duration-300"
+    className="group relative overflow-hidden bg-white dark:bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200 dark:border-slate-200 dark:border-slate-800/50 rounded-2xl p-5 hover:border-cyan-500/20 transition-all duration-300"
   >
     <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl group-hover:bg-cyan-500/10 transition-all" />
     <div className="absolute bottom-0 left-0 h-px w-0 group-hover:w-full bg-linear-to-r from-cyan-500/40 to-transparent transition-all duration-500" />
     <div className="relative flex items-center gap-4">
-      <div className="p-3 rounded-xl bg-slate-800/80 border border-slate-700/50 group-hover:border-cyan-500/20 transition-all">
+      <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-200 dark:border-slate-700/50 group-hover:border-cyan-500/20 transition-all">
         {icon}
       </div>
       <div className="flex-1">
@@ -294,7 +294,7 @@ export default function AdminDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -334,7 +334,7 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-50 dark:bg-slate-950">
       {/* Particles */}
       {particlesReady && (
         <Particles id="dash-particles" options={dashParticlesOptions} className="fixed inset-0 z-0 pointer-events-none" />
@@ -365,13 +365,13 @@ export default function AdminDashboard() {
         initial={{ x: -100, opacity: 0 }}
         animate={{ x: 0, opacity: 1 }}
         transition={{ duration: 0.5 }}
-        className={`fixed left-0 top-0 bottom-0 ${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-slate-900/90 backdrop-blur-2xl border-r border-cyan-500/10 flex flex-col z-50 transition-all duration-300`}
+        className={`fixed left-0 top-0 bottom-0 ${isSidebarCollapsed ? 'w-20' : 'w-64'} bg-white dark:bg-white dark:bg-slate-900/90 backdrop-blur-2xl border-r border-cyan-500/10 flex flex-col z-50 transition-all duration-300`}
       >
         {/* Sidebar inner glow */}
         <div className="absolute inset-0 bg-linear-to-b from-cyan-500/2 to-transparent pointer-events-none" />
 
         {/* Logo */}
-        <div className="p-5 border-b border-slate-800/50">
+        <div className="p-5 border-b border-slate-200 dark:border-slate-200 dark:border-slate-800/50">
           <div className="flex items-center gap-3">
             <div className="relative w-10 h-10 rounded-xl bg-linear-to-br from-cyan-500 to-teal-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
               <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -385,7 +385,7 @@ export default function AdminDashboard() {
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.2 }}
               >
-                <h1 className="text-lg font-bold text-white">DocLoq</h1>
+                <h1 className="text-lg font-bold text-slate-900 dark:text-white">DocLoq</h1>
                 <p className="text-xs text-cyan-400">Admin Portal</p>
               </motion.div>
             )}
@@ -404,7 +404,7 @@ export default function AdminDashboard() {
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
                 activeTab === item.id
                   ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 shadow-lg shadow-cyan-500/5'
-                  : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                  : 'text-slate-400 hover:bg-slate-100 dark:bg-slate-100 dark:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-900 dark:hover:text-white'
               }`}
             >
               {item.icon}
@@ -413,12 +413,12 @@ export default function AdminDashboard() {
           ))}
 
           {/* Divider */}
-          <div className="my-4 border-t border-slate-800/50" />
+          <div className="my-4 border-t border-slate-200 dark:border-slate-200 dark:border-slate-800/50" />
 
           {/* Settings Links */}
           <Link
             to="/admin/blockchain"
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800/50 hover:text-white transition-all duration-200"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-100 dark:bg-slate-100 dark:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-900 dark:hover:text-white transition-all duration-200"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
@@ -428,7 +428,7 @@ export default function AdminDashboard() {
 
           <Link
             to="/admin/ai"
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800/50 hover:text-white transition-all duration-200"
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-100 dark:bg-slate-100 dark:bg-slate-800/50 hover:text-slate-900 dark:hover:text-slate-900 dark:hover:text-white transition-all duration-200"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -440,7 +440,7 @@ export default function AdminDashboard() {
         {/* Collapse Button */}
         <button
           onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className="absolute -right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 bg-slate-800 border border-cyan-500/20 rounded-full flex items-center justify-center text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40 transition-all shadow-lg"
+          className="absolute -right-3 top-1/2 transform -translate-y-1/2 w-6 h-6 bg-slate-200 dark:bg-slate-200 dark:bg-slate-800 border border-cyan-500/20 rounded-full flex items-center justify-center text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40 transition-all shadow-lg"
         >
           <svg className={`w-4 h-4 transition-transform ${isSidebarCollapsed ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -448,16 +448,16 @@ export default function AdminDashboard() {
         </button>
 
         {/* User Info & Logout */}
-        <div className="p-4 border-t border-slate-800/50">
+        <div className="p-4 border-t border-slate-200 dark:border-slate-200 dark:border-slate-800/50">
           <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3'}`}>
             <div className="w-10 h-10 rounded-xl bg-linear-to-br from-slate-700 to-slate-800 flex items-center justify-center">
-              <span className="text-sm font-bold text-white">
+              <span className="text-sm font-bold text-slate-900 dark:text-white">
                 {admin?.firstName?.[0] || 'A'}
               </span>
             </div>
             {!isSidebarCollapsed && (
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">
+                <p className="text-sm font-medium text-slate-900 dark:text-slate-900 dark:text-slate-900 dark:text-white truncate">
                   {admin?.firstName} {admin?.lastName}
                 </p>
                 <p className="text-xs text-slate-500 truncate">{admin?.email}</p>
@@ -492,7 +492,7 @@ export default function AdminDashboard() {
               </span>
               <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-[0.15em]">Live</span>
             </div>
-            <h1 className="text-3xl font-bold text-white mb-2">
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">
             {activeTab === 'overview' && 'Dashboard Overview'}
             {activeTab === 'clients' && 'Client Organizations'}
             {activeTab === 'users' && 'User Management'}
@@ -607,7 +607,7 @@ export default function AdminDashboard() {
 
               {/* Quick Actions */}
               <motion.div variants={itemVariants}>
-                <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Quick Actions</h3>
                 <div className="grid md:grid-cols-4 gap-4">
                   <QuickActionCard
                     title="Blockchain Settings"
@@ -660,9 +660,9 @@ export default function AdminDashboard() {
               {/* Recent Activity */}
               <motion.div variants={itemVariants} className="grid lg:grid-cols-2 gap-6">
                 {/* Recent Users */}
-                <div className="bg-slate-900/60 backdrop-blur-xl border border-cyan-500/10 rounded-2xl overflow-hidden group">
-                  <div className="p-5 border-b border-slate-800/50 flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <div className="bg-white dark:bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-cyan-500/10 rounded-2xl overflow-hidden group">
+                  <div className="p-5 border-b border-slate-200 dark:border-slate-200 dark:border-slate-800/50 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
                       Recent Users
                     </h3>
@@ -680,15 +680,15 @@ export default function AdminDashboard() {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-xl hover:bg-slate-800/50 transition-colors"
+                        className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-50 dark:bg-slate-800/30 rounded-xl hover:bg-slate-100 dark:bg-slate-100 dark:bg-slate-800/50 transition-colors"
                       >
                         <div className="w-10 h-10 rounded-xl bg-linear-to-br from-slate-700 to-slate-800 flex items-center justify-center">
-                          <span className="text-sm font-bold text-white">
+                          <span className="text-sm font-bold text-slate-900 dark:text-white">
                             {user.firstName?.[0] || user.email[0].toUpperCase()}
                           </span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-white truncate">
+                          <p className="text-sm font-medium text-slate-900 dark:text-slate-900 dark:text-slate-900 dark:text-white truncate">
                             {user.firstName} {user.lastName}
                           </p>
                           <p className="text-xs text-slate-500 truncate">{user.email}</p>
@@ -706,9 +706,9 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Recent Activity Log */}
-                <div className="bg-slate-900/60 backdrop-blur-xl border border-cyan-500/10 rounded-2xl overflow-hidden group">
-                  <div className="p-5 border-b border-slate-800/50 flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <div className="bg-white dark:bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-cyan-500/10 rounded-2xl overflow-hidden group">
+                  <div className="p-5 border-b border-slate-200 dark:border-slate-200 dark:border-slate-800/50 flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                       <div className="w-1.5 h-1.5 rounded-full bg-teal-400" />
                       Recent Activity
                     </h3>
@@ -726,7 +726,7 @@ export default function AdminDashboard() {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className="flex items-center gap-3 p-3 bg-slate-800/30 rounded-xl"
+                        className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-50 dark:bg-slate-800/30 rounded-xl"
                       >
                         <div className={`w-2 h-2 rounded-full ${
                           log.statusCode >= 200 && log.statusCode < 300 ? 'bg-emerald-400' :
@@ -760,11 +760,11 @@ export default function AdminDashboard() {
               exit={{ opacity: 0, y: -20 }}
               className="space-y-6"
             >
-              <div className="bg-slate-900/60 backdrop-blur-xl border border-cyan-500/10 rounded-2xl overflow-hidden">
-                <div className="p-5 border-b border-slate-800/50">
+              <div className="bg-white dark:bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-cyan-500/10 rounded-2xl overflow-hidden">
+                <div className="p-5 border-b border-slate-200 dark:border-slate-200 dark:border-slate-800/50">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-lg font-semibold text-white flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-purple-400" />Client Organizations</h3>
+                      <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-purple-400" />Client Organizations</h3>
                       <p className="text-sm text-slate-400 mt-1">View organization details and usage statistics</p>
                     </div>
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg">
@@ -777,7 +777,7 @@ export default function AdminDashboard() {
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-slate-800/30">
+                    <thead className="bg-slate-50 dark:bg-slate-50 dark:bg-slate-800/30">
                       <tr>
                         <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase">Organization</th>
                         <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase">Users</th>
@@ -789,7 +789,7 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody className="divide-y divide-slate-800/50">
                       {stats?.clients?.length > 0 ? stats.clients.map(client => (
-                        <tr key={client.id} className="hover:bg-slate-800/30 transition-colors">
+                        <tr key={client.id} className="hover:bg-slate-50 dark:bg-slate-50 dark:bg-slate-800/30 transition-colors">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-xl bg-linear-to-br from-cyan-500/20 to-teal-500/20 flex items-center justify-center">
@@ -798,7 +798,7 @@ export default function AdminDashboard() {
                                 </span>
                               </div>
                               <div>
-                                <p className="text-sm font-medium text-white">{client.name}</p>
+                                <p className="text-sm font-medium text-slate-900 dark:text-white">{client.name}</p>
                                 <p className="text-xs text-slate-500">@{client.slug}</p>
                               </div>
                             </div>
@@ -839,10 +839,10 @@ export default function AdminDashboard() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
             >
-              <div className="bg-slate-900/60 backdrop-blur-xl border border-cyan-500/10 rounded-2xl overflow-hidden">
+              <div className="bg-white dark:bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-cyan-500/10 rounded-2xl overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-slate-800/30">
+                    <thead className="bg-slate-50 dark:bg-slate-50 dark:bg-slate-800/30">
                       <tr>
                         <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase">User</th>
                         <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase">Role</th>
@@ -853,16 +853,16 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody className="divide-y divide-slate-800/50">
                       {users.map(user => (
-                        <tr key={user.id} className="hover:bg-slate-800/30 transition-colors">
+                        <tr key={user.id} className="hover:bg-slate-50 dark:bg-slate-50 dark:bg-slate-800/30 transition-colors">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-xl bg-linear-to-br from-slate-700 to-slate-800 flex items-center justify-center">
-                                <span className="text-sm font-bold text-white">
+                                <span className="text-sm font-bold text-slate-900 dark:text-white">
                                   {user.firstName?.[0] || user.email[0].toUpperCase()}
                                 </span>
                               </div>
                               <div>
-                                <p className="text-sm font-medium text-white">{user.firstName} {user.lastName}</p>
+                                <p className="text-sm font-medium text-slate-900 dark:text-white">{user.firstName} {user.lastName}</p>
                                 <p className="text-xs text-slate-500">{user.email}</p>
                               </div>
                             </div>
@@ -897,10 +897,10 @@ export default function AdminDashboard() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
             >
-              <div className="bg-slate-900/60 backdrop-blur-xl border border-cyan-500/10 rounded-2xl overflow-hidden">
+              <div className="bg-white dark:bg-white dark:bg-slate-900/60 backdrop-blur-xl border border-cyan-500/10 rounded-2xl overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-slate-800/30">
+                    <thead className="bg-slate-50 dark:bg-slate-50 dark:bg-slate-800/30">
                       <tr>
                         <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase">Endpoint</th>
                         <th className="px-6 py-4 text-left text-xs font-medium text-slate-400 uppercase">Method</th>
@@ -912,7 +912,7 @@ export default function AdminDashboard() {
                     </thead>
                     <tbody className="divide-y divide-slate-800/50">
                       {activity.map((log, index) => (
-                        <tr key={log.id || index} className="hover:bg-slate-800/30 transition-colors">
+                        <tr key={log.id || index} className="hover:bg-slate-50 dark:bg-slate-50 dark:bg-slate-800/30 transition-colors">
                           <td className="px-6 py-4">
                             <span className="text-sm font-mono text-slate-300">{log.endpoint}</span>
                           </td>

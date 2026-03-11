@@ -802,6 +802,57 @@ export const taskComments = pgTable('task_comments', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+// DOCUMENT SIGNATURES (DocuSeal Integration)
+export const documentSignatures = pgTable('document_signatures', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  organizationId: uuid('organization_id').references(() => organizations.id, { onDelete: 'cascade' }).notNull(),
+
+  // Relasi ke entities DocLoq
+  taskId: uuid('task_id').references(() => tasks.id, { onDelete: 'set null' }),
+  documentId: uuid('document_id').references(() => documents.id, { onDelete: 'cascade' }).notNull(),
+  formInstanceId: uuid('form_instance_id'),
+
+  // DocuSeal IDs
+  docusealSubmissionId: integer('docuseal_submission_id'),
+  docusealTemplateId: integer('docuseal_template_id'),
+  docusealSubmitterId: integer('docuseal_submitter_id'),
+  docusealSlug: varchar('docuseal_slug', { length: 100 }),
+
+  // Signer Info
+  signerUserId: uuid('signer_user_id').references(() => users.id),
+  signerEmail: text('signer_email').notNull(),
+  signerName: text('signer_name'),
+  signerRole: text('signer_role').default('First Party'),
+
+  // Status: pending, sent, opened, completed, declined, expired
+  status: text('status').default('pending'),
+
+  // DocuSeal Timestamps
+  sentAt: timestamp('sent_at'),
+  openedAt: timestamp('opened_at'),
+  completedAt: timestamp('completed_at'),
+  declinedAt: timestamp('declined_at'),
+  declineReason: text('decline_reason'),
+
+  // Signed Document
+  signedDocumentUrl: text('signed_document_url'),
+  signedDocumentPath: text('signed_document_path'),
+  auditLogUrl: text('audit_log_url'),
+
+  // Embed
+  embedSrc: text('embed_src'),
+
+  metadata: jsonb('metadata').default({}),
+
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('doc_sig_org_idx').on(table.organizationId),
+  taskIdx: index('doc_sig_task_idx').on(table.taskId),
+  docIdx: index('doc_sig_doc_idx').on(table.documentId),
+  statusIdx: index('doc_sig_status_idx').on(table.status),
+}));
+
 // AI CHATBOT
 export const chatSessions = pgTable('chat_sessions', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -1295,6 +1346,94 @@ export const formWorkflowStepsRelations = relations(formWorkflowSteps, ({ one })
   }),
 }));
 
+
+// =======================================
+// CUSTOM ROLES & PERMISSION MANAGEMENT
+// =======================================
+
+// Custom Roles (organization-level role management for document access)
+export const customRoles = pgTable('custom_roles', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  organizationId: uuid('organization_id').references(() => organizations.id, { onDelete: 'cascade' }).notNull(),
+  
+  name: text('name').notNull(),
+  description: text('description'),
+  color: varchar('color', { length: 20 }).default('indigo'),
+  
+  isActive: boolean('is_active').default(true),
+  createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  orgIdx: index('custom_role_org_idx').on(table.organizationId),
+  orgNameIdx: uniqueIndex('custom_role_org_name_idx').on(table.organizationId, table.name),
+}));
+
+// Role Permissions: what folders/documents a role can access
+export const rolePermissions = pgTable('role_permissions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  roleId: uuid('role_id').references(() => customRoles.id, { onDelete: 'cascade' }).notNull(),
+  
+  resourceType: text('resource_type').notNull(), // 'folder' or 'document'
+  resourceId: uuid('resource_id').notNull(),
+  permissionLevel: text('permission_level').notNull().default('none'), // 'none', 'viewer', 'editor', 'admin'
+  
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  roleIdx: index('role_perm_role_idx').on(table.roleId),
+  resourceIdx: index('role_perm_resource_idx').on(table.resourceType, table.resourceId),
+  uniqueIdx: uniqueIndex('role_perm_unique_idx').on(table.roleId, table.resourceType, table.resourceId),
+}));
+
+// User-Role Assignments: which users are assigned to which custom roles
+export const userRoleAssignments = pgTable('user_role_assignments', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }).notNull(),
+  roleId: uuid('role_id').references(() => customRoles.id, { onDelete: 'cascade' }).notNull(),
+  
+  assignedBy: uuid('assigned_by').references(() => users.id, { onDelete: 'set null' }),
+  assignedAt: timestamp('assigned_at').defaultNow(),
+}, (table) => ({
+  uniqueIdx: uniqueIndex('user_role_assign_unique_idx').on(table.userId, table.roleId),
+  userIdx: index('user_role_assign_user_idx').on(table.userId),
+  roleIdx: index('user_role_assign_role_idx').on(table.roleId),
+}));
+
+// Custom Roles Relations
+export const customRolesRelations = relations(customRoles, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [customRoles.organizationId],
+    references: [organizations.id],
+  }),
+  creator: one(users, {
+    fields: [customRoles.createdBy],
+    references: [users.id],
+  }),
+  permissions: many(rolePermissions),
+  assignments: many(userRoleAssignments),
+}));
+
+export const rolePermissionsRelations = relations(rolePermissions, ({ one }) => ({
+  role: one(customRoles, {
+    fields: [rolePermissions.roleId],
+    references: [customRoles.id],
+  }),
+}));
+
+export const userRoleAssignmentsRelations = relations(userRoleAssignments, ({ one }) => ({
+  user: one(users, {
+    fields: [userRoleAssignments.userId],
+    references: [users.id],
+  }),
+  role: one(customRoles, {
+    fields: [userRoleAssignments.roleId],
+    references: [customRoles.id],
+  }),
+  assignedByUser: one(users, {
+    fields: [userRoleAssignments.assignedBy],
+    references: [users.id],
+  }),
+}));
 
 // =======================================
 // ADMIN DOCLOQ TABLES

@@ -34,6 +34,7 @@
     "pdf-parse": "^2.2.2",
     "pg": "^8.17.2",
     "qrcode": "^1.5.4",
+    "sharp": "^0.34.5",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

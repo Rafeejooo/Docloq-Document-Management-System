@@ -3,6 +3,7 @@
 import { db } from '../db/index.js';
 import { folders, documents, auditLogs } from '../db/schema.js';
 import { eq, and, desc, asc, isNull, like } from 'drizzle-orm';
+import { getAllUserPermissions } from '../middlewares/permission.middleware.js';
 
 // ──────────────────────────────────────────────
 // GET all folders (flat list, frontend builds tree)
@@ -45,6 +46,21 @@ export const getAllFolders = async (req, res) => {
       ...f,
       documentCount: docCountMap[f.id] || 0,
     }));
+
+    // Filter folders by permissions for non-admin users
+    const userId = req.user?.userId || req.user?.id;
+    if (userId && orgId) {
+      const { hasFullAccess, permissions } = await getAllUserPermissions(userId, orgId);
+
+      if (!hasFullAccess) {
+        const filteredFolders = foldersWithCount.filter((folder) => {
+          const folderKey = `folder:${folder.id}`;
+          return permissions[folderKey] && permissions[folderKey] !== 'none';
+        });
+
+        return res.json({ success: true, data: filteredFolders });
+      }
+    }
 
     res.json({ success: true, data: foldersWithCount });
   } catch (error) {
