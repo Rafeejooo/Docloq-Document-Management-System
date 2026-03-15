@@ -51,7 +51,36 @@ export const uploadConfig = {
   thumbnailsDir: path.join(process.env.STORAGE_LOCAL_PATH || path.join(process.cwd(), 'storage'), 'thumbnails'),
 
   // === Storage Provider ===
-  storageProvider: process.env.STORAGE_PROVIDER || 'local',
+  storageProvider: process.env.STORAGE_PROVIDER || 'local', // local | minio
+
+  // === S3 / MinIO Settings ===
+  s3: {
+    endpoint: process.env.S3_ENDPOINT || 'http://localhost:9000',
+    region: process.env.S3_REGION || 'us-east-1',
+    accessKey: process.env.S3_ACCESS_KEY || '',
+    secretKey: process.env.S3_SECRET_KEY || '',
+    documentsBucket: process.env.S3_DOCUMENTS_BUCKET || 'docloq-documents',
+    archiveBucket: process.env.S3_ARCHIVE_BUCKET || 'docloq-archive',
+    qrBucket: process.env.S3_QR_BUCKET || 'docloq-qrcodes',
+    forcePathStyle: process.env.S3_FORCE_PATH_STYLE !== 'false', // true for MinIO
+  },
+
+  // === Key Management Provider ===
+  keyProvider: process.env.KEY_PROVIDER || 'local', // local | vault
+
+  // === Vault Settings ===
+  vault: {
+    addr: process.env.VAULT_ADDR || 'http://localhost:8200',
+    token: process.env.VAULT_TOKEN || '',
+    transitKey: process.env.VAULT_TRANSIT_KEY || 'docloq-master',
+  },
+
+  // === Qdrant Settings ===
+  qdrant: {
+    url: process.env.QDRANT_URL || 'http://localhost:6333',
+    collection: process.env.QDRANT_COLLECTION || 'docloq_documents',
+    vectorSize: 1536, // OpenAI text-embedding-3-small dimension
+  },
 
   // === Encryption Settings ===
   encryption: {

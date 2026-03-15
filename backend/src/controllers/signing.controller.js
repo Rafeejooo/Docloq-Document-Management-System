@@ -69,7 +69,7 @@ async function getDocumentBuffer(doc) {
         }
 
         if (authTag) {
-          return decryptFile(encryptedBuffer, version.encryptionKeyId, version.encryptionIv, authTag);
+          return await decryptFile(encryptedBuffer, version.encryptionKeyId, version.encryptionIv, authTag);
         }
       }
     } catch (err) {

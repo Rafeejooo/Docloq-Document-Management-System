@@ -351,7 +351,7 @@ export const serveDocument = async (req, res) => {
           }
 
           if (authTag) {
-            const decryptedBuffer = decryptFile(
+            const decryptedBuffer = await decryptFile(
               encryptedBuffer,
               version.encryptionKeyId,
               version.encryptionIv,
@@ -432,7 +432,7 @@ export const downloadDocument = async (req, res) => {
           }
 
           if (authTag) {
-            const decryptedBuffer = decryptFile(
+            const decryptedBuffer = await decryptFile(
               encryptedBuffer,
               version.encryptionKeyId,
               version.encryptionIv,
@@ -667,7 +667,7 @@ export const onlyOfficeCallback = async (req, res) => {
           if (isPipelineDoc) {
             // ── Pipeline document: re-encrypt and store in storage/documents/ ──
             const ext = path.extname(doc.originalFilename);
-            const newKeyData = generateDocumentKey();
+            const newKeyData = await generateDocumentKey();
             const encResult = encryptFileService(buffer, newKeyData.plaintextKey, newKeyData.iv);
 
             // New storage key for the updated version
@@ -864,7 +864,7 @@ export const downloadDocumentDecrypted = async (req, res) => {
       }
 
       if (authTag) {
-        const decryptedBuffer = decryptFile(
+        const decryptedBuffer = await decryptFile(
           encryptedBuffer,
           version.encryptionKeyId, // This holds the encryptedKey in our pipeline
           version.encryptionIv,

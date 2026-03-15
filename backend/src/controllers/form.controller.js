@@ -368,7 +368,7 @@ export const createFormInstance = async (req, res) => {
               } catch { /* no meta file */ }
 
               if (authTag) {
-                fileBuffer = decryptFile(encryptedBuffer, version.encryptionKeyId, version.encryptionIv, authTag);
+                fileBuffer = await decryptFile(encryptedBuffer, version.encryptionKeyId, version.encryptionIv, authTag);
               }
             }
           } catch (err) {

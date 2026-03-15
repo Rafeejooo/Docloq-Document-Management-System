@@ -1,9 +1,11 @@
 version: '3.8'
 
 services:
-  # Service Database
+  # ============================================================
+  # Database — PostgreSQL 16
+  # ============================================================
   db:
-    image: postgres:16-alpine 
+    image: postgres:16-alpine
     container_name: docloq_postgres
     ports:
       - "5436:5432"
@@ -12,12 +14,107 @@ services:
       POSTGRES_PASSWORD: password
       POSTGRES_DB: docloq_db
     volumes:
-      - postgres_data:/var/lib/postgresql/data 
+      - postgres_data:/var/lib/postgresql/data
     networks:
       - docloq_network
     restart: always
 
-  # Opsional: GUI untuk lihat database (jika malas install DBeaver/TablePlus)
+  # ============================================================
+  # Object Storage — MinIO (S3-compatible)
+  # ============================================================
+  minio:
+    image: minio/minio:RELEASE.2025-01-20T14-49-07Z
+    container_name: docloq_minio
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Console UI
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-docloq-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-docloq-secret-key-change-me}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - docloq_network
+    restart: always
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # MinIO bucket initialization (one-shot)
+  minio-init:
+    image: minio/mc:latest
+    container_name: docloq_minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-docloq-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-docloq-secret-key-change-me}
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set docloq http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
+      mc mb --ignore-existing docloq/docloq-documents;
+      mc mb --ignore-existing docloq/docloq-archive;
+      mc mb --ignore-existing docloq/docloq-qrcodes;
+      echo 'Buckets created successfully';
+      exit 0;
+      "
+    networks:
+      - docloq_network
+
+  # ============================================================
+  # Key Management — HashiCorp Vault (Transit Engine)
+  # ============================================================
+  vault:
+    image: hashicorp/vault:1.17
+    container_name: docloq_vault
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN:-docloq-dev-token}
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    cap_add:
+      - IPC_LOCK
+    networks:
+      - docloq_network
+    restart: always
+
+  # ============================================================
+  # Malware Scanner — ClamAV
+  # ============================================================
+  clamav:
+    image: clamav/clamav:stable
+    container_name: docloq_clamav
+    ports:
+      - "3310:3310"
+    volumes:
+      - clamav_data:/var/lib/clamav
+    networks:
+      - docloq_network
+    restart: always
+
+  # ============================================================
+  # Vector Database — Qdrant (AI semantic search)
+  # ============================================================
+  qdrant:
+    image: qdrant/qdrant:v1.13.1
+    container_name: docloq_qdrant
+    ports:
+      - "6333:6333"   # REST API
+      - "6334:6334"   # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - docloq_network
+    restart: always
+
+  # ============================================================
+  # Opsional: pgAdmin
+  # ============================================================
   # pgadmin:
   #   image: dpage/pgadmin4
   #   container_name: docloq_pgadmin
@@ -33,6 +130,9 @@ services:
 
 volumes:
   postgres_data:
+  minio_data:
+  clamav_data:
+  qdrant_data:
 
 networks:
   docloq_network:

@@ -1,12 +1,23 @@
 // Storage Abstraction Layer
-// Currently implements LocalStorageProvider.
-// TODO: Replace with S3StorageProvider for production (AWS S3).
+// Supports two providers:
+//   - "local"  → files on disk (development default)
+//   - "minio"  → MinIO / AWS S3 via @aws-sdk/client-s3
+//
+// All public functions have the same signature regardless of provider.
+// Switching provider requires only changing STORAGE_PROVIDER env var.
 
 import fs from 'fs/promises';
-import { createReadStream, createWriteStream } from 'fs';
 import path from 'path';
-import { randomUUID } from 'crypto';
 import uploadConfig from '../config/upload.config.js';
+import {
+  s3Upload,
+  s3Download,
+  s3Delete,
+  s3Exists,
+  s3GetPresignedUrl,
+} from './minio.service.js';
+
+const provider = uploadConfig.storageProvider; // 'local' | 'minio'
 
 // ============================================================
 // LocalStorageProvider — saves files to local disk
@@ -20,69 +31,36 @@ const ensureDir = async (dirPath) => {
   }
 };
 
-/**
- * Upload a file buffer to local storage.
- * @param {Buffer} fileBuffer
- * @param {string} key — relative path / filename (e.g. "abc-123.enc")
- * @param {object} metadata — optional metadata (ignored for local, stored as sidecar .meta.json)
- * @returns {{ key: string, bucket: string, size: number }}
- */
-export const uploadFile = async (fileBuffer, key, metadata = {}) => {
-  // TODO: Replace with S3 putObject when switching to AWS
+const localUpload = async (fileBuffer, key, metadata = {}) => {
   const destDir = uploadConfig.documentsDir;
   await ensureDir(destDir);
 
   const filePath = path.join(destDir, key);
-  // Ensure sub-directories inside documents/ if key contains slashes
   await ensureDir(path.dirname(filePath));
-
   await fs.writeFile(filePath, fileBuffer);
 
-  // Optionally persist metadata as sidecar JSON
   if (Object.keys(metadata).length > 0) {
     const metaPath = `${filePath}.meta.json`;
     await fs.writeFile(metaPath, JSON.stringify(metadata, null, 2));
   }
 
-  return {
-    key,
-    bucket: 'local',
-    size: fileBuffer.length,
-  };
+  return { key, bucket: 'local', size: fileBuffer.length };
 };
 
-/**
- * Download (read) a file from local storage.
- * @param {string} key
- * @returns {Buffer}
- */
-export const downloadFile = async (key) => {
-  // TODO: Replace with S3 getObject when switching to AWS
+const localDownload = async (key) => {
   const filePath = path.join(uploadConfig.documentsDir, key);
-
   try {
-    const buffer = await fs.readFile(filePath);
-    return buffer;
+    return await fs.readFile(filePath);
   } catch (err) {
-    if (err.code === 'ENOENT') {
-      throw new Error(`File not found: ${key}`);
-    }
+    if (err.code === 'ENOENT') throw new Error(`File not found: ${key}`);
     throw err;
   }
 };
 
-/**
- * Delete a file from local storage.
- * @param {string} key
- * @returns {boolean}
- */
-export const deleteFile = async (key) => {
-  // TODO: Replace with S3 deleteObject when switching to AWS
+const localDelete = async (key) => {
   const filePath = path.join(uploadConfig.documentsDir, key);
-
   try {
     await fs.unlink(filePath);
-    // Also remove sidecar metadata if present
     try { await fs.unlink(`${filePath}.meta.json`); } catch { /* ignore */ }
     return true;
   } catch (err) {
@@ -91,25 +69,11 @@ export const deleteFile = async (key) => {
   }
 };
 
-/**
- * Get a URL (or local file path) to access the file.
- * In local mode this returns the absolute path.
- * @param {string} key
- * @param {number} _expiresIn — ignored for local; used for presigned URLs in S3
- * @returns {string}
- */
-export const getFileUrl = (key, _expiresIn = 3600) => {
-  // TODO: Replace with S3 getSignedUrl when switching to AWS
+const localGetFileUrl = (key) => {
   return path.join(uploadConfig.documentsDir, key);
 };
 
-/**
- * Check whether a file exists in storage.
- * @param {string} key
- * @returns {boolean}
- */
-export const fileExists = async (key) => {
-  // TODO: Replace with S3 headObject when switching to AWS
+const localExists = async (key) => {
   const filePath = path.join(uploadConfig.documentsDir, key);
   try {
     await fs.access(filePath);
@@ -120,11 +84,105 @@ export const fileExists = async (key) => {
 };
 
 // ============================================================
-// Helper: store to temp directory (used during upload pipeline)
+// MinIO / S3 Provider — delegates to minio.service.js
+// ============================================================
+
+const minioUpload = async (fileBuffer, key, metadata = {}) => {
+  const result = await s3Upload(uploadConfig.s3.documentsBucket, key, fileBuffer, metadata);
+
+  // Also upload sidecar .meta.json (needed for authTag retrieval during download)
+  if (Object.keys(metadata).length > 0) {
+    const metaBuffer = Buffer.from(JSON.stringify(metadata, null, 2));
+    await s3Upload(uploadConfig.s3.documentsBucket, `${key}.meta.json`, metaBuffer, {
+      contentType: 'application/json',
+    });
+  }
+
+  return result;
+};
+
+const minioDownload = async (key) => {
+  return s3Download(uploadConfig.s3.documentsBucket, key);
+};
+
+const minioDelete = async (key) => {
+  return s3Delete(uploadConfig.s3.documentsBucket, key);
+};
+
+const minioGetFileUrl = async (key, expiresIn = 3600) => {
+  return s3GetPresignedUrl(uploadConfig.s3.documentsBucket, key, expiresIn);
+};
+
+const minioExists = async (key) => {
+  return s3Exists(uploadConfig.s3.documentsBucket, key);
+};
+
+// ============================================================
+// Public API — provider-agnostic
+// ============================================================
+
+/**
+ * Upload a file buffer to storage.
+ * @param {Buffer} fileBuffer
+ * @param {string} key — relative path / filename (e.g. "abc-123.enc")
+ * @param {object} metadata — optional metadata
+ * @returns {{ key: string, bucket: string, size: number }}
+ */
+export const uploadFile = async (fileBuffer, key, metadata = {}) => {
+  if (provider === 'minio') return minioUpload(fileBuffer, key, metadata);
+  return localUpload(fileBuffer, key, metadata);
+};
+
+/**
+ * Download (read) a file from storage.
+ * @param {string} key
+ * @returns {Buffer}
+ */
+export const downloadFile = async (key) => {
+  if (provider === 'minio') return minioDownload(key);
+  return localDownload(key);
+};
+
+/**
+ * Delete a file from storage.
+ * @param {string} key
+ * @returns {boolean}
+ */
+export const deleteFile = async (key) => {
+  if (provider === 'minio') return minioDelete(key);
+  return localDelete(key);
+};
+
+/**
+ * Get a URL (or local file path) to access the file.
+ * For MinIO: returns a presigned URL (temporary, secure).
+ * For local: returns the absolute file path.
+ * @param {string} key
+ * @param {number} expiresIn — seconds (only used for MinIO/S3)
+ * @returns {string|Promise<string>}
+ */
+export const getFileUrl = (key, expiresIn = 3600) => {
+  if (provider === 'minio') return minioGetFileUrl(key, expiresIn);
+  return localGetFileUrl(key);
+};
+
+/**
+ * Check whether a file exists in storage.
+ * @param {string} key
+ * @returns {boolean}
+ */
+export const fileExists = async (key) => {
+  if (provider === 'minio') return minioExists(key);
+  return localExists(key);
+};
+
+// ============================================================
+// Helper: store to temp directory (always local — temp is local disk)
 // ============================================================
 
 /**
  * Save an upload buffer to the temp directory.
+ * Temp storage is always local regardless of provider.
  * @param {Buffer} fileBuffer
  * @param {string} sessionId — unique upload session id
  * @param {string} ext — file extension including dot, e.g. ".pdf"
@@ -148,41 +206,41 @@ export const saveToTemp = async (fileBuffer, sessionId, ext) => {
  * @returns {string} — storage key for the QR image
  */
 export const saveQrCode = async (qrBuffer, filename) => {
+  if (provider === 'minio') {
+    await s3Upload(uploadConfig.s3.qrBucket, filename, qrBuffer, {
+      contentType: 'image/png',
+    });
+    return filename;
+  }
+
+  // Local fallback
   const qrDir = uploadConfig.qrCodesDir;
   await ensureDir(qrDir);
-
   const filePath = path.join(qrDir, filename);
   await fs.writeFile(filePath, qrBuffer);
   return filename;
 };
 
 // ============================================================
-// Initialise storage directories on import
+// Initialise local storage directories on import
 // ============================================================
 
 export const initStorageDirs = async () => {
+  // Always create local dirs (needed for temp at minimum)
   await ensureDir(uploadConfig.storagePath);
-  await ensureDir(uploadConfig.documentsDir);
   await ensureDir(uploadConfig.tempDir);
-  await ensureDir(uploadConfig.qrCodesDir);
-  await ensureDir(uploadConfig.thumbnailsDir);
+
+  if (provider === 'local') {
+    await ensureDir(uploadConfig.documentsDir);
+    await ensureDir(uploadConfig.qrCodesDir);
+    await ensureDir(uploadConfig.thumbnailsDir);
+    console.log('[Storage] Provider: local (filesystem)');
+  } else {
+    console.log(`[Storage] Provider: ${provider} (S3-compatible → ${uploadConfig.s3.endpoint})`);
+  }
 };
 
 // Auto-init directories
 initStorageDirs().catch((err) =>
   console.error('[Storage] Failed to initialise storage directories:', err.message),
 );
-
-// ============================================================
-// S3StorageProvider — placeholder for AWS production
-// ============================================================
-
-// TODO: Implement S3StorageProvider using @aws-sdk/client-s3
-// export const s3UploadFile = async (fileBuffer, key, metadata) => { ... };
-// export const s3DownloadFile = async (key) => { ... };
-// export const s3DeleteFile = async (key) => { ... };
-// export const s3GetFileUrl = async (key, expiresIn) => { ... };
-// export const s3FileExists = async (key) => { ... };
-//
-// When ready, swap the default exports in this module to use S3
-// based on uploadConfig.storageProvider === 's3'.

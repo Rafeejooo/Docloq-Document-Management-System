@@ -1,22 +1,34 @@
-// Encryption Service — Local key management with envelope encryption
-// Uses AES-256-GCM. Master key from env encrypts per-document keys.
-// TODO: Replace local master-key operations with AWS KMS when ready.
+// Encryption Service — Envelope encryption with AES-256-GCM
+//
+// Key providers:
+//   - "local"  → master key from env var (development)
+//   - "vault"  → HashiCorp Vault Transit engine (production)
+//
+// Switching provider requires only changing KEY_PROVIDER env var.
 
 import crypto from 'crypto';
 import uploadConfig from '../config/upload.config.js';
 
 const { algorithm, keyLength, ivLength, authTagLength } = uploadConfig.encryption;
+const keyProvider = uploadConfig.keyProvider; // 'local' | 'vault'
 
-/**
- * Derive the master key buffer from the hex string in env.
- * Falls back to a deterministic dev key if not configured (logs warning).
- */
+// Lazy-load vault service only when needed to avoid connection errors in local mode
+let vaultService = null;
+const getVaultService = async () => {
+  if (!vaultService) {
+    vaultService = await import('./vault.service.js');
+  }
+  return vaultService;
+};
+
+// ============================================================
+// Local Key Provider — master key from env var
+// ============================================================
+
 const getMasterKey = () => {
-  // TODO: Replace with AWS KMS Decrypt call (envelope encryption via KMS)
   const hex = uploadConfig.encryption.masterKey;
   if (!hex) {
-    console.warn('[Encryption] ⚠️  ENCRYPTION_MASTER_KEY not set — using insecure dev key');
-    // Deterministic dev-only key (32 bytes)
+    console.warn('[Encryption] ENCRYPTION_MASTER_KEY not set — using insecure dev key');
     return crypto.createHash('sha256').update('docloq-dev-master-key-INSECURE').digest();
   }
   if (hex.length !== 64) {
@@ -25,18 +37,10 @@ const getMasterKey = () => {
   return Buffer.from(hex, 'hex');
 };
 
-/**
- * Generate a new per-document encryption key (envelope encryption).
- * The plaintext key is used to encrypt the document, and then the
- * plaintext key itself is encrypted with the master key for storage.
- *
- * @returns {{ encryptedKey: string, plaintextKey: Buffer, keyId: string, salt: string, iv: string }}
- */
-export const generateDocumentKey = () => {
-  // TODO: Replace with AWS KMS GenerateDataKey API call
-  const plaintextKey = crypto.randomBytes(keyLength); // 32 bytes
-  const iv = crypto.randomBytes(ivLength);             // 16 bytes
-  const salt = crypto.randomBytes(uploadConfig.encryption.saltLength); // 32 bytes
+const localGenerateDocumentKey = () => {
+  const plaintextKey = crypto.randomBytes(keyLength);
+  const iv = crypto.randomBytes(ivLength);
+  const salt = crypto.randomBytes(uploadConfig.encryption.saltLength);
   const keyId = crypto.randomUUID();
 
   // Encrypt the document key with the master key (envelope encryption)
@@ -53,21 +57,15 @@ export const generateDocumentKey = () => {
   const encryptedKey = Buffer.concat([masterIv, tag, encPart1, encPart2]).toString('base64');
 
   return {
-    encryptedKey,      // Store in DB (base64)
-    plaintextKey,      // Use in memory only — never persist
+    encryptedKey,
+    plaintextKey,
     keyId,
     salt: salt.toString('base64'),
     iv: iv.toString('base64'),
   };
 };
 
-/**
- * Decrypt a per-document key that was encrypted with the master key.
- * @param {string} encryptedKeyBase64 — base64 encoded encrypted key from DB
- * @returns {Buffer} plaintextKey
- */
-export const decryptDocumentKey = (encryptedKeyBase64) => {
-  // TODO: Replace with AWS KMS Decrypt API call
+const localDecryptDocumentKey = (encryptedKeyBase64) => {
   const masterKey = getMasterKey();
   const raw = Buffer.from(encryptedKeyBase64, 'base64');
 
@@ -84,6 +82,62 @@ export const decryptDocumentKey = (encryptedKeyBase64) => {
   const part2 = decipher.final();
 
   return Buffer.concat([part1, part2]);
+};
+
+// ============================================================
+// Vault Key Provider — Transit engine
+// ============================================================
+
+const vaultGenerateDocumentKey = async () => {
+  const vault = await getVaultService();
+  const { plaintextKey, encryptedKey } = await vault.generateDataKey();
+
+  const iv = crypto.randomBytes(ivLength);
+  const salt = crypto.randomBytes(uploadConfig.encryption.saltLength);
+  const keyId = crypto.randomUUID();
+
+  return {
+    encryptedKey,      // Vault ciphertext (e.g. "vault:v1:abc...")
+    plaintextKey,      // 32-byte Buffer — use in memory only
+    keyId,
+    salt: salt.toString('base64'),
+    iv: iv.toString('base64'),
+  };
+};
+
+const vaultDecryptDocumentKey = async (encryptedKey) => {
+  const vault = await getVaultService();
+  return vault.decryptDataKey(encryptedKey);
+};
+
+// ============================================================
+// Public API — provider-agnostic
+// ============================================================
+
+/**
+ * Generate a new per-document encryption key (envelope encryption).
+ * The plaintext key is used to encrypt the document, and then the
+ * plaintext key itself is encrypted for storage.
+ *
+ * @returns {Promise<{ encryptedKey: string, plaintextKey: Buffer, keyId: string, salt: string, iv: string }>}
+ */
+export const generateDocumentKey = async () => {
+  if (keyProvider === 'vault') {
+    return vaultGenerateDocumentKey();
+  }
+  return localGenerateDocumentKey();
+};
+
+/**
+ * Decrypt a per-document key that was encrypted with the master key / Vault.
+ * @param {string} encryptedKey — encrypted key from DB
+ * @returns {Promise<Buffer>} plaintextKey
+ */
+export const decryptDocumentKey = async (encryptedKey) => {
+  if (keyProvider === 'vault') {
+    return vaultDecryptDocumentKey(encryptedKey);
+  }
+  return localDecryptDocumentKey(encryptedKey);
 };
 
 /**
@@ -112,13 +166,13 @@ export const encryptFile = (fileBuffer, plaintextKey, ivBase64) => {
 /**
  * Decrypt a file buffer.
  * @param {Buffer} encryptedBuffer
- * @param {string} encryptedKeyBase64 — encrypted document key from DB
+ * @param {string} encryptedKey — encrypted document key from DB
  * @param {string} ivBase64 — base64-encoded IV from DB
  * @param {string} authTagBase64 — base64-encoded GCM auth tag
- * @returns {Buffer} — decrypted plaintext file
+ * @returns {Promise<Buffer>} — decrypted plaintext file
  */
-export const decryptFile = (encryptedBuffer, encryptedKeyBase64, ivBase64, authTagBase64) => {
-  const plaintextKey = decryptDocumentKey(encryptedKeyBase64);
+export const decryptFile = async (encryptedBuffer, encryptedKey, ivBase64, authTagBase64) => {
+  const plaintextKey = await decryptDocumentKey(encryptedKey);
   const iv = Buffer.from(ivBase64, 'base64');
   const authTag = Buffer.from(authTagBase64, 'base64');
 

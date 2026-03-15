@@ -70,8 +70,9 @@ const clamavScan = (buffer) => {
     });
 
     client.on('end', () => {
-      // Parse response:  "stream: OK" or "stream: <ThreatName> FOUND"
-      const trimmed = response.trim();
+      // Parse response:  "stream: OK\0" or "stream: <ThreatName> FOUND\0"
+      // ClamAV uses null-terminated strings, so strip \0 before parsing
+      const trimmed = response.replace(/\0/g, '').trim();
       if (trimmed.endsWith('OK')) {
         resolve({ isClean: true, threatName: null });
       } else {

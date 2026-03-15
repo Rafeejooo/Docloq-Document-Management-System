@@ -15,6 +15,7 @@
 // 12. DATABASE        — insert into documents, versions, honeytokens, qr codes, audit logs
 // 13. CLEANUP         — secure-wipe temp file
 // 14. RETURN          — return document metadata + warnings
+// 15. VECTOR INDEX    — async: index in Qdrant for AI semantic search
 
 import path from 'path';
 import fs from 'fs/promises';
@@ -46,6 +47,7 @@ import { generateVerificationQR } from './qrcode.service.js';
 import { scanFile } from './scanner.service.js';
 import { secureWipe } from './secure-wipe.service.js';
 import { saveQrCode } from './storage.service.js';
+import { indexDocument } from './qdrant.service.js';
 
 // ============================================================
 // Helpers
@@ -266,7 +268,7 @@ export const uploadPipeline = async (file, userId, organizationId, folderId = nu
       log(10, 'Encrypting honeytoken-modified content');
     }
 
-    const keyData = generateDocumentKey();
+    const keyData = await generateDocumentKey();
     const encResult = encryptFile(bufferToEncrypt, keyData.plaintextKey, keyData.iv);
 
     // ──────────────────────────────────────────────
@@ -400,9 +402,23 @@ export const uploadPipeline = async (file, userId, organizationId, folderId = nu
     }
 
     // ──────────────────────────────────────────────
-    // STEP 14: RETURN
+    // STEP 14: VECTOR INDEX (async, non-blocking)
     // ──────────────────────────────────────────────
-    log(14, 'Upload complete ✓');
+    if (hasText && textContent) {
+      log(14, 'Queueing async vector indexing...');
+      indexDocument(documentId, textContent, organizationId, {
+        filename: file.originalname,
+        mimeType: file.mimetype,
+        folderId,
+      }).catch((err) =>
+        console.warn('[Pipeline] Vector indexing failed (non-critical):', err.message),
+      );
+    }
+
+    // ──────────────────────────────────────────────
+    // STEP 15: RETURN
+    // ──────────────────────────────────────────────
+    log(15, 'Upload complete ✓');
 
     return {
       success: true,

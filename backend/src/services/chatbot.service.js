@@ -26,9 +26,9 @@ import crypto from 'crypto';
 // ──────────────────────────────────────────────
 // OpenAI client
 // ──────────────────────────────────────────────
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
 const LLM_MODEL = process.env.CHATBOT_MODEL || 'gpt-4o-mini';
 
