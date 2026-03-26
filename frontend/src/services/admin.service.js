@@ -296,9 +296,9 @@ const adminService = {
   // Get Blockchain Stats
   getBlockchainStats: async () => {
     try {
-      const token = localStorage.getItem('adminToken');
-      
-      const response = await fetch(`${API_URL}/admin/blockchain/stats`, {
+      const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
+
+      const response = await fetch(`${API_URL}/blockchain/stats`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -319,10 +319,10 @@ const adminService = {
   // Get Blockchain Transactions
   getBlockchainTransactions: async (params = {}) => {
     try {
-      const token = localStorage.getItem('adminToken');
+      const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
       const queryString = new URLSearchParams(params).toString();
-      
-      const response = await fetch(`${API_URL}/admin/blockchain/transactions?${queryString}`, {
+
+      const response = await fetch(`${API_URL}/blockchain/transactions?${queryString}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -343,9 +343,9 @@ const adminService = {
   // Update Blockchain Wallet Config
   updateWalletConfig: async (walletData) => {
     try {
-      const token = localStorage.getItem('adminToken');
-      
-      const response = await fetch(`${API_URL}/admin/blockchain/wallet`, {
+      const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
+
+      const response = await fetch(`${API_URL}/blockchain/wallet`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,

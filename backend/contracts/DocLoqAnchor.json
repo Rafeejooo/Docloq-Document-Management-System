@@ -1,0 +1,197 @@
+{
+  "contractName": "DocLoqAnchor",
+  "abi": [
+    {
+      "inputs": [],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "address", "name": "account", "type": "address" }
+      ],
+      "name": "AnchorAuthorized",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "address", "name": "account", "type": "address" }
+      ],
+      "name": "AnchorRevoked",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "bytes32", "name": "anchorId", "type": "bytes32" },
+        { "indexed": false, "internalType": "bytes32", "name": "documentHash", "type": "bytes32" },
+        { "indexed": false, "internalType": "uint32", "name": "versionNumber", "type": "uint32" },
+        { "indexed": false, "internalType": "uint64", "name": "timestamp", "type": "uint64" }
+      ],
+      "name": "DocumentAnchored",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "bytes32", "name": "anchorId", "type": "bytes32" },
+        { "indexed": false, "internalType": "bytes32", "name": "newDocumentHash", "type": "bytes32" },
+        { "indexed": false, "internalType": "uint32", "name": "newVersionNumber", "type": "uint32" },
+        { "indexed": false, "internalType": "uint64", "name": "timestamp", "type": "uint64" }
+      ],
+      "name": "AnchorUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "bytes32", "name": "merkleRoot", "type": "bytes32" },
+        { "indexed": false, "internalType": "uint32", "name": "documentCount", "type": "uint32" },
+        { "indexed": false, "internalType": "uint64", "name": "timestamp", "type": "uint64" }
+      ],
+      "name": "BatchAnchored",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        { "indexed": true, "internalType": "address", "name": "previousOwner", "type": "address" },
+        { "indexed": true, "internalType": "address", "name": "newOwner", "type": "address" }
+      ],
+      "name": "OwnershipTransferred",
+      "type": "event"
+    },
+    {
+      "inputs": [{ "internalType": "address", "name": "account", "type": "address" }],
+      "name": "authorizeAnchor",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [{ "internalType": "address", "name": "account", "type": "address" }],
+      "name": "revokeAnchor",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [{ "internalType": "address", "name": "newOwner", "type": "address" }],
+      "name": "transferOwnership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "bytes32", "name": "anchorId", "type": "bytes32" },
+        { "internalType": "bytes32", "name": "documentHash", "type": "bytes32" },
+        { "internalType": "bytes32", "name": "pseudoOrgId", "type": "bytes32" },
+        { "internalType": "uint32", "name": "versionNumber", "type": "uint32" }
+      ],
+      "name": "anchorDocument",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "bytes32", "name": "anchorId", "type": "bytes32" },
+        { "internalType": "bytes32", "name": "newDocumentHash", "type": "bytes32" },
+        { "internalType": "uint32", "name": "newVersionNumber", "type": "uint32" }
+      ],
+      "name": "updateAnchor",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "bytes32", "name": "merkleRoot", "type": "bytes32" },
+        { "internalType": "uint32", "name": "documentCount", "type": "uint32" }
+      ],
+      "name": "anchorBatch",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        { "internalType": "bytes32", "name": "anchorId", "type": "bytes32" },
+        { "internalType": "bytes32", "name": "documentHash", "type": "bytes32" }
+      ],
+      "name": "verifyDocument",
+      "outputs": [
+        { "internalType": "bool", "name": "isValid", "type": "bool" },
+        { "internalType": "uint64", "name": "timestamp", "type": "uint64" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [{ "internalType": "bytes32", "name": "anchorId", "type": "bytes32" }],
+      "name": "getAnchor",
+      "outputs": [
+        { "internalType": "bytes32", "name": "documentHash", "type": "bytes32" },
+        { "internalType": "bytes32", "name": "pseudoOrgId", "type": "bytes32" },
+        { "internalType": "uint32", "name": "versionNumber", "type": "uint32" },
+        { "internalType": "uint64", "name": "timestamp", "type": "uint64" },
+        { "internalType": "bool", "name": "exists", "type": "bool" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [{ "internalType": "bytes32", "name": "merkleRoot", "type": "bytes32" }],
+      "name": "verifyBatch",
+      "outputs": [
+        { "internalType": "uint32", "name": "documentCount", "type": "uint32" },
+        { "internalType": "uint64", "name": "timestamp", "type": "uint64" },
+        { "internalType": "bool", "name": "exists", "type": "bool" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "owner",
+      "outputs": [{ "internalType": "address", "name": "", "type": "address" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [{ "internalType": "address", "name": "", "type": "address" }],
+      "name": "authorizedAnchors",
+      "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+      "name": "anchors",
+      "outputs": [
+        { "internalType": "bytes32", "name": "documentHash", "type": "bytes32" },
+        { "internalType": "bytes32", "name": "pseudoOrgId", "type": "bytes32" },
+        { "internalType": "uint32", "name": "versionNumber", "type": "uint32" },
+        { "internalType": "uint64", "name": "timestamp", "type": "uint64" },
+        { "internalType": "bool", "name": "exists", "type": "bool" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [{ "internalType": "bytes32", "name": "", "type": "bytes32" }],
+      "name": "merkleAnchors",
+      "outputs": [
+        { "internalType": "bytes32", "name": "merkleRoot", "type": "bytes32" },
+        { "internalType": "uint32", "name": "documentCount", "type": "uint32" },
+        { "internalType": "uint64", "name": "timestamp", "type": "uint64" },
+        { "internalType": "bool", "name": "exists", "type": "bool" }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ]
+}

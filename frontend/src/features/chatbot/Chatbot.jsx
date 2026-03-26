@@ -134,9 +134,9 @@ export default function Chatbot() {
         console.error('Failed to load chat data:', err);
         // Set default suggestions even if API fails
         setSuggestions([
-          { label: 'Lihat dokumen saya', message: 'Tampilkan daftar dokumen saya' },
-          { label: 'Fitur DocLoq', message: 'Apa saja fitur-fitur DocLoq?' },
-          { label: 'Info keamanan', message: 'Bagaimana keamanan dokumen di DocLoq?' },
+          { label: 'View my documents', message: 'Show my document list' },
+          { label: 'DocLoq Features', message: 'What are the features of DocLoq?' },
+          { label: 'Security info', message: 'How is document security in DocLoq?' },
         ]);
       } finally {
         setIsLoadingHistory(false);
@@ -197,7 +197,7 @@ export default function Chatbot() {
     setMessages(prev => [...prev, {
       id: `e-${Date.now()}`,
       type: "bot",
-      content: "Maaf, saya mengalami gangguan. Silakan coba lagi.",
+      content: "Sorry, something went wrong. Please try again.",
       timestamp: new Date(),
     }]);
   };
@@ -270,7 +270,7 @@ export default function Chatbot() {
                     <div className="w-10 h-10 rounded-xl bg-linear-to-br from-blue-500 to-indigo-600 flex items-center justify-center mx-auto mb-3 animate-pulse">
                       <span className="text-white font-bold text-sm">D</span>
                     </div>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Memuat DoKi...</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Loading DoKi...</p>
                   </div>
                 </div>
               ) : messages.length === 0 ? (
@@ -283,7 +283,7 @@ export default function Chatbot() {
                       Hai{user?.firstName ? `, ${user.firstName}` : ''}!
                     </h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-                      Saya <strong>DoKi</strong> (Document Knowledge Intelligence), asisten DocLoq kamu. Tanya apa saja seputar fitur dan dokumen!
+                      I'm <strong>DoKi</strong> (Document Knowledge Intelligence), your DocLoq assistant. Ask me anything about features and documents!
                     </p>
                     {/* Suggestion chips */}
                     <div className="flex flex-wrap gap-2 justify-center">
@@ -335,7 +335,7 @@ export default function Chatbot() {
                               <DocumentCard key={doc.id} doc={doc} />
                             ))}
                             {message.data.items.length > 10 && (
-                              <p className="text-xs text-slate-400 mt-2">...dan {message.data.items.length - 10} dokumen lainnya</p>
+                              <p className="text-xs text-slate-400 mt-2">...and {message.data.items.length - 10} more documents</p>
                             )}
                           </div>
                         )}
@@ -347,7 +347,7 @@ export default function Chatbot() {
                               <UserCard key={u.id} user={u} />
                             ))}
                             {message.data.items.length > 10 && (
-                              <p className="text-xs text-slate-400 mt-2">...dan {message.data.items.length - 10} user lainnya</p>
+                              <p className="text-xs text-slate-400 mt-2">...and {message.data.items.length - 10} more users</p>
                             )}
                           </div>
                         )}
@@ -398,7 +398,7 @@ export default function Chatbot() {
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Tanya DoKi sesuatu..."
+                  placeholder="Ask DoKi something..."
                   disabled={isTyping}
                   maxLength={2000}
                   className="flex-1 px-4 py-3 md:py-2.5 text-sm rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 disabled:opacity-50 disabled:cursor-not-allowed transition-shadow"
@@ -408,14 +408,14 @@ export default function Chatbot() {
                   disabled={!input.trim() || isTyping}
                   className="px-4 bg-linear-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white border-0"
                 >
-                  <span className="hidden md:inline">Kirim</span>
+                  <span className="hidden md:inline">Send</span>
                   <svg className="w-5 h-5 md:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                   </svg>
                 </Button>
               </div>
               <p className="text-[10px] text-slate-400 mt-1.5 text-center">
-                DoKi hanya menjawab seputar DocLoq • Powered by AI
+                DoKi only answers about DocLoq • Powered by AI
               </p>
             </form>
           </Card>

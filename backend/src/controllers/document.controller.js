@@ -11,7 +11,7 @@ import {
 import { eq, desc, and, isNull, inArray } from 'drizzle-orm';
 import path from 'path';
 import fs from 'fs/promises';
-import { randomUUID } from 'crypto';
+import crypto, { randomUUID } from 'crypto';
 
 import { uploadPipeline } from '../services/upload-pipeline.service.js';
 import { downloadFile, uploadFile } from '../services/storage.service.js';
@@ -20,7 +20,33 @@ import { verifyQRPayload } from '../services/qrcode.service.js';
 import { generateSHA256 } from '../services/hash.service.js';
 import { convertDocument, downloadFromUrl } from '../services/conversion.service.js';
 import { getAllUserPermissions, getUserPermissionLevel } from '../middlewares/permission.middleware.js';
-import { tasks } from '../db/schema.js';
+import { tasks, downloadWatermarks } from '../db/schema.js';
+import { injectDownloadWatermark, hashPayload } from '../services/download-watermark.service.js';
+import { watermarkBuffer } from '../services/document-rewriter.service.js';
+import uploadConfig from '../config/upload.config.js';
+
+// ── OnlyOffice request token (server-to-server auth) ──
+// OnlyOffice can't send JWT headers, so we sign document-specific short-lived tokens
+// as query parameters. The secret is per-process when ONLYOFFICE_SECRET is unset.
+const OO_SECRET = process.env.ONLYOFFICE_SECRET || crypto.randomBytes(32).toString('hex');
+
+function generateOOToken(documentId) {
+  const expires = Date.now() + 12 * 60 * 60 * 1000; // 12 hours
+  const payload = `${documentId}:${expires}`;
+  const signature = crypto.createHmac('sha256', OO_SECRET).update(payload).digest('hex');
+  return `${payload}:${signature}`;
+}
+
+function verifyOOToken(token, documentId) {
+  if (!token) return false;
+  const parts = token.split(':');
+  if (parts.length !== 3) return false;
+  const [docId, expires, signature] = parts;
+  if (docId !== documentId) return false;
+  if (Date.now() > parseInt(expires, 10)) return false;
+  const expected = crypto.createHmac('sha256', OO_SECRET).update(`${docId}:${expires}`).digest('hex');
+  return crypto.timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(expected, 'hex'));
+}
 
 // ============================================================
 // Legacy: Upload directory for plain OnlyOffice files
@@ -313,6 +339,12 @@ export const serveDocument = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Verify OnlyOffice token or user auth (bearer token via optionalAuth)
+    const ooToken = req.query.oo_token;
+    if (!req.user && !verifyOOToken(ooToken, id)) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
     const [doc] = await db.select().from(documents).where(eq(documents.id, id));
 
     if (!doc) {
@@ -573,21 +605,24 @@ export const getOnlyOfficeConfig = async (req, res) => {
     const backendUrlForDocker = process.env.BACKEND_URL_DOCKER || 'http://host.docker.internal:3000';
     const onlyOfficeUrl = process.env.ONLYOFFICE_URL || 'http://localhost:8082';
     
+    // Generate a signed token for OnlyOffice server-to-server requests
+    const ooToken = generateOOToken(doc.id);
+
     // OnlyOffice configuration
     const config = {
       document: {
         fileType: ext,
         key: `${doc.id}-${doc.updatedAt?.getTime() || Date.now()}`, // Unique key for caching
         title: doc.originalFilename,
-        // Use Docker-accessible URL for OnlyOffice to fetch the file
-        url: `${backendUrlForDocker}/api/documents/${doc.id}/file`,
+        // Use Docker-accessible URL for OnlyOffice to fetch the file (with signed token)
+        url: `${backendUrlForDocker}/api/documents/${doc.id}/file?oo_token=${encodeURIComponent(ooToken)}`,
       },
       documentType: documentType,
       editorConfig: {
         mode: mode,
         lang: 'en',
-        // Callback URL also needs to be Docker-accessible
-        callbackUrl: `${backendUrlForDocker}/api/documents/${doc.id}/callback`,
+        // Callback URL also needs to be Docker-accessible (with signed token)
+        callbackUrl: `${backendUrlForDocker}/api/documents/${doc.id}/callback?oo_token=${encodeURIComponent(ooToken)}`,
         user: {
           id: req.user?.id || 'guest',
           name: req.user?.firstName ? `${req.user.firstName} ${req.user.lastName || ''}`.trim() : 'Guest User',
@@ -628,6 +663,13 @@ export const getOnlyOfficeConfig = async (req, res) => {
 export const onlyOfficeCallback = async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Verify OnlyOffice signed token
+    const ooToken = req.query.oo_token;
+    if (!verifyOOToken(ooToken, id)) {
+      return res.status(401).json({ error: 1 }); // OnlyOffice expects { error: N }
+    }
+
     const { status, url, key } = req.body;
 
     console.log('OnlyOffice callback:', { id, status, key });
@@ -710,6 +752,18 @@ export const onlyOfficeCallback = async (req, res) => {
               .where(eq(documents.id, id));
 
             console.log('Pipeline document saved & re-encrypted:', doc.originalFilename, `(v${newVersionNumber})`);
+
+            // Auto-anchor to blockchain if enabled
+            if (doc.autoAnchorOnEdit && uploadConfig.blockchain.enabled) {
+              import('../services/blockchain.service.js').then(({ updateAnchor: bcUpdate, isReady }) => {
+                if (isReady()) {
+                  const newHash = generateSHA256(buffer);
+                  bcUpdate(doc.id, newHash, newVersionNumber).catch(err =>
+                    console.warn('[Blockchain] Auto-anchor on edit failed:', err.message)
+                  );
+                }
+              }).catch(() => {});
+            }
           } else {
             // ── Legacy document: save plain file to uploads/ ──
             const filePath = path.join(UPLOAD_DIR, doc.filename);
@@ -871,6 +925,45 @@ export const downloadDocumentDecrypted = async (req, res) => {
           authTag,
         );
 
+        // ── Per-download invisible watermark injection ──
+        let finalBuffer = decryptedBuffer;
+        let watermarkId = null;
+        if (uploadConfig.downloadWatermark.enabled) {
+          try {
+            watermarkId = randomUUID();
+            const wmPayload = {
+              w: watermarkId,
+              d: doc.id,
+              u: req.user?.id || 'anonymous',
+              t: new Date().toISOString(),
+            };
+            const wmResult = await watermarkBuffer(
+              decryptedBuffer,
+              doc.mimeType,
+              (text) => injectDownloadWatermark(text, wmPayload),
+            );
+            if (wmResult.success) {
+              finalBuffer = wmResult.buffer;
+              // Fire-and-forget DB insert
+              db.insert(downloadWatermarks).values({
+                documentId: doc.id,
+                versionId: version.id,
+                downloadedBy: req.user?.id,
+                watermarkId,
+                watermarkToken: wmResult.watermarkToken || '',
+                watermarkPositions: wmResult.positions || [],
+                payloadHash: hashPayload(wmPayload),
+                payload: wmPayload,
+                documentFormat: wmResult.method,
+                ipAddress: req.ip,
+                userAgent: req.headers['user-agent'],
+              }).catch(err => console.warn('[DownloadWatermark] DB insert failed:', err.message));
+            }
+          } catch (wmErr) {
+            console.warn('[DownloadWatermark] Injection failed, serving original:', wmErr.message);
+          }
+        }
+
         // Audit log
         await db.insert(auditLogs).values({
           organizationId: doc.organizationId,
@@ -878,14 +971,14 @@ export const downloadDocumentDecrypted = async (req, res) => {
           action: 'download',
           resourceType: 'document',
           resourceId: id,
-          details: { versionNumber: version.versionNumber, encrypted: true },
+          details: { versionNumber: version.versionNumber, encrypted: true, watermarkId },
           ipAddress: req.ip,
           userAgent: req.headers['user-agent'],
         });
 
         res.setHeader('Content-Type', doc.mimeType);
         res.setHeader('Content-Disposition', `attachment; filename="${doc.originalFilename}"`);
-        return res.send(decryptedBuffer);
+        return res.send(finalBuffer);
       }
     } catch (err) {
       console.warn('Encrypted download failed, trying legacy path:', err.message);
@@ -988,6 +1081,44 @@ export const downloadDocumentConverted = async (req, res) => {
     const outputFilename = `${baseName}.${targetFormat}`;
     const outputMime = FORMAT_MIME_MAP[targetFormat] || 'application/octet-stream';
 
+    // ── Per-download invisible watermark injection ──
+    let finalConvertedBuffer = convertedBuffer;
+    let convertWatermarkId = null;
+    if (uploadConfig.downloadWatermark.enabled) {
+      try {
+        convertWatermarkId = randomUUID();
+        const wmPayload = {
+          w: convertWatermarkId,
+          d: doc.id,
+          u: req.user?.id || 'anonymous',
+          t: new Date().toISOString(),
+        };
+        const wmResult = await watermarkBuffer(
+          convertedBuffer,
+          outputMime,
+          (text) => injectDownloadWatermark(text, wmPayload),
+        );
+        if (wmResult.success) {
+          finalConvertedBuffer = wmResult.buffer;
+          db.insert(downloadWatermarks).values({
+            documentId: doc.id,
+            versionId: doc.currentVersionId,
+            downloadedBy: req.user?.id,
+            watermarkId: convertWatermarkId,
+            watermarkToken: wmResult.watermarkToken || '',
+            watermarkPositions: wmResult.positions || [],
+            payloadHash: hashPayload(wmPayload),
+            payload: wmPayload,
+            documentFormat: wmResult.method,
+            ipAddress: req.ip,
+            userAgent: req.headers['user-agent'],
+          }).catch(err => console.warn('[DownloadWatermark] DB insert failed:', err.message));
+        }
+      } catch (wmErr) {
+        console.warn('[DownloadWatermark] Converted injection failed:', wmErr.message);
+      }
+    }
+
     // Audit log
     try {
       await db.insert(auditLogs).values({
@@ -996,7 +1127,7 @@ export const downloadDocumentConverted = async (req, res) => {
         action: 'download_converted',
         resourceType: 'document',
         resourceId: id,
-        details: { sourceFormat: srcExt, targetFormat, filename: outputFilename },
+        details: { sourceFormat: srcExt, targetFormat, filename: outputFilename, watermarkId: convertWatermarkId },
         ipAddress: req.ip,
         userAgent: req.headers['user-agent'],
       });
@@ -1004,7 +1135,7 @@ export const downloadDocumentConverted = async (req, res) => {
 
     res.setHeader('Content-Type', outputMime);
     res.setHeader('Content-Disposition', `attachment; filename="${outputFilename}"`);
-    return res.send(convertedBuffer);
+    return res.send(finalConvertedBuffer);
   } catch (error) {
     console.error('Download converted document error:', error);
     res.status(500).json({

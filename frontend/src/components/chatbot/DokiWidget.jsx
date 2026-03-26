@@ -37,7 +37,7 @@ function formatSize(bytes) {
 
 function formatDate(d) {
   if (!d) return "";
-  return new Date(d).toLocaleDateString("id-ID", {
+  return new Date(d).toLocaleDateString("en-US", {
     day: "numeric",
     month: "short",
     year: "numeric",
@@ -68,8 +68,8 @@ const PRIORITY_STYLES = {
 const STATUS_STYLES = {
   pending: { bg: "bg-amber-100 dark:bg-amber-900/30", text: "text-amber-700 dark:text-amber-400", label: "Pending" },
   in_progress: { bg: "bg-blue-100 dark:bg-blue-900/30", text: "text-blue-700 dark:text-blue-400", label: "In Progress" },
-  completed: { bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-700 dark:text-emerald-400", label: "Selesai" },
-  cancelled: { bg: "bg-slate-100 dark:bg-slate-700", text: "text-slate-500 dark:text-slate-400", label: "Dibatalkan" },
+  completed: { bg: "bg-emerald-100 dark:bg-emerald-900/30", text: "text-emerald-700 dark:text-emerald-400", label: "Completed" },
+  cancelled: { bg: "bg-slate-100 dark:bg-slate-700", text: "text-slate-500 dark:text-slate-400", label: "Cancelled" },
 };
 
 function daysUntil(dateStr) {
@@ -181,7 +181,7 @@ function DocumentList({ items }) {
                   : "bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400"
               }`}
             >
-              {doc.status === "active" ? "Aktif" : doc.status}
+              {doc.status === "active" ? "Active" : doc.status}
             </span>
           </motion.div>
         );
@@ -192,8 +192,8 @@ function DocumentList({ items }) {
           className="w-full text-center text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors font-medium cursor-pointer"
         >
           {expanded
-            ? "Tampilkan lebih sedikit ▲"
-            : `Tampilkan ${items.length - 5} lainnya ▼`}
+            ? "Show less ▲"
+            : `Show ${items.length - 5} more ▼`}
         </button>
       )}
     </div>
@@ -243,8 +243,8 @@ function UserList({ items }) {
           className="w-full text-center text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors font-medium cursor-pointer"
         >
           {expanded
-            ? "Tampilkan lebih sedikit ▲"
-            : `Tampilkan ${items.length - 5} lainnya ▼`}
+            ? "Show less ▲"
+            : `Show ${items.length - 5} more ▼`}
         </button>
       )}
     </div>
@@ -304,12 +304,12 @@ function TaskList({ items }) {
                     }`}>
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                       {isOverdue
-                        ? `Terlambat ${Math.abs(days)} hari`
+                        ? `Overdue ${Math.abs(days)} days`
                         : days === 0
-                          ? "Hari ini"
+                          ? "Today"
                           : days === 1
-                            ? "Besok"
-                            : `${days} hari lagi`}
+                            ? "Tomorrow"
+                            : `${days} days left`}
                     </span>
                   )}
                 </div>
@@ -329,8 +329,8 @@ function TaskList({ items }) {
           className="w-full text-center text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 py-1.5 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors font-medium cursor-pointer"
         >
           {expanded
-            ? "Tampilkan lebih sedikit ▲"
-            : `Tampilkan ${items.length - 5} lainnya ▼`}
+            ? "Show less ▲"
+            : `Show ${items.length - 5} more ▼`}
         </button>
       )}
     </div>
@@ -402,12 +402,12 @@ export default function DokiWidget() {
 
   const setDefaults = () =>
     setSuggestions([
-      { label: "Dokumen saya", message: "Tampilkan daftar dokumen saya" },
-      { label: "Tugas saya", message: "Tampilkan daftar tugas saya" },
-      { label: "Fitur DocLoq", message: "Apa saja fitur-fitur DocLoq?" },
+      { label: "My Documents", message: "Show my document list" },
+      { label: "My Tasks", message: "Show my task list" },
+      { label: "DocLoq Features", message: "What are the features of DocLoq?" },
       {
-        label: "Info keamanan",
-        message: "Bagaimana keamanan dokumen di DocLoq?",
+        label: "Security Info",
+        message: "How is document security in DocLoq?",
       },
     ]);
 
@@ -466,7 +466,7 @@ export default function DokiWidget() {
       {
         id: `e-${Date.now()}`,
         type: "bot",
-        content: "Maaf, terjadi kesalahan. Silakan coba lagi.",
+        content: "Sorry, an error occurred. Please try again.",
         timestamp: new Date(),
       },
     ]);
@@ -589,7 +589,7 @@ export default function DokiWidget() {
                 {messages.length > 0 && (
                   <button
                     onClick={handleClear}
-                    title="Hapus riwayat"
+                    title="Clear history"
                     className="p-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                   >
                     <svg
@@ -623,9 +623,9 @@ export default function DokiWidget() {
                       Hai{user?.firstName ? `, ${user.firstName}` : ""}!
                     </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-5 leading-relaxed">
-                      Saya DoKi, asisten pintar DocLoq.
+                      I'm DoKi, your smart DocLoq assistant.
                       <br />
-                      Tanya apa saja seputar dokumen dan fitur DocLoq.
+                      Ask me anything about documents and DocLoq features.
                     </p>
                     <div className="grid grid-cols-2 gap-2">
                       {suggestions.map((s, i) => (
@@ -745,7 +745,7 @@ export default function DokiWidget() {
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Tanya DoKi seputar DocLoq..."
+                  placeholder="Ask DoKi about DocLoq..."
                   disabled={isTyping}
                   maxLength={2000}
                   className="flex-1 pl-4 pr-4 py-3 text-[13.5px] rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:bg-white dark:focus:bg-slate-800 border border-transparent focus:border-indigo-300 dark:focus:border-indigo-700 transition-all"

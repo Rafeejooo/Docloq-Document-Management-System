@@ -15,6 +15,10 @@ import dashboardRoutes from './dashboard.routes.js';
 import departmentRoutes from './department.routes.js';
 import signingRoutes from './signing.routes.js';
 import roleRoutes from './role.routes.js';
+import aiAnalysisRoutes from './ai-analysis.routes.js';
+import notificationRoutes from './notification.routes.js';
+import watermarkScannerRoutes from './watermark-scanner.routes.js';
+import blockchainRoutes from './blockchain.routes.js';
 
 const router = Router();
 
@@ -33,6 +37,10 @@ router.use('/dashboard', dashboardRoutes);
 router.use('/departments', departmentRoutes);
 router.use('/signing', signingRoutes);
 router.use('/roles', roleRoutes);
+router.use('/ai-analysis', aiAnalysisRoutes);
+router.use('/notifications', notificationRoutes);
+router.use('/watermark-scanner', watermarkScannerRoutes);
+router.use('/blockchain', blockchainRoutes);
 
 // Health Check
 router.get('/health', (req, res) => {

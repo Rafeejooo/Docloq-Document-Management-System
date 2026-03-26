@@ -3,6 +3,10 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import { useDebounce } from "@/hooks/useDebounce";
+import roleService from "@/services/role.service";
+import folderService from "@/services/folder.service";
+import userService from "@/services/user.service";
+import { toast } from "sonner";
 
 // Permission Icons as SVG components
 const PermissionIcons = {
@@ -37,122 +41,11 @@ const PERMISSION_LEVELS = [
   { id: "admin", name: "Admin", color: "violet", desc: "Full access" },
 ];
 
-// Sample folder/document structure
-const FOLDER_STRUCTURE = [
-  {
-    id: "folder-1",
-    name: "Contracts",
-    documents: [
-      { id: "doc-1", name: "Master Agreement 2025.pdf", type: "PDF" },
-      { id: "doc-2", name: "Vendor Contract.docx", type: "DOCX" },
-      { id: "doc-3", name: "Service Agreement.pdf", type: "PDF" },
-      { id: "doc-4", name: "Partnership Deal.pdf", type: "PDF" },
-    ],
-  },
-  {
-    id: "folder-2",
-    name: "Financial Reports",
-    documents: [
-      { id: "doc-5", name: "Q4 2025 Report.xlsx", type: "XLSX" },
-      { id: "doc-6", name: "Budget 2026.xlsx", type: "XLSX" },
-      { id: "doc-7", name: "Expense Summary.pdf", type: "PDF" },
-      { id: "doc-8", name: "Revenue Analysis.xlsx", type: "XLSX" },
-    ],
-  },
-  {
-    id: "folder-3",
-    name: "HR Documents",
-    documents: [
-      { id: "doc-9", name: "Employee Handbook.pdf", type: "PDF" },
-      { id: "doc-10", name: "Leave Policy.docx", type: "DOCX" },
-      { id: "doc-11", name: "Onboarding Guide.pdf", type: "PDF" },
-    ],
-  },
-  {
-    id: "folder-4",
-    name: "Marketing Assets",
-    documents: [
-      { id: "doc-12", name: "Brand Guidelines.pdf", type: "PDF" },
-      { id: "doc-13", name: "Campaign Assets.zip", type: "ZIP" },
-      { id: "doc-14", name: "Social Media Plan.pptx", type: "PPTX" },
-    ],
-  },
-  {
-    id: "folder-5",
-    name: "Legal Documents",
-    documents: [
-      { id: "doc-15", name: "Terms of Service.pdf", type: "PDF" },
-      { id: "doc-16", name: "Privacy Policy.pdf", type: "PDF" },
-      { id: "doc-17", name: "NDA Template.docx", type: "DOCX" },
-    ],
-  },
-];
-
-// Sample initial roles
-const INITIAL_ROLES = [
-  {
-    id: 1,
-    name: "Finance Team",
-    description: "Access to financial documents and reports",
-    color: "indigo",
-    members: 8,
-    permissions: {
-      "folder-2": "admin",
-      "doc-5": "admin",
-      "doc-6": "admin",
-      "doc-7": "viewer",
-      "folder-1": "viewer",
-    },
-    createdAt: "Dec 15, 2025",
-  },
-  {
-    id: 2,
-    name: "Legal Department",
-    description: "Full access to contracts and legal docs",
-    color: "violet",
-    members: 5,
-    permissions: {
-      "folder-1": "admin",
-      "folder-5": "admin",
-      "folder-2": "viewer",
-    },
-    createdAt: "Dec 10, 2025",
-  },
-  {
-    id: 3,
-    name: "HR Team",
-    description: "Manage employee documents and policies",
-    color: "emerald",
-    members: 4,
-    permissions: {
-      "folder-3": "admin",
-      "folder-1": "viewer",
-    },
-    createdAt: "Dec 20, 2025",
-  },
-  {
-    id: 4,
-    name: "Marketing",
-    description: "Access to marketing materials and assets",
-    color: "amber",
-    members: 6,
-    permissions: {
-      "folder-4": "admin",
-      "folder-2": "viewer",
-    },
-    createdAt: "Dec 22, 2025",
-  },
-];
-
-// Sample users
-const USERS = [
-  { id: 1, name: "John Doe", email: "john@company.com", avatar: "JD" },
-  { id: 2, name: "Jane Smith", email: "jane@company.com", avatar: "JS" },
-  { id: 3, name: "Mike Johnson", email: "mike@company.com", avatar: "MJ" },
-  { id: 4, name: "Sarah Williams", email: "sarah@company.com", avatar: "SW" },
-  { id: 5, name: "Alex Chen", email: "alex@company.com", avatar: "AC" },
-  { id: 6, name: "Emily Brown", email: "emily@company.com", avatar: "EB" },
-];
+// Format date helper
+const formatDate = (dateString) => {
+  if (!dateString) return '-';
+  return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
 
 // Custom Permission Dropdown Component
 function PermissionDropdown({ value, onChange, compact = false }) {
@@ -232,7 +125,11 @@ function PermissionDropdown({ value, onChange, compact = false }) {
 }
 
 export default function RoleManagement() {
-  const [roles, setRoles] = useState(INITIAL_ROLES);
+  const [roles, setRoles] = useState([]);
+  const [folderStructure, setFolderStructure] = useState([]);
+  const [orgUsers, setOrgUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState(null);
@@ -240,7 +137,7 @@ export default function RoleManagement() {
   const [selectedRole, setSelectedRole] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebounce(searchQuery, 300);
-  
+
   // Form state
   const [formData, setFormData] = useState({
     name: "",
@@ -249,10 +146,58 @@ export default function RoleManagement() {
     permissions: {},
     assignedUsers: [],
   });
-  
+
   // Expanded folders in permission editor
   const [expandedFolders, setExpandedFolders] = useState([]);
   const [permissionSearch, setPermissionSearch] = useState("");
+
+  // Fetch roles, folders, and users on mount
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const [rolesRes, foldersRes, usersRes] = await Promise.all([
+        roleService.getRoles(),
+        folderService.getAllFolders(),
+        userService.getUsers({ limit: 100 }),
+      ]);
+
+      if (rolesRes.success) setRoles(rolesRes.data || []);
+
+      // Transform folders into folder-with-documents structure
+      if (foldersRes.success) {
+        const foldersData = foldersRes.data || [];
+        // Each folder may have documents nested or we just list folders
+        const structured = foldersData.map(f => ({
+          id: f.id,
+          name: f.name,
+          documents: (f.documents || []).map(d => ({
+            id: d.id,
+            name: d.originalName || d.name,
+            type: (d.mimeType || '').split('/').pop()?.toUpperCase() || 'FILE',
+          })),
+        }));
+        setFolderStructure(structured);
+      }
+
+      if (usersRes.success) {
+        const usersData = usersRes.data?.users || usersRes.data || [];
+        setOrgUsers(usersData.map(u => ({
+          id: u.id,
+          name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email,
+          email: u.email,
+          avatar: `${(u.firstName || u.email)[0]}${(u.lastName || '')[0] || ''}`.toUpperCase(),
+        })));
+      }
+    } catch (error) {
+      console.error('Failed to load role management data:', error);
+      toast.error('Failed to load data');
+    }
+    setIsLoading(false);
+  };
 
   // Color options for roles
   const colorOptions = [
@@ -271,14 +216,14 @@ export default function RoleManagement() {
 
   // Stats calculation
   const stats = useMemo(() => {
-    const totalPermissions = roles.reduce((sum, role) => sum + Object.keys(role.permissions).length, 0);
+    const totalPermissions = roles.reduce((sum, role) => sum + Object.keys(role.permissions || {}).length, 0);
     return [
       { label: "Total Roles", value: roles.length },
-      { label: "Total Members", value: roles.reduce((sum, r) => sum + r.members, 0) },
+      { label: "Total Members", value: roles.reduce((sum, r) => sum + (r.members || 0), 0) },
       { label: "Permissions Set", value: totalPermissions },
-      { label: "Folders Managed", value: FOLDER_STRUCTURE.length },
+      { label: "Folders Managed", value: folderStructure.length },
     ];
-  }, [roles]);
+  }, [roles, folderStructure]);
 
   // Filter roles based on search
   const filteredRoles = useMemo(() => {
@@ -291,17 +236,17 @@ export default function RoleManagement() {
 
   // Filter folders/docs in permission editor
   const filteredFolders = useMemo(() => {
-    if (!permissionSearch.trim()) return FOLDER_STRUCTURE;
+    if (!permissionSearch.trim()) return folderStructure;
     const search = permissionSearch.toLowerCase();
-    return FOLDER_STRUCTURE.map(folder => ({
+    return folderStructure.map(folder => ({
       ...folder,
-      documents: folder.documents.filter(doc => 
+      documents: (folder.documents || []).filter(doc =>
         doc.name.toLowerCase().includes(search)
       ),
-    })).filter(folder => 
+    })).filter(folder =>
       folder.name.toLowerCase().includes(search) || folder.documents.length > 0
     );
-  }, [permissionSearch]);
+  }, [permissionSearch, folderStructure]);
 
   // Open create modal
   const handleCreateRole = useCallback(() => {
@@ -324,10 +269,10 @@ export default function RoleManagement() {
     setSelectedRole(role);
     setFormData({
       name: role.name,
-      description: role.description,
-      color: role.color,
-      permissions: { ...role.permissions },
-      assignedUsers: [],
+      description: role.description || "",
+      color: role.color || "indigo",
+      permissions: { ...(role.permissions || {}) },
+      assignedUsers: (role.assignedUsers || []).map(u => u.userId || u.id),
     });
     setExpandedFolders([]);
     setPermissionSearch("");
@@ -340,34 +285,53 @@ export default function RoleManagement() {
     setSelectedRole(null);
   }, []);
 
-  // Save role
-  const handleSaveRole = useCallback(() => {
+  // Save role (create or update via API)
+  const handleSaveRole = useCallback(async () => {
     if (!formData.name.trim()) return;
+    setIsSaving(true);
 
-    if (modalMode === "create") {
-      const newRole = {
-        id: Date.now(),
-        name: formData.name,
+    try {
+      const payload = {
+        name: formData.name.trim(),
         description: formData.description,
         color: formData.color,
-        members: formData.assignedUsers.length,
         permissions: formData.permissions,
-        createdAt: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+        assignedUsers: formData.assignedUsers,
       };
-      setRoles(prev => [...prev, newRole]);
-    } else {
-      setRoles(prev => prev.map(role =>
-        role.id === selectedRole.id
-          ? { ...role, name: formData.name, description: formData.description, color: formData.color, permissions: formData.permissions }
-          : role
-      ));
+
+      if (modalMode === "create") {
+        const res = await roleService.createRole(payload);
+        if (res.success) {
+          setRoles(prev => [res.data, ...prev]);
+          toast.success('Role created successfully');
+        }
+      } else {
+        const res = await roleService.updateRole(selectedRole.id, payload);
+        if (res.success) {
+          setRoles(prev => prev.map(role =>
+            role.id === selectedRole.id ? { ...role, ...res.data } : role
+          ));
+          toast.success('Role updated successfully');
+        }
+      }
+      handleCloseModal();
+    } catch (error) {
+      toast.error(error.message || 'Failed to save role');
     }
-    handleCloseModal();
+    setIsSaving(false);
   }, [formData, modalMode, selectedRole, handleCloseModal]);
 
-  // Delete role
-  const handleDeleteRole = useCallback((roleId) => {
-    setRoles(prev => prev.filter(role => role.id !== roleId));
+  // Delete role via API
+  const handleDeleteRole = useCallback(async (roleId) => {
+    try {
+      const res = await roleService.deleteRole(roleId);
+      if (res.success) {
+        setRoles(prev => prev.filter(role => role.id !== roleId));
+        toast.success('Role deleted successfully');
+      }
+    } catch (error) {
+      toast.error(error.message || 'Failed to delete role');
+    }
     setShowDeleteModal(false);
     setRoleToDelete(null);
   }, []);
@@ -387,14 +351,18 @@ export default function RoleManagement() {
     );
   }, []);
 
-  // Set permission for folder or document
+  // Build permission key in the format "folder:<id>" or "document:<id>"
+  const permKey = useCallback((itemId, type = "document") => `${type}:${itemId}`, []);
+
+  // Set permission for a document
   const setPermission = useCallback((itemId, level) => {
     setFormData(prev => {
       const newPermissions = { ...prev.permissions };
+      const key = `document:${itemId}`;
       if (level === "none") {
-        delete newPermissions[itemId];
+        delete newPermissions[key];
       } else {
-        newPermissions[itemId] = level;
+        newPermissions[key] = level;
       }
       return { ...prev, permissions: newPermissions };
     });
@@ -404,22 +372,24 @@ export default function RoleManagement() {
   const setFolderPermission = useCallback((folder, level) => {
     setFormData(prev => {
       const newPermissions = { ...prev.permissions };
+      const folderKey = `folder:${folder.id}`;
       if (level === "none") {
-        delete newPermissions[folder.id];
-        folder.documents.forEach(doc => delete newPermissions[doc.id]);
+        delete newPermissions[folderKey];
+        (folder.documents || []).forEach(doc => delete newPermissions[`document:${doc.id}`]);
       } else {
-        newPermissions[folder.id] = level;
-        folder.documents.forEach(doc => {
-          newPermissions[doc.id] = level;
+        newPermissions[folderKey] = level;
+        (folder.documents || []).forEach(doc => {
+          newPermissions[`document:${doc.id}`] = level;
         });
       }
       return { ...prev, permissions: newPermissions };
     });
   }, []);
 
-  // Get permission level for an item
-  const getPermission = useCallback((itemId) => {
-    return formData.permissions[itemId] || "none";
+  // Get permission level for an item (try both keyed and raw id for backward compat)
+  const getPermission = useCallback((itemId, type = "document") => {
+    const key = `${type}:${itemId}`;
+    return formData.permissions[key] || formData.permissions[itemId] || "none";
   }, [formData.permissions]);
 
   // Count permissions for a role
@@ -440,6 +410,23 @@ export default function RoleManagement() {
         : [...prev.assignedUsers, userId],
     }));
   }, []);
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-indigo-500/10 flex items-center justify-center animate-pulse">
+              <svg className="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </div>
+            <p className="text-sm text-slate-400">Loading roles...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -575,7 +562,7 @@ export default function RoleManagement() {
                   {/* Footer */}
                   <div className="flex items-center justify-between pt-4 border-t border-slate-200 dark:border-slate-700/50">
                     <span className="text-xs text-slate-500">
-                      {role.createdAt}
+                      {formatDate(role.createdAt)}
                     </span>
                     <button
                       onClick={() => handleEditRole(role)}
@@ -710,7 +697,7 @@ export default function RoleManagement() {
                       <span className="ml-2 text-xs font-normal text-slate-500">({formData.assignedUsers.length} selected)</span>
                     </label>
                     <div className="space-y-1.5 max-h-40 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/30 p-2">
-                      {USERS.map((user) => (
+                      {orgUsers.map((user) => (
                         <label
                           key={user.id}
                           className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-all ${
@@ -782,7 +769,7 @@ export default function RoleManagement() {
                   <div className="rounded-xl border border-slate-200 dark:border-slate-700/50 overflow-hidden max-h-[420px] overflow-y-auto bg-slate-50 dark:bg-slate-800/30">
                     {filteredFolders.map((folder) => {
                       const isExpanded = expandedFolders.includes(folder.id);
-                      const folderPerm = getPermission(folder.id);
+                      const folderPerm = getPermission(folder.id, "folder");
                       
                       return (
                         <div key={folder.id} className="border-b border-slate-200 dark:border-slate-700/50 last:border-b-0">
@@ -824,7 +811,7 @@ export default function RoleManagement() {
                           {isExpanded && (
                             <div className="bg-slate-900/30">
                               {folder.documents.map((doc) => {
-                                const docPerm = getPermission(doc.id);
+                                const docPerm = getPermission(doc.id, "document");
                                 
                                 return (
                                   <div
@@ -895,10 +882,10 @@ export default function RoleManagement() {
               </button>
               <button
                 onClick={handleSaveRole}
-                disabled={!formData.name.trim()}
+                disabled={!formData.name.trim() || isSaving}
                 className="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 text-white font-semibold transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/25"
               >
-                {modalMode === "create" ? "Create Role" : "Save Changes"}
+                {isSaving ? "Saving..." : modalMode === "create" ? "Create Role" : "Save Changes"}
               </button>
             </div>
           </div>

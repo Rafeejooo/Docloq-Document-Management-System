@@ -7,6 +7,8 @@ import { useDebounce } from "@/hooks/useDebounce";
 import documentService from "@/services/document.service";
 import folderService from "@/services/folder.service";
 import OnlyOfficeEditor from "@/components/onlyoffice/OnlyOfficeEditor";
+import blockchainService from "@/services/blockchain.service";
+import useAuthStore from "@/app/store/auth.store";
 
 // ── Helpers ──
 function getFileTypeFromMime(mimeType) {
@@ -20,8 +22,70 @@ function getFileTypeFromMime(mimeType) {
   return "document";
 }
 
-const FILE_ICONS = { pdf: "📕", docx: "📘", xlsx: "📗", pptx: "📙", image: "🖼️" };
-const getFileIcon = (type) => FILE_ICONS[type] || "📄";
+// ── File Type SVG Icons (replaces emoji) ──
+const FileIconPdf = ({ className = "w-6 h-6" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none">
+    <path d="M6 2a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6H6z" fill="#EF4444" opacity="0.15" />
+    <path d="M14 2l6 6h-4a2 2 0 01-2-2V2z" fill="#EF4444" opacity="0.3" />
+    <path d="M6 2a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6H6z" stroke="#EF4444" strokeWidth="1.5" fill="none" />
+    <text x="7" y="17" fontSize="6" fontWeight="700" fill="#EF4444" fontFamily="system-ui">PDF</text>
+  </svg>
+);
+const FileIconDocx = ({ className = "w-6 h-6" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none">
+    <path d="M6 2a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6H6z" fill="#3B82F6" opacity="0.15" />
+    <path d="M14 2l6 6h-4a2 2 0 01-2-2V2z" fill="#3B82F6" opacity="0.3" />
+    <path d="M6 2a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6H6z" stroke="#3B82F6" strokeWidth="1.5" fill="none" />
+    <text x="5.5" y="17" fontSize="5.5" fontWeight="700" fill="#3B82F6" fontFamily="system-ui">DOC</text>
+  </svg>
+);
+const FileIconXlsx = ({ className = "w-6 h-6" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none">
+    <path d="M6 2a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6H6z" fill="#22C55E" opacity="0.15" />
+    <path d="M14 2l6 6h-4a2 2 0 01-2-2V2z" fill="#22C55E" opacity="0.3" />
+    <path d="M6 2a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6H6z" stroke="#22C55E" strokeWidth="1.5" fill="none" />
+    <text x="5.5" y="17" fontSize="5.5" fontWeight="700" fill="#22C55E" fontFamily="system-ui">XLS</text>
+  </svg>
+);
+const FileIconPptx = ({ className = "w-6 h-6" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none">
+    <path d="M6 2a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6H6z" fill="#F97316" opacity="0.15" />
+    <path d="M14 2l6 6h-4a2 2 0 01-2-2V2z" fill="#F97316" opacity="0.3" />
+    <path d="M6 2a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6H6z" stroke="#F97316" strokeWidth="1.5" fill="none" />
+    <text x="5.5" y="17" fontSize="5.5" fontWeight="700" fill="#F97316" fontFamily="system-ui">PPT</text>
+  </svg>
+);
+const FileIconImage = ({ className = "w-6 h-6" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none">
+    <path d="M6 2a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6H6z" fill="#8B5CF6" opacity="0.15" />
+    <path d="M14 2l6 6h-4a2 2 0 01-2-2V2z" fill="#8B5CF6" opacity="0.3" />
+    <path d="M6 2a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6H6z" stroke="#8B5CF6" strokeWidth="1.5" fill="none" />
+    <circle cx="9" cy="13" r="1.5" fill="#8B5CF6" opacity="0.6" />
+    <path d="M7 18l3-4 2 2 3-4 2 6H7z" fill="#8B5CF6" opacity="0.4" />
+  </svg>
+);
+const FileIconTxt = ({ className = "w-6 h-6" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none">
+    <path d="M6 2a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6H6z" fill="#64748B" opacity="0.15" />
+    <path d="M14 2l6 6h-4a2 2 0 01-2-2V2z" fill="#64748B" opacity="0.3" />
+    <path d="M6 2a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6H6z" stroke="#64748B" strokeWidth="1.5" fill="none" />
+    <text x="5.5" y="17" fontSize="5.5" fontWeight="700" fill="#64748B" fontFamily="system-ui">TXT</text>
+  </svg>
+);
+const FileIconGeneric = ({ className = "w-6 h-6" }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none">
+    <path d="M6 2a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6H6z" fill="#6366F1" opacity="0.15" />
+    <path d="M14 2l6 6h-4a2 2 0 01-2-2V2z" fill="#6366F1" opacity="0.3" />
+    <path d="M6 2a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6H6z" stroke="#6366F1" strokeWidth="1.5" fill="none" />
+    <path d="M8 13h8M8 16h5" stroke="#6366F1" strokeWidth="1.2" strokeLinecap="round" opacity="0.5" />
+  </svg>
+);
+
+const FILE_ICON_COMPONENTS = { pdf: FileIconPdf, docx: FileIconDocx, xlsx: FileIconXlsx, pptx: FileIconPptx, image: FileIconImage, txt: FileIconTxt };
+const getFileIcon = (type, className) => {
+  const Icon = FILE_ICON_COMPONENTS[type] || FileIconGeneric;
+  return <Icon className={className} />;
+};
 
 function formatFileSize(bytes) {
   if (!bytes) return "0 B";
@@ -165,6 +229,16 @@ const IconInfo = () => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
 );
+const IconChain = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+  </svg>
+);
+const IconVerified = ({ className = "w-4 h-4" }) => (
+  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+  </svg>
+);
 
 // ── Download format helpers ──
 function getDownloadFormats(mimeType) {
@@ -178,43 +252,43 @@ function getDownloadFormats(mimeType) {
   }
 
   const base = [
-    { format: original, label: original.toUpperCase(), desc: 'Original format', icon: '📄' },
+    { format: original, label: original.toUpperCase(), desc: 'Original format', fileType: type },
   ];
 
   const allExtras = {
     docx: [
-      { format: 'pdf',  label: 'PDF',  desc: 'Portable document', icon: '📕' },
-      { format: 'png',  label: 'PNG',  desc: 'Image format',       icon: '🖼️' },
-      { format: 'jpg',  label: 'JPG',  desc: 'Compressed image',   icon: '🖼️' },
+      { format: 'pdf',  label: 'PDF',  desc: 'Portable document', fileType: 'pdf' },
+      { format: 'png',  label: 'PNG',  desc: 'Image format',       fileType: 'image' },
+      { format: 'jpg',  label: 'JPG',  desc: 'Compressed image',   fileType: 'image' },
     ],
     xlsx: [
-      { format: 'pdf',  label: 'PDF',  desc: 'Portable document', icon: '📕' },
-      { format: 'csv',  label: 'CSV',  desc: 'Comma separated',   icon: '📊' },
-      { format: 'png',  label: 'PNG',  desc: 'Image format',       icon: '🖼️' },
-      { format: 'jpg',  label: 'JPG',  desc: 'Compressed image',   icon: '🖼️' },
+      { format: 'pdf',  label: 'PDF',  desc: 'Portable document', fileType: 'pdf' },
+      { format: 'csv',  label: 'CSV',  desc: 'Comma separated',   fileType: 'xlsx' },
+      { format: 'png',  label: 'PNG',  desc: 'Image format',       fileType: 'image' },
+      { format: 'jpg',  label: 'JPG',  desc: 'Compressed image',   fileType: 'image' },
     ],
     pptx: [
-      { format: 'pdf',  label: 'PDF',  desc: 'Portable document', icon: '📕' },
-      { format: 'png',  label: 'PNG',  desc: 'Image format',       icon: '🖼️' },
-      { format: 'jpg',  label: 'JPG',  desc: 'Compressed image',   icon: '🖼️' },
+      { format: 'pdf',  label: 'PDF',  desc: 'Portable document', fileType: 'pdf' },
+      { format: 'png',  label: 'PNG',  desc: 'Image format',       fileType: 'image' },
+      { format: 'jpg',  label: 'JPG',  desc: 'Compressed image',   fileType: 'image' },
     ],
     pdf: [
-      { format: 'docx', label: 'DOCX', desc: 'Word document',     icon: '📘' },
-      { format: 'png',  label: 'PNG',  desc: 'Image format',       icon: '🖼️' },
-      { format: 'jpg',  label: 'JPG',  desc: 'Compressed image',   icon: '🖼️' },
+      { format: 'docx', label: 'DOCX', desc: 'Word document',     fileType: 'docx' },
+      { format: 'png',  label: 'PNG',  desc: 'Image format',       fileType: 'image' },
+      { format: 'jpg',  label: 'JPG',  desc: 'Compressed image',   fileType: 'image' },
     ],
     image: [
-      { format: 'pdf',  label: 'PDF',  desc: 'Portable document', icon: '📕' },
-      { format: 'jpg',  label: 'JPG',  desc: 'Compressed image',   icon: '🖼️' },
-      { format: 'png',  label: 'PNG',  desc: 'Image format',       icon: '🖼️' },
+      { format: 'pdf',  label: 'PDF',  desc: 'Portable document', fileType: 'pdf' },
+      { format: 'jpg',  label: 'JPG',  desc: 'Compressed image',   fileType: 'image' },
+      { format: 'png',  label: 'PNG',  desc: 'Image format',       fileType: 'image' },
     ],
     txt: [
-      { format: 'pdf',  label: 'PDF',  desc: 'Portable document', icon: '📕' },
-      { format: 'docx', label: 'DOCX', desc: 'Word document',     icon: '📘' },
+      { format: 'pdf',  label: 'PDF',  desc: 'Portable document', fileType: 'pdf' },
+      { format: 'docx', label: 'DOCX', desc: 'Word document',     fileType: 'docx' },
     ],
   };
 
-  const extras = (allExtras[type] || [{ format: 'pdf', label: 'PDF', desc: 'Portable document', icon: '📕' }])
+  const extras = (allExtras[type] || [{ format: 'pdf', label: 'PDF', desc: 'Portable document', fileType: 'pdf' }])
     .filter((e) => e.format !== original); // remove duplicate of the original format
   return [...base, ...extras];
 }
@@ -295,7 +369,7 @@ function DownloadDropdown({ doc, variant = "icon" }) {
           {formats.map((fmt) => (
             <button key={fmt.format} onClick={(e) => { e.stopPropagation(); handleDownload(fmt); }} disabled={!!converting}
               className="w-full flex items-center gap-3 px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors disabled:opacity-50 text-left">
-              <span className="text-base">{fmt.icon}</span>
+              <span className="w-5 h-5 flex-shrink-0">{getFileIcon(fmt.fileType, "w-5 h-5")}</span>
               <span className="flex-1">
                 <span className="font-medium text-slate-700 dark:text-slate-200">{fmt.label}</span>
                 <span className="block text-[11px] text-slate-400 dark:text-slate-500">{fmt.desc}</span>
@@ -416,6 +490,15 @@ export default function Documents() {
   const [onlyOfficeConfig, setOnlyOfficeConfig] = useState(null);
   const [onlyOfficeDoc, setOnlyOfficeDoc] = useState(null);
 
+  // ── Blockchain ──
+  const [showBlockchainDetails, setShowBlockchainDetails] = useState(false);
+  const [blockchainAnchor, setBlockchainAnchor] = useState(null);
+  const [blockchainLoading, setBlockchainLoading] = useState(false);
+  const [blockchainAction, setBlockchainAction] = useState(null); // 'anchor' | 'verify' | null
+  const [blockchainResult, setBlockchainResult] = useState(null);
+  const userRole = useAuthStore((s) => s.user?.role);
+  const isAdmin = userRole === 'admin' || userRole === 'super_admin';
+
   const [showMoveModal, setShowMoveModal] = useState(false);
   const [movingDocument, setMovingDocument] = useState(null);
 
@@ -450,12 +533,14 @@ export default function Documents() {
   }, []);
 
   // Build a small custom drag ghost image
-  const createDragGhost = useCallback((label, emoji = "📄") => {
-    // Remove any previous ghost
+  const createDragGhost = useCallback((label, itemType = "document") => {
     if (dragGhostRef.current) { document.body.removeChild(dragGhostRef.current); dragGhostRef.current = null; }
     const ghost = document.createElement("div");
     ghost.style.cssText = "position:fixed;top:-1000px;left:-1000px;padding:8px 14px;background:#4f46e5;color:#fff;border-radius:12px;font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;box-shadow:0 8px 24px rgba(0,0,0,.25);white-space:nowrap;z-index:9999;max-width:220px;overflow:hidden;text-overflow:ellipsis;";
-    ghost.innerHTML = `<span style="font-size:16px">${emoji}</span><span style="overflow:hidden;text-overflow:ellipsis">${label}</span>`;
+    const iconSvg = itemType === "folder"
+      ? '<svg width="16" height="16" fill="currentColor" viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>'
+      : '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>';
+    ghost.innerHTML = `${iconSvg}<span style="overflow:hidden;text-overflow:ellipsis">${label}</span>`;
     document.body.appendChild(ghost);
     dragGhostRef.current = ghost;
     return ghost;
@@ -472,9 +557,8 @@ export default function Documents() {
     dragItemRef.current = item;
     e.dataTransfer.effectAllowed = "move";
     e.dataTransfer.setData("text/plain", JSON.stringify({ type, id }));
-    const emoji = type === "folder" ? "📁" : "📄";
     const label = type === "folder" ? (data.name || "Folder") : (data.originalFilename || "Document");
-    const ghost = createDragGhost(label, emoji);
+    const ghost = createDragGhost(label, type);
     e.dataTransfer.setDragImage(ghost, 24, 24);
   }, [createDragGhost]);
 
@@ -857,7 +941,70 @@ export default function Documents() {
     catch { alert("Failed to move document"); }
   };
 
-  const openDocument = (doc) => { setSelectedDocument(doc); setShowSecurityDetails(false); setShowDocumentModal(true); };
+  const openDocument = (doc) => { setSelectedDocument(doc); setShowSecurityDetails(false); setShowBlockchainDetails(false); setBlockchainAnchor(null); setBlockchainResult(null); setShowDocumentModal(true); };
+
+  // ── Blockchain Handlers ──
+  const fetchBlockchainAnchor = useCallback(async (docId) => {
+    try {
+      const res = await blockchainService.getAnchorInfo(docId);
+      if (res.success) setBlockchainAnchor(res.data);
+    } catch { setBlockchainAnchor(null); }
+  }, []);
+
+  const handleAnchorDocument = useCallback(async () => {
+    if (!selectedDocument) return;
+    setBlockchainLoading(true);
+    setBlockchainAction('anchor');
+    setBlockchainResult(null);
+    try {
+      const res = await blockchainService.anchorDocument(selectedDocument.id);
+      setBlockchainResult({ type: res.success ? 'success' : 'error', message: res.success ? 'Document anchored to Polygon blockchain' : (res.message || 'Anchoring failed') });
+      if (res.success) {
+        setBlockchainAnchor(res.data);
+        setSelectedDocument(prev => ({ ...prev, blockchainAnchored: true }));
+      }
+    } catch (err) {
+      setBlockchainResult({ type: 'error', message: err?.response?.data?.message || 'Failed to anchor document' });
+    } finally { setBlockchainLoading(false); setBlockchainAction(null); }
+  }, [selectedDocument]);
+
+  const handleVerifyDocument = useCallback(async () => {
+    if (!selectedDocument) return;
+    setBlockchainLoading(true);
+    setBlockchainAction('verify');
+    setBlockchainResult(null);
+    try {
+      const res = await blockchainService.verifyDocument(selectedDocument.id);
+      if (res.success) {
+        const v = res.data;
+        setBlockchainResult({
+          type: v.verified ? 'success' : 'warning',
+          message: v.verified ? 'Document integrity verified on blockchain' : 'Document hash does not match on-chain record',
+          details: v,
+        });
+      } else {
+        setBlockchainResult({ type: 'error', message: res.message || 'Verification failed' });
+      }
+    } catch (err) {
+      setBlockchainResult({ type: 'error', message: err?.response?.data?.message || 'Failed to verify document' });
+    } finally { setBlockchainLoading(false); setBlockchainAction(null); }
+  }, [selectedDocument]);
+
+  const handleToggleAutoAnchor = useCallback(async () => {
+    if (!selectedDocument) return;
+    const newVal = !selectedDocument.autoAnchorOnEdit;
+    try {
+      const res = await blockchainService.setAutoAnchor(selectedDocument.id, newVal);
+      if (res.success) setSelectedDocument(prev => ({ ...prev, autoAnchorOnEdit: newVal }));
+    } catch { /* silently fail */ }
+  }, [selectedDocument]);
+
+  // Fetch blockchain anchor when expanding section
+  useEffect(() => {
+    if (showBlockchainDetails && selectedDocument?.id && isAdmin) {
+      fetchBlockchainAnchor(selectedDocument.id);
+    }
+  }, [showBlockchainDetails, selectedDocument?.id, isAdmin, fetchBlockchainAnchor]);
 
   // Lock scroll when modals open
   useEffect(() => {
@@ -1226,33 +1373,40 @@ export default function Documents() {
                     onDragEnd={handleDragEnd}
                     className={`transition-all duration-200 ${dragItem && dragItem.type === "document" && dragItem.id === doc.id ? "opacity-40 scale-90" : ""}`}
                   >
-                    <Card className="p-5 hover:shadow-xl transition-all duration-300 group cursor-pointer"
+                    <Card className="p-5 hover:shadow-lg hover:shadow-slate-200/50 dark:hover:shadow-slate-900/50 transition-all duration-300 group cursor-pointer"
                       onDoubleClick={() => handleViewInOnlyOffice(doc)}
                     >
                       <div className="flex items-start justify-between mb-4">
-                        <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
-                          {getFileIcon(type)}
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/50 flex items-center justify-center group-hover:scale-110 transition-transform ring-1 ring-slate-200/40 dark:ring-slate-700/40">
+                          {getFileIcon(type, "w-6 h-6")}
                         </div>
-                        <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${doc.status === "active" ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"}`}>
-                          {doc.status === "active" ? "Active" : doc.status}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {doc.blockchainAnchored && (
+                            <span className="p-1 rounded-md bg-violet-50 dark:bg-violet-500/10 text-violet-500" title="Blockchain Anchored">
+                              <IconChain className="w-3 h-3" />
+                            </span>
+                          )}
+                          <span className={`px-2 py-0.5 rounded-md text-[11px] font-semibold ${doc.status === "active" ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"}`}>
+                            {doc.status === "active" ? "Active" : doc.status}
+                          </span>
+                        </div>
                       </div>
-                      <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-2 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                      <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-1.5 truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                         {doc.originalFilename}
                       </h3>
-                      <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mb-4">
+                      <div className="flex items-center gap-2 text-[11px] text-slate-400 dark:text-slate-500 mb-4">
                         <span>{formatFileSize(doc.fileSize)}</span>
-                        <span>·</span>
+                        <span className="w-0.5 h-0.5 rounded-full bg-slate-300 dark:bg-slate-600" />
                         <span>{formatTimeAgo(doc.updatedAt || doc.createdAt)}</span>
                       </div>
-                      <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
-                        <span className="text-xs text-slate-400">{type.toUpperCase()}</span>
-                        <div className="flex gap-1">
-                          <button onClick={(e) => { e.stopPropagation(); openDocument(doc); }} className="p-2 rounded-lg hover:bg-sky-50 dark:hover:bg-sky-500/10 text-slate-400 hover:text-sky-600 transition-colors" title="Info"><IconInfo /></button>
-                          <button onClick={(e) => { e.stopPropagation(); handleEditInOnlyOffice(doc); }} className="p-2 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-500/10 text-slate-400 hover:text-indigo-600 transition-colors" title="Edit"><IconEdit /></button>
+                      <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800">
+                        <span className="text-[11px] font-medium text-slate-400 tracking-wide">{type.toUpperCase()}</span>
+                        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={(e) => { e.stopPropagation(); openDocument(doc); }} className="p-1.5 rounded-lg hover:bg-sky-50 dark:hover:bg-sky-500/10 text-slate-400 hover:text-sky-600 transition-colors" title="Info"><IconInfo /></button>
+                          <button onClick={(e) => { e.stopPropagation(); handleEditInOnlyOffice(doc); }} className="p-1.5 rounded-lg hover:bg-indigo-50 dark:hover:bg-indigo-500/10 text-slate-400 hover:text-indigo-600 transition-colors" title="Edit"><IconEdit /></button>
                           <DownloadDropdown doc={doc} />
-                          <button onClick={(e) => { e.stopPropagation(); setMovingDocument(doc); setShowMoveModal(true); }} className="p-2 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-500/10 text-slate-400 hover:text-amber-600 transition-colors" title="Move"><IconFolderMove /></button>
-                          <button onClick={(e) => { e.stopPropagation(); handleDeleteDocument(doc); }} className="p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-slate-400 hover:text-red-600 transition-colors" title="Delete"><IconTrash /></button>
+                          <button onClick={(e) => { e.stopPropagation(); setMovingDocument(doc); setShowMoveModal(true); }} className="p-1.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-500/10 text-slate-400 hover:text-amber-600 transition-colors" title="Move"><IconFolderMove /></button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteDocument(doc); }} className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 text-slate-400 hover:text-red-600 transition-colors" title="Delete"><IconTrash /></button>
                         </div>
                       </div>
                     </Card>
@@ -1285,16 +1439,23 @@ export default function Documents() {
                           onDragEnd={handleDragEnd}
                         >                          <td className="px-5 py-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-lg">{getFileIcon(type)}</div>
+                              <div className="w-10 h-10 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-center">{getFileIcon(type, "w-6 h-6")}</div>
                               <span className="text-sm font-medium text-slate-900 dark:text-white">{doc.originalFilename}</span>
                             </div>
                           </td>
                           <td className="px-5 py-4 text-sm text-slate-500">{formatFileSize(doc.fileSize)}</td>
                           <td className="px-5 py-4 text-sm text-slate-500">{formatTimeAgo(doc.updatedAt || doc.createdAt)}</td>
                           <td className="px-5 py-4">
-                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${doc.status === "active" ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600" : "bg-slate-100 text-slate-600"}`}>
-                              {doc.status === "active" ? "Active" : doc.status}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium ${doc.status === "active" ? "bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600" : "bg-slate-100 text-slate-600"}`}>
+                                {doc.status === "active" ? "Active" : doc.status}
+                              </span>
+                              {doc.blockchainAnchored && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-50 dark:bg-violet-500/10 text-violet-500 text-[10px] font-medium" title="Blockchain Anchored">
+                                  <IconChain className="w-3 h-3" /> On-chain
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="px-5 py-4">
                             <div className="flex gap-1">
@@ -1321,113 +1482,268 @@ export default function Documents() {
         {showDocumentModal && selectedDocument && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => setShowDocumentModal(false)}>
-            <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: 16 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 16 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl shadow-black/20 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-slate-200/50 dark:border-slate-800" onClick={(e) => e.stopPropagation()}>
               {/* Header */}
               <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 shrink-0">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-4 min-w-0">
-                    <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-3xl shrink-0">
-                      {getFileIcon(getFileTypeFromMime(selectedDocument.mimeType))}
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/50 flex items-center justify-center shrink-0 ring-1 ring-slate-200/50 dark:ring-slate-700/50">
+                      {getFileIcon(getFileTypeFromMime(selectedDocument.mimeType), "w-8 h-8")}
                     </div>
                     <div className="min-w-0">
                       <h2 className="text-lg font-bold text-slate-900 dark:text-white truncate">{selectedDocument.originalFilename}</h2>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-sm text-slate-500">{formatFileSize(selectedDocument.fileSize)}</span>
-                        <span className="text-slate-300">·</span>
-                        <span className="text-sm text-slate-500">{selectedDocument.folderId ? getFolderName(selectedDocument.folderId) : "Root"}</span>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold ${selectedDocument.status === "active" ? "bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" : "bg-slate-100 dark:bg-slate-800 text-slate-500"}`}>
+                          {selectedDocument.status === "active" && (
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                          )}
+                          {selectedDocument.status === "active" ? "Active" : selectedDocument.status}
+                        </span>
+                        {selectedDocument.blockchainAnchored && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-400">
+                            <IconChain className="w-3 h-3" /> On-chain
+                          </span>
+                        )}
+                        <span className="text-[11px] text-slate-400">
+                          {formatFileSize(selectedDocument.fileSize)} &middot; {selectedDocument.folderId ? getFolderName(selectedDocument.folderId) : "Root"}
+                        </span>
                       </div>
                     </div>
                   </div>
-                  <button onClick={() => setShowDocumentModal(false)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shrink-0">
-                    <IconX />
+                  <button onClick={() => setShowDocumentModal(false)} className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shrink-0">
+                    <IconX className="w-4 h-4 text-slate-400" />
                   </button>
                 </div>
               </div>
               {/* Content */}
-              <div className="px-6 py-5 flex-1 overflow-y-auto space-y-6">
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
-                    <p className="text-xs text-slate-400 mb-1">Status</p>
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-sm font-medium ${selectedDocument.status === "active" ? "bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600" : "bg-slate-200 text-slate-600"}`}>
-                      {selectedDocument.status === "active" ? "✓ Active" : selectedDocument.status}
-                    </span>
+              <div className="px-6 py-5 flex-1 overflow-y-auto space-y-4">
+                {/* Info Grid */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Format</p>
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{getFileTypeFromMime(selectedDocument.mimeType).toUpperCase()}</span>
                   </div>
-                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
-                    <p className="text-xs text-slate-400 mb-1">Size</p>
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{formatFileSize(selectedDocument.fileSize)}</span>
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Size</p>
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{formatFileSize(selectedDocument.fileSize)}</span>
                   </div>
-                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
-                    <p className="text-xs text-slate-400 mb-1">Last Modified</p>
-                    <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{formatTimeAgo(selectedDocument.updatedAt || selectedDocument.createdAt)}</span>
+                  <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Modified</p>
+                    <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">{formatTimeAgo(selectedDocument.updatedAt || selectedDocument.createdAt)}</span>
                   </div>
                 </div>
-                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center text-indigo-600"><IconUpload /></div>
-                    <div>
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">Uploaded</p>
-                      <p className="text-xs text-slate-500">
-                        {selectedDocument.createdAt ? new Date(selectedDocument.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}{" "}
-                        at {selectedDocument.createdAt ? new Date(selectedDocument.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : ""}
-                      </p>
-                    </div>
+
+                {/* Upload Info */}
+                <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800">
+                  <div className="w-9 h-9 rounded-lg bg-indigo-100 dark:bg-indigo-500/15 flex items-center justify-center text-indigo-600 dark:text-indigo-400 flex-shrink-0"><IconUpload /></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">Uploaded</p>
+                    <p className="text-[11px] text-slate-400">
+                      {selectedDocument.createdAt ? new Date(selectedDocument.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : ""}{" "}
+                      at {selectedDocument.createdAt ? new Date(selectedDocument.createdAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }) : ""}
+                    </p>
                   </div>
                 </div>
 
                 {/* Security Details (expandable) */}
-                <div>
+                <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden">
                   <button onClick={() => setShowSecurityDetails(!showSecurityDetails)}
-                    className="w-full flex items-center justify-between p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-                    <div className="flex items-center gap-2">
-                      <IconShield />
+                    className="w-full flex items-center justify-between px-4 py-3.5 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-md bg-indigo-100 dark:bg-indigo-500/15 flex items-center justify-center">
+                        <IconShield className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                      </div>
                       <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Security Details</span>
                     </div>
-                    <IconChevDown className={`w-4 h-4 text-slate-400 transition-transform ${showSecurityDetails ? "rotate-180" : ""}`} />
+                    <IconChevDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${showSecurityDetails ? "rotate-180" : ""}`} />
                   </button>
                   <AnimatePresence>
                     {showSecurityDetails && (
-                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                        <div className="mt-3 space-y-3 px-1">
+                      <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                        <div className="p-4 space-y-2.5 border-t border-slate-200/60 dark:border-slate-800 bg-white dark:bg-slate-900">
                           {selectedDocument.contentHash && (
-                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
-                              <p className="text-xs text-slate-400 mb-1">Content Hash (SHA-256)</p>
-                              <code className="text-xs font-mono text-slate-700 dark:text-slate-300 break-all">{selectedDocument.contentHash}</code>
+                            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
+                              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Content Hash (SHA-256)</p>
+                              <code className="text-[11px] font-mono text-slate-600 dark:text-slate-400 break-all leading-relaxed">{selectedDocument.contentHash}</code>
                             </div>
                           )}
                           {selectedDocument.ssdeepHash && (
-                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
-                              <p className="text-xs text-slate-400 mb-1">SSDEEP Hash (Fuzzy)</p>
-                              <code className="text-xs font-mono text-slate-700 dark:text-slate-300 break-all">{selectedDocument.ssdeepHash}</code>
+                            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
+                              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">SSDEEP Hash (Fuzzy)</p>
+                              <code className="text-[11px] font-mono text-slate-600 dark:text-slate-400 break-all leading-relaxed">{selectedDocument.ssdeepHash}</code>
                             </div>
                           )}
                           {selectedDocument.simHash && (
-                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
-                              <p className="text-xs text-slate-400 mb-1">SimHash (Similarity)</p>
-                              <code className="text-xs font-mono text-slate-700 dark:text-slate-300 break-all">{selectedDocument.simHash}</code>
+                            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-800/40">
+                              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">SimHash (Similarity)</p>
+                              <code className="text-[11px] font-mono text-slate-600 dark:text-slate-400 break-all leading-relaxed">{selectedDocument.simHash}</code>
                             </div>
                           )}
                           {!selectedDocument.contentHash && !selectedDocument.ssdeepHash && (
-                            <p className="text-xs text-slate-400 text-center py-2">No hash data available (legacy upload)</p>
+                            <p className="text-xs text-slate-400 text-center py-3">No hash data available (legacy upload)</p>
                           )}
-                          <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20">
-                            <div className="flex items-center gap-2">
-                              <IconLock />
-                              <span className="text-xs text-indigo-700 dark:text-indigo-300">End-to-end encrypted with AES-256-GCM</span>
-                            </div>
+                          <div className="flex items-center gap-2 p-3 rounded-lg bg-indigo-50 dark:bg-indigo-500/5 border border-indigo-100 dark:border-indigo-500/15">
+                            <IconLock className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
+                            <span className="text-[11px] font-medium text-indigo-700 dark:text-indigo-300">End-to-end encrypted with AES-256-GCM</span>
                           </div>
                         </div>
                       </motion.div>
                     )}
                   </AnimatePresence>
                 </div>
+
+                {/* Blockchain Anchoring (admin/manager only) */}
+                {isAdmin && (
+                  <div className="rounded-xl border border-slate-200/60 dark:border-slate-800 overflow-hidden">
+                    <button onClick={() => setShowBlockchainDetails(!showBlockchainDetails)}
+                      className="w-full flex items-center justify-between px-4 py-3.5 bg-slate-50 dark:bg-slate-800/40 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition-colors">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-md bg-violet-100 dark:bg-violet-500/15 flex items-center justify-center">
+                          <IconChain className="w-3.5 h-3.5 text-violet-600 dark:text-violet-400" />
+                        </div>
+                        <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Blockchain Anchoring</span>
+                        {selectedDocument.blockchainAnchored && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
+                            <IconVerified className="w-3 h-3" /> Anchored
+                          </span>
+                        )}
+                      </div>
+                      <IconChevDown className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${showBlockchainDetails ? "rotate-180" : ""}`} />
+                    </button>
+                    <AnimatePresence>
+                      {showBlockchainDetails && (
+                        <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
+                          <div className="p-4 space-y-3 border-t border-slate-200/60 dark:border-slate-800 bg-white dark:bg-slate-900">
+                            {/* Anchor Status */}
+                            {blockchainAnchor?.anchor ? (
+                              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 space-y-2">
+                                <div className="flex items-center gap-2">
+                                  <IconVerified className="w-4 h-4 text-emerald-500" />
+                                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Anchored on Polygon</span>
+                                </div>
+                                {blockchainAnchor.anchor.txHash && (
+                                  <div>
+                                    <p className="text-[10px] text-slate-400 mb-0.5">Transaction Hash</p>
+                                    <code className="text-[10px] font-mono text-slate-600 dark:text-slate-400 break-all">{blockchainAnchor.anchor.txHash}</code>
+                                  </div>
+                                )}
+                                {blockchainAnchor.anchor.blockNumber && (
+                                  <div className="flex items-center gap-4">
+                                    <div>
+                                      <p className="text-[10px] text-slate-400">Block</p>
+                                      <span className="text-xs font-mono text-slate-600 dark:text-slate-400">{blockchainAnchor.anchor.blockNumber}</span>
+                                    </div>
+                                    <div>
+                                      <p className="text-[10px] text-slate-400">Network</p>
+                                      <span className="text-xs text-slate-600 dark:text-slate-400">{blockchainAnchor.anchor.network || 'Polygon'}</span>
+                                    </div>
+                                    {blockchainAnchor.anchor.gasUsed && (
+                                      <div>
+                                        <p className="text-[10px] text-slate-400">Gas Used</p>
+                                        <span className="text-xs font-mono text-slate-600 dark:text-slate-400">{blockchainAnchor.anchor.gasUsed}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                {blockchainAnchor.anchor.anchoredAt && (
+                                  <p className="text-[10px] text-slate-400">
+                                    Anchored: {new Date(blockchainAnchor.anchor.anchoredAt).toLocaleString()}
+                                  </p>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                                <div className="flex items-center gap-2">
+                                  <IconChain className="w-4 h-4 text-slate-400" />
+                                  <span className="text-xs text-slate-500">Not yet anchored to blockchain</span>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Auto-Anchor Toggle */}
+                            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                              <div>
+                                <p className="text-xs font-medium text-slate-700 dark:text-slate-300">Auto-anchor on edit</p>
+                                <p className="text-[10px] text-slate-400 mt-0.5">Re-anchor automatically when document is saved</p>
+                              </div>
+                              <button onClick={handleToggleAutoAnchor}
+                                className={`relative w-10 h-5 rounded-full transition-colors ${selectedDocument.autoAnchorOnEdit ? 'bg-violet-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
+                                <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${selectedDocument.autoAnchorOnEdit ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                              </button>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex gap-2">
+                              {!selectedDocument.blockchainAnchored ? (
+                                <button onClick={handleAnchorDocument} disabled={blockchainLoading}
+                                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors">
+                                  {blockchainAction === 'anchor' ? (
+                                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                  ) : (
+                                    <IconChain className="w-3.5 h-3.5" />
+                                  )}
+                                  Anchor to Polygon
+                                </button>
+                              ) : (
+                                <>
+                                  <button onClick={handleVerifyDocument} disabled={blockchainLoading}
+                                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-semibold transition-colors">
+                                    {blockchainAction === 'verify' ? (
+                                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                      <IconVerified className="w-3.5 h-3.5" />
+                                    )}
+                                    Verify Integrity
+                                  </button>
+                                  <button onClick={handleAnchorDocument} disabled={blockchainLoading}
+                                    className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-violet-300 dark:border-violet-600 text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-500/10 disabled:opacity-50 text-xs font-semibold transition-colors">
+                                    {blockchainAction === 'anchor' ? (
+                                      <span className="w-3.5 h-3.5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                                    ) : (
+                                      <IconChain className="w-3.5 h-3.5" />
+                                    )}
+                                    Re-anchor
+                                  </button>
+                                </>
+                              )}
+                            </div>
+
+                            {/* Result Message */}
+                            {blockchainResult && (
+                              <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                                className={`p-3 rounded-xl border text-xs ${
+                                  blockchainResult.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-300' :
+                                  blockchainResult.type === 'warning' ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 text-amber-700 dark:text-amber-300' :
+                                  'bg-red-50 dark:bg-red-500/10 border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-300'
+                                }`}>
+                                <p className="font-semibold">{blockchainResult.message}</p>
+                                {blockchainResult.details && (
+                                  <div className="mt-2 space-y-1 text-[10px] opacity-80">
+                                    {blockchainResult.details.onChainHash && (
+                                      <p>On-chain hash: <code className="font-mono">{blockchainResult.details.onChainHash.slice(0, 20)}...</code></p>
+                                    )}
+                                    {blockchainResult.details.timestamp && (
+                                      <p>Anchored: {new Date(blockchainResult.details.timestamp * 1000).toLocaleString()}</p>
+                                    )}
+                                  </div>
+                                )}
+                              </motion.div>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
               </div>
               {/* Footer */}
-              <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex gap-3 shrink-0">
+              <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-800 flex gap-2.5 shrink-0 bg-slate-50/50 dark:bg-slate-800/20">
                 <button onClick={() => setShowDocumentModal(false)}
-                  className="px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Close</button>
+                  className="px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">Close</button>
                 <button onClick={() => { handleEditInOnlyOffice(selectedDocument); setShowDocumentModal(false); }}
-                  className="flex-1 px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2">
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-lg shadow-indigo-500/20 transition-all flex items-center justify-center gap-2">
                   <IconEdit /> Edit in OnlyOffice
                 </button>
                 <DownloadDropdown doc={selectedDocument} variant="button" />
@@ -1507,8 +1823,8 @@ export default function Documents() {
                           <div className="max-h-40 overflow-y-auto space-y-2">
                             {uploadedFiles.map((f) => (
                               <div key={f.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 group">
-                                <div className="w-10 h-10 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-lg">
-                                  {getFileIcon(f.type)}
+                                <div className="w-10 h-10 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center">
+                                  {getFileIcon(f.type, "w-6 h-6")}
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{f.name}</p>

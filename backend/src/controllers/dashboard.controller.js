@@ -10,6 +10,7 @@ import {
   formInstances,
   trashItems,
   auditLogs,
+  aiQuotas,
 } from '../db/schema.js';
 import { eq, and, desc, sql, isNull, gte, count } from 'drizzle-orm';
 
@@ -219,6 +220,44 @@ export const getDashboardStats = async (req, res) => {
       .from(trashItems)
       .where(eq(trashItems.organizationId, orgId));
 
+    // ── 8. AI stats ─────────────────────────────────────────
+    const [aiAccessCount] = await db
+      .select({ count: count() })
+      .from(documents)
+      .where(and(
+        eq(documents.organizationId, orgId),
+        eq(documents.aiAccessGranted, true),
+        isNull(documents.deletedAt),
+      ));
+
+    let aiQuota = null;
+    const [quotaRow] = await db
+      .select()
+      .from(aiQuotas)
+      .where(eq(aiQuotas.organizationId, orgId))
+      .limit(1);
+    if (quotaRow) {
+      aiQuota = {
+        analysesUsed: quotaRow.analysisUsedThisMonth || 0,
+        analysesLimit: quotaRow.monthlyAnalysisLimit || 100,
+        pagesUsed: quotaRow.pagesUsedThisMonth || 0,
+        pagesLimit: quotaRow.monthlyPagesLimit || 500,
+        totalAnalysesAllTime: quotaRow.totalAnalysesAllTime || 0,
+        totalPagesAllTime: quotaRow.totalPagesAllTime || 0,
+      };
+    }
+
+    // Storage breakdown by file type (bytes per type)
+    const storageByType = {};
+    for (const doc of allDocs) {
+      const ext = getFileExtension(doc.mimeType, doc.originalFilename || doc.filename);
+      storageByType[ext] = (storageByType[ext] || 0) + (Number(doc.fileSize) || 0);
+    }
+    const storageBreakdown = Object.entries(storageByType)
+      .map(([type, bytes]) => ({ type, size: formatFileSize(bytes), bytes }))
+      .sort((a, b) => b.bytes - a.bytes)
+      .slice(0, 6);
+
     // ── Assemble response ─────────────────────────────────────
     return res.json({
       success: true,
@@ -237,9 +276,12 @@ export const getDashboardStats = async (req, res) => {
           totalFormInstances: instanceCount?.count || 0,
           totalUsers: userCount,
           trashItems: trashCount?.count || 0,
+          aiAccessDocs: aiAccessCount?.count || 0,
         },
         recentDocuments,
         documentTypes,
+        storageBreakdown,
+        aiQuota,
         upcomingTasks,
         recentActivity,
       },

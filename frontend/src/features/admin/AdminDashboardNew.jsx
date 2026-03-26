@@ -4,16 +4,17 @@ import { motion, AnimatePresence } from "framer-motion";
 import Particles, { initParticlesEngine } from "@tsparticles/react";
 import { loadSlim } from "@tsparticles/slim";
 import adminService from "../../services/admin.service";
+import { Pagination, TableSkeleton } from "../../components/ui/Skeleton";
 
 // Format currency
-const formatCurrency = (amount, currency = 'IDR') => {
-  return new Intl.NumberFormat('id-ID', { style: 'currency', currency, minimumFractionDigits: 0 }).format(amount);
+const formatCurrency = (amount, currency = 'USD') => {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 0 }).format(amount);
 };
 
 // Format date
 const formatDate = (dateString) => {
   if (!dateString) return '-';
-  return new Date(dateString).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 };
 
 const containerVariants = {
@@ -246,6 +247,10 @@ export default function AdminDashboard() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [particlesReady, setParticlesReady] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [clientsPage, setClientsPage] = useState(1);
+  const [usersPage, setUsersPage] = useState(1);
+  const [activityPage, setActivityPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   // Init particles
   useEffect(() => {
@@ -286,6 +291,23 @@ export default function AdminDashboard() {
     }
     setIsLoading(false);
   };
+
+  // Paginated data slices
+  const paginatedClients = useMemo(() => {
+    const items = stats?.clients || [];
+    const start = (clientsPage - 1) * PAGE_SIZE;
+    return items.slice(start, start + PAGE_SIZE);
+  }, [stats?.clients, clientsPage]);
+
+  const paginatedUsers = useMemo(() => {
+    const start = (usersPage - 1) * PAGE_SIZE;
+    return users.slice(start, start + PAGE_SIZE);
+  }, [users, usersPage]);
+
+  const paginatedActivity = useMemo(() => {
+    const start = (activityPage - 1) * PAGE_SIZE;
+    return activity.slice(start, start + PAGE_SIZE);
+  }, [activity, activityPage]);
 
   const handleLogout = async () => {
     await adminService.logout();
@@ -788,7 +810,7 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/50">
-                      {stats?.clients?.length > 0 ? stats.clients.map(client => (
+                      {paginatedClients.length > 0 ? paginatedClients.map(client => (
                         <tr key={client.id} className="hover:bg-slate-50 dark:bg-slate-50 dark:bg-slate-800/30 transition-colors">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
@@ -827,6 +849,12 @@ export default function AdminDashboard() {
                     </tbody>
                   </table>
                 </div>
+                <Pagination
+                  currentPage={clientsPage}
+                  totalItems={(stats?.clients || []).length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setClientsPage}
+                />
               </div>
             </motion.div>
           )}
@@ -852,7 +880,7 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/50">
-                      {users.map(user => (
+                      {paginatedUsers.map(user => (
                         <tr key={user.id} className="hover:bg-slate-50 dark:bg-slate-50 dark:bg-slate-800/30 transition-colors">
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-3">
@@ -870,8 +898,8 @@ export default function AdminDashboard() {
                           <td className="px-6 py-4 text-sm text-slate-300 capitalize">{user.role}</td>
                           <td className="px-6 py-4">
                             <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full ${
-                              user.isActive 
-                                ? 'bg-emerald-500/10 text-emerald-400' 
+                              user.isActive
+                                ? 'bg-emerald-500/10 text-emerald-400'
                                 : 'bg-red-500/10 text-red-400'
                             }`}>
                               <span className={`w-1.5 h-1.5 rounded-full ${user.isActive ? 'bg-emerald-400' : 'bg-red-400'}`} />
@@ -885,6 +913,12 @@ export default function AdminDashboard() {
                     </tbody>
                   </table>
                 </div>
+                <Pagination
+                  currentPage={usersPage}
+                  totalItems={users.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setUsersPage}
+                />
               </div>
             </motion.div>
           )}
@@ -911,7 +945,7 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/50">
-                      {activity.map((log, index) => (
+                      {paginatedActivity.map((log, index) => (
                         <tr key={log.id || index} className="hover:bg-slate-50 dark:bg-slate-50 dark:bg-slate-800/30 transition-colors">
                           <td className="px-6 py-4">
                             <span className="text-sm font-mono text-slate-300">{log.endpoint}</span>
@@ -942,6 +976,12 @@ export default function AdminDashboard() {
                     </tbody>
                   </table>
                 </div>
+                <Pagination
+                  currentPage={activityPage}
+                  totalItems={activity.length}
+                  pageSize={PAGE_SIZE}
+                  onPageChange={setActivityPage}
+                />
               </div>
             </motion.div>
           )}

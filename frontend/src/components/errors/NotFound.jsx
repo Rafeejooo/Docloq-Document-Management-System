@@ -14,9 +14,9 @@ export default function NotFound() {
           </div>
 
           <h1 className="text-6xl font-bold text-slate-200 dark:text-slate-800 mb-2">404</h1>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Halaman Tidak Ditemukan</h2>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Page Not Found</h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-8">
-            Halaman yang Anda cari tidak ada atau telah dipindahkan. Silakan kembali ke dashboard.
+            The page you're looking for doesn't exist or has been moved. Please return to the dashboard.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -24,13 +24,13 @@ export default function NotFound() {
               to="/dashboard"
               className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm shadow-lg shadow-indigo-500/25 transition-all"
             >
-              Kembali ke Dashboard
+              Back to Dashboard
             </Link>
             <button
               onClick={() => window.history.back()}
               className="px-6 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
             >
-              Halaman Sebelumnya
+              Previous Page
             </button>
           </div>
         </div>

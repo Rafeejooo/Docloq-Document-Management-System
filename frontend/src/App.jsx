@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { RouterProvider } from "react-router-dom";
+import { Toaster } from "sonner";
 import { router } from "@/app/routes";
 import { ThemeProvider } from "@/app/providers/ThemeProvider";
 import useIdleTimeout from "@/hooks/useIdleTimeout";
@@ -25,6 +26,7 @@ export default function App() {
     <ThemeProvider>
       <IdleTimeoutProvider>
         <RouterProvider router={router} />
+        <Toaster position="top-right" richColors closeButton />
       </IdleTimeoutProvider>
     </ThemeProvider>
   );

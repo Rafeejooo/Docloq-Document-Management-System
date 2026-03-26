@@ -25,11 +25,18 @@ const getVaultService = async () => {
 // Local Key Provider — master key from env var
 // ============================================================
 
+// Ephemeral master key — generated once per process when env var is missing.
+// Encrypted files won't be decryptable after restart unless ENCRYPTION_MASTER_KEY is set.
+let _ephemeralMasterKey = null;
+
 const getMasterKey = () => {
   const hex = uploadConfig.encryption.masterKey;
   if (!hex) {
-    console.warn('[Encryption] ENCRYPTION_MASTER_KEY not set — using insecure dev key');
-    return crypto.createHash('sha256').update('docloq-dev-master-key-INSECURE').digest();
+    if (!_ephemeralMasterKey) {
+      _ephemeralMasterKey = crypto.randomBytes(32);
+      console.warn('[Encryption] ENCRYPTION_MASTER_KEY not set — using random ephemeral key (data lost on restart)');
+    }
+    return _ephemeralMasterKey;
   }
   if (hex.length !== 64) {
     throw new Error('ENCRYPTION_MASTER_KEY must be a 64-character hex string (32 bytes)');

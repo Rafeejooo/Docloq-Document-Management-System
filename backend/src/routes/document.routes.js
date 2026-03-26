@@ -69,7 +69,7 @@ const upload = multer({
 router.get('/', optionalAuth, getAllDocuments);
 router.get('/verify', verifyByShortCode);              // Public QR code verification by short code
 router.get('/:id', optionalAuth, getDocument);
-router.get('/:id/file', serveDocument);                // No auth — OnlyOffice must access this
+router.get('/:id/file', optionalAuth, serveDocument);   // Auth via user JWT or OnlyOffice signed token
 
 // === Authenticated routes ===
 router.post('/upload', optionalAuth, upload.single('file'), uploadDocument);                  // Full pipeline
@@ -82,7 +82,7 @@ router.delete('/:id', optionalAuth, deleteDocument);
 
 // === OnlyOffice specific routes ===
 router.get('/:id/onlyoffice-config', optionalAuth, getOnlyOfficeConfig);
-router.post('/:id/callback', onlyOfficeCallback);      // No auth — OnlyOffice callback
+router.post('/:id/callback', onlyOfficeCallback);      // Auth via OnlyOffice signed token (oo_token query param)
 router.post('/:id/force-save', optionalAuth, forceSaveDocument);  // Manual save trigger
 
 export default router;

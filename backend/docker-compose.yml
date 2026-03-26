@@ -113,6 +113,30 @@ services:
     restart: always
 
   # ============================================================
+  # Cache Database — MongoDB (AI Analysis Cache)
+  # ============================================================
+  mongodb:
+    image: mongo:7.0
+    container_name: docloq_mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-docloq}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-docloq-mongo-secret}
+      MONGO_INITDB_DATABASE: docloq_ai_cache
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - docloq_network
+    restart: always
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ============================================================
   # Opsional: pgAdmin
   # ============================================================
   # pgadmin:
@@ -133,6 +157,7 @@ volumes:
   minio_data:
   clamav_data:
   qdrant_data:
+  mongodb_data:
 
 networks:
   docloq_network:

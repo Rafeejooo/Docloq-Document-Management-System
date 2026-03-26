@@ -60,6 +60,34 @@ export const organizations = pgTable('organizations', {
   slugIdx: uniqueIndex('org_slug_idx').on(table.slug),
 }));
 
+// AI Quotas (per-organization usage limits)
+export const aiQuotas = pgTable('ai_quotas', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  organizationId: uuid('organization_id').references(() => organizations.id, { onDelete: 'cascade' }).notNull(),
+
+  // Quota limits
+  monthlyAnalysisLimit: integer('monthly_analysis_limit').default(100),
+  monthlyPagesLimit: integer('monthly_pages_limit').default(500),
+
+  // Current usage (reset monthly)
+  analysisUsedThisMonth: integer('analysis_used_this_month').default(0),
+  pagesUsedThisMonth: integer('pages_used_this_month').default(0),
+
+  // Tracking period
+  currentPeriodStart: timestamp('current_period_start').defaultNow(),
+  currentPeriodEnd: timestamp('current_period_end'),
+
+  // Lifetime stats
+  totalAnalysesAllTime: integer('total_analyses_all_time').default(0),
+  totalPagesAllTime: integer('total_pages_all_time').default(0),
+  totalTokensAllTime: integer('total_tokens_all_time').default(0),
+
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  orgIdx: uniqueIndex('ai_quota_org_idx').on(table.organizationId),
+}));
+
 // Departments
 export const departments = pgTable('departments', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -281,11 +309,21 @@ export const documents = pgTable('documents', {
   
   // Expiration
   expiresAt: timestamp('expires_at'),
-  
+
+  // AI Analysis Access Control
+  aiAccessGranted: boolean('ai_access_granted').default(false),
+  aiAccessGrantedAt: timestamp('ai_access_granted_at'),
+  aiAccessGrantedBy: uuid('ai_access_granted_by').references(() => users.id),
+
+  // Blockchain Anchoring
+  blockchainAnchored: boolean('blockchain_anchored').default(false),
+  blockchainAnchorId: uuid('blockchain_anchor_id'),
+  autoAnchorOnEdit: boolean('auto_anchor_on_edit').default(false),
+
   // Soft delete
   deletedAt: timestamp('deleted_at'),
   deletedBy: uuid('deleted_by').references(() => users.id),
-  
+
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 }, (table) => ({
@@ -398,6 +436,41 @@ export const documentHoneytokens = pgTable('document_honeytokens', {
   createdAt: timestamp('created_at').defaultNow(),
 }, (table) => ({
   docIdx: index('honeytoken_doc_idx').on(table.documentId),
+}));
+
+// DOWNLOAD WATERMARKS (Per-Download Leak Identification)
+export const downloadWatermarks = pgTable('download_watermarks', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  documentId: uuid('document_id').references(() => documents.id, { onDelete: 'cascade' }).notNull(),
+  versionId: uuid('version_id').references(() => documentVersions.id, { onDelete: 'cascade' }).notNull(),
+
+  // Who downloaded
+  downloadedBy: uuid('downloaded_by').references(() => users.id, { onDelete: 'set null' }),
+
+  // Unique watermark identifier per download event
+  watermarkId: text('watermark_id').notNull().unique(),
+
+  // Watermark encoding details
+  watermarkToken: text('watermark_token').notNull(),      // SHA-256(positions+payload)
+  watermarkPositions: jsonb('watermark_positions'),        // Array of injection positions
+  payloadHash: text('payload_hash').notNull(),             // SHA-256 of full payload
+  payload: jsonb('payload').notNull(),                     // {w, d, u, t}
+
+  // Format and method info
+  documentFormat: text('document_format'),                 // pdf, docx, txt
+  watermarkMethod: text('watermark_method').default('unicode_invisible'),
+
+  // Download context
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+
+  isActive: boolean('is_active').default(true),
+  createdAt: timestamp('created_at').defaultNow(),
+}, (table) => ({
+  docIdx: index('dl_watermark_doc_idx').on(table.documentId),
+  userIdx: index('dl_watermark_user_idx').on(table.downloadedBy),
+  wmIdIdx: uniqueIndex('dl_watermark_wm_id_idx').on(table.watermarkId),
+  payloadHashIdx: index('dl_watermark_payload_hash_idx').on(table.payloadHash),
 }));
 
 // QR CODE (Document Verification)

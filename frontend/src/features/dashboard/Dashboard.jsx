@@ -416,6 +416,9 @@ export default function Dashboard() {
       },
     ];
 
+    // Add AI stats card if any AI data
+
+
     if (isAdmin) {
       items[2] = { ...items[2], sub: `${s.totalUsers} active users` };
     }
@@ -645,6 +648,100 @@ export default function Dashboard() {
           </Card>
         </motion.div>
       </div>
+
+      {/* ── Storage Breakdown + AI Quota Row ───────── */}
+      {(data?.storageBreakdown?.length > 0 || data?.aiQuota) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
+          {/* Storage by Type */}
+          {data?.storageBreakdown?.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.38, duration: 0.4 }}
+            >
+              <Card className="p-4 sm:p-5 h-full" animate={false}>
+                <h2 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">Storage by File Type</h2>
+                <div className="space-y-3">
+                  {data.storageBreakdown.map((item) => {
+                    const maxBytes = data.storageBreakdown[0]?.bytes || 1;
+                    const pct = Math.max(5, Math.round((item.bytes / maxBytes) * 100));
+                    const colors = TYPE_COLORS[item.type] || DEFAULT_TYPE_COLOR;
+                    return (
+                      <div key={item.type}>
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-xs font-medium ${colors.text}`}>{item.type}</span>
+                          <span className="text-xs text-slate-500 dark:text-slate-400">{item.size}</span>
+                        </div>
+                        <div className="w-full h-2 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                          <div className={`h-full rounded-full ${colors.bar} transition-all duration-500`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+            </motion.div>
+          )}
+
+          {/* AI Quota */}
+          {data?.aiQuota && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.4 }}
+            >
+              <Card className="p-4 sm:p-5 h-full" animate={false}>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-2 rounded-lg bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400">
+                    {Icons.ai}
+                  </div>
+                  <h2 className="text-sm font-semibold text-slate-900 dark:text-white">AI Analysis Quota</h2>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Analyses This Month</span>
+                      <span className="text-xs font-bold text-slate-900 dark:text-white">{data.aiQuota.analysesUsed}/{data.aiQuota.analysesLimit}</span>
+                    </div>
+                    <div className="w-full h-2.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          data.aiQuota.analysesUsed / data.aiQuota.analysesLimit > 0.9
+                            ? 'bg-red-500' : data.aiQuota.analysesUsed / data.aiQuota.analysesLimit > 0.7
+                            ? 'bg-amber-500' : 'bg-cyan-500'
+                        }`}
+                        style={{ width: `${Math.min(100, (data.aiQuota.analysesUsed / data.aiQuota.analysesLimit) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-medium text-slate-600 dark:text-slate-300">Pages Processed</span>
+                      <span className="text-xs font-bold text-slate-900 dark:text-white">{data.aiQuota.pagesUsed}/{data.aiQuota.pagesLimit}</span>
+                    </div>
+                    <div className="w-full h-2.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          data.aiQuota.pagesUsed / data.aiQuota.pagesLimit > 0.9
+                            ? 'bg-red-500' : data.aiQuota.pagesUsed / data.aiQuota.pagesLimit > 0.7
+                            ? 'bg-amber-500' : 'bg-teal-500'
+                        }`}
+                        style={{ width: `${Math.min(100, (data.aiQuota.pagesUsed / data.aiQuota.pagesLimit) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                    <span className="text-xs text-slate-400">Lifetime: {data.aiQuota.totalAnalysesAllTime} analyses, {data.aiQuota.totalPagesAllTime} pages</span>
+                    <Link to="/ai-analysis" className="text-xs font-medium text-cyan-500 hover:text-cyan-400 transition-colors">
+                      View AI
+                    </Link>
+                  </div>
+                </div>
+              </Card>
+            </motion.div>
+          )}
+        </div>
+      )}
 
       {/* ── Urgent Tasks ───────────────────────────── */}
       <motion.div

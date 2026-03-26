@@ -58,7 +58,7 @@ const log = (step, msg) => console.log(`[Upload Pipeline] Step ${step}: ${msg}`)
 /**
  * Attempt to extract text from file buffer based on MIME type category.
  */
-const extractText = async (buffer, mimeType) => {
+export const extractText = async (buffer, mimeType) => {
   const category = uploadConfig.mimeToCategory[mimeType] || 'unknown';
 
   switch (category) {
@@ -76,14 +76,37 @@ const extractText = async (buffer, mimeType) => {
     case 'text':
       return buffer.toString('utf-8');
 
-    case 'office':
-      // TODO: Implement office text extraction (mammoth for docx, xlsx-parse, etc.)
-      // For now, return null → pipeline will hash the raw file bytes
+    case 'office': {
+      // DOCX extraction via mammoth
+      if (mimeType.includes('wordprocessingml') || mimeType.includes('msword')) {
+        try {
+          const mammoth = await import('mammoth');
+          const result = await mammoth.extractRawText({ buffer });
+          return result.value || null;
+        } catch (err) {
+          console.warn('[Pipeline] mammoth DOCX extraction failed:', err.message);
+          return null;
+        }
+      }
+      // XLSX/PPTX: still null for now
       return null;
+    }
 
-    case 'image':
-      // No text to extract from images
-      return null;
+    case 'image': {
+      // OCR extraction for images
+      try {
+        const { processImageForAI } = await import('./ocr.service.js');
+        const result = await processImageForAI(buffer);
+        if (result.text && result.text.length > 0) {
+          console.log(`[Pipeline] OCR extracted ${result.text.length} chars (${result.confidence}% confidence)`);
+          return result.text;
+        }
+        return null;
+      } catch (err) {
+        console.warn('[Pipeline] OCR extraction failed:', err.message);
+        return null;
+      }
+    }
 
     default:
       return null;
@@ -402,18 +425,12 @@ export const uploadPipeline = async (file, userId, organizationId, folderId = nu
     }
 
     // ──────────────────────────────────────────────
-    // STEP 14: VECTOR INDEX (async, non-blocking)
+    // STEP 14: VECTOR INDEX — SKIPPED
+    // Vector indexing is now triggered manually when user grants AI access
+    // from the AI Document Analysis page. This ensures data sovereignty:
+    // documents are NOT sent to vector DB unless explicitly authorized.
     // ──────────────────────────────────────────────
-    if (hasText && textContent) {
-      log(14, 'Queueing async vector indexing...');
-      indexDocument(documentId, textContent, organizationId, {
-        filename: file.originalname,
-        mimeType: file.mimetype,
-        folderId,
-      }).catch((err) =>
-        console.warn('[Pipeline] Vector indexing failed (non-critical):', err.message),
-      );
-    }
+    log(14, 'Vector indexing deferred (requires user AI access grant)');
 
     // ──────────────────────────────────────────────
     // STEP 15: RETURN

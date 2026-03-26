@@ -95,13 +95,13 @@ export default function SigningPanel({ task, onComplete }) {
           });
 
           if (!convertRes.ok) {
-            throw new Error(`Konversi gagal (${convertRes.status})`);
+            throw new Error(`Conversion failed (${convertRes.status})`);
           }
           pdfArrayBuffer = await convertRes.arrayBuffer();
           console.log("[SigningPanel] Conversion successful, got", pdfArrayBuffer.byteLength, "bytes");
         }
       } else {
-        throw new Error(`Gagal memuat dokumen (${directRes.status})`);
+        throw new Error(`Failed to load document (${directRes.status})`);
       }
 
       // Render PDF with pdf.js
@@ -133,7 +133,7 @@ export default function SigningPanel({ task, onComplete }) {
       console.log("[SigningPanel] PDF preview ready,", pages.length, "pages rendered");
     } catch (err) {
       console.error("[SigningPanel] PDF preview error:", err);
-      setPdfError(err.message || "Gagal memuat preview dokumen");
+      setPdfError(err.message || "Failed to load document preview");
       setPdfPages([]);
     } finally {
       setPdfLoading(false);
@@ -170,7 +170,7 @@ export default function SigningPanel({ task, onComplete }) {
 
   const handleInitiateSigning = async () => {
     if (!task?.relatedDocumentId) {
-      setError("Task ini tidak memiliki dokumen terkait.");
+      setError("This task has no associated document.");
       return;
     }
 
@@ -203,16 +203,16 @@ export default function SigningPanel({ task, onComplete }) {
           setFormUrl(url);
           setStep("signing");
         } else {
-          setError("Tidak ada form URL dari DocuSeal.");
+          setError("No form URL from DocuSeal.");
           setStep("error");
         }
       } else {
-        setError(res.message || "Gagal memulai proses tanda tangan.");
+        setError(res.message || "Failed to initiate signing process.");
         setStep("error");
       }
     } catch (err) {
       console.error("Initiate signing error:", err);
-      setError(err.response?.data?.message || "Gagal menghubungi server.");
+      setError(err.response?.data?.message || "Failed to contact server.");
       setStep("error");
     }
   };
@@ -251,7 +251,7 @@ export default function SigningPanel({ task, onComplete }) {
   const handleDocusealDecline = useCallback((data) => {
     console.log("[SigningPanel] DocuSeal form declined:", data);
     setStep("declined");
-    setSigData((prev) => ({ ...prev, declineReason: data?.reason || "Ditolak oleh pengguna" }));
+    setSigData((prev) => ({ ...prev, declineReason: data?.reason || "Declined by user" }));
   }, []);
 
   // ══════════════════════════════════════════════
@@ -269,9 +269,9 @@ export default function SigningPanel({ task, onComplete }) {
             </svg>
           </div>
           <div>
-            <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Dokumen Telah Ditandatangani</p>
+            <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">Document Has Been Signed</p>
             <p className="text-xs text-emerald-600 dark:text-emerald-500">
-              {sigData?.completedAt ? `Selesai: ${new Date(sigData.completedAt).toLocaleString("id-ID")}` : "Tanda tangan berhasil."}
+              {sigData?.completedAt ? `Completed: ${new Date(sigData.completedAt).toLocaleString("en-US")}` : "Signature successful."}
             </p>
           </div>
         </div>
@@ -282,7 +282,7 @@ export default function SigningPanel({ task, onComplete }) {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
-            Unduh Dokumen Bertandatangan
+            Download Signed Document
           </a>
         )}
       </div>
@@ -300,9 +300,9 @@ export default function SigningPanel({ task, onComplete }) {
             </svg>
           </div>
           <div>
-            <p className="text-sm font-semibold text-rose-700 dark:text-rose-400">Tanda Tangan Ditolak</p>
+            <p className="text-sm font-semibold text-rose-700 dark:text-rose-400">Signature Declined</p>
             {sigData?.declineReason && (
-              <p className="text-xs text-rose-600 dark:text-rose-500">Alasan: {sigData.declineReason}</p>
+              <p className="text-xs text-rose-600 dark:text-rose-500">Reason: {sigData.declineReason}</p>
             )}
           </div>
         </div>
@@ -316,7 +316,7 @@ export default function SigningPanel({ task, onComplete }) {
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-            Tanda tangani dokumen di bawah:
+            Sign the document below:
           </p>
           <button onClick={handleCheckStatus} disabled={polling}
             className="text-xs px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-all flex items-center gap-1.5">
@@ -327,7 +327,7 @@ export default function SigningPanel({ task, onComplete }) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
             )}
-            Cek Status
+            Check Status
           </button>
         </div>
 
@@ -344,7 +344,7 @@ export default function SigningPanel({ task, onComplete }) {
         </div>
 
         <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
-          Setelah menandatangani, status akan diperbarui secara otomatis.
+          After signing, the status will be updated automatically.
         </p>
       </div>
     );
@@ -369,7 +369,7 @@ export default function SigningPanel({ task, onComplete }) {
 
       {/* Description */}
       <p className="text-sm text-slate-500 dark:text-slate-400">
-        Pilih posisi tanda tangan pada dokumen, lalu mulai proses penandatanganan.
+        Select a signature position on the document, then start the signing process.
       </p>
 
       {/* Document Preview — Signature Placement */}
@@ -378,18 +378,18 @@ export default function SigningPanel({ task, onComplete }) {
           <svg className="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          Posisi Tanda Tangan
+          Signature Position
         </p>
 
         <p className="text-xs text-slate-400 dark:text-slate-500">
-          Klik dan seret pada dokumen di bawah untuk menandai area tanda tangan.
+          Click and drag on the document below to mark the signature area.
         </p>
 
         {pdfLoading && (
           <div className="flex items-center justify-center py-12 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
             <div className="text-center space-y-3">
               <div className="w-8 h-8 mx-auto border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-              <p className="text-xs text-slate-400">Memuat preview dokumen...</p>
+              <p className="text-xs text-slate-400">Loading document preview...</p>
             </div>
           </div>
         )}
@@ -404,17 +404,17 @@ export default function SigningPanel({ task, onComplete }) {
                   disabled={currentPage === 0}
                   className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 transition-all"
                 >
-                  ← Sebelumnya
+                  ← Previous
                 </button>
                 <span className="text-xs text-slate-500 dark:text-slate-400">
-                  Halaman {currentPage + 1} / {totalPages}
+                  Page {currentPage + 1} / {totalPages}
                 </span>
                 <button
                   onClick={() => setCurrentPage((p) => Math.min(pdfPages.length - 1, p + 1))}
                   disabled={currentPage >= pdfPages.length - 1}
                   className="px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 transition-all"
                 >
-                  Selanjutnya →
+                  Next →
                 </button>
               </div>
             )}
@@ -480,7 +480,7 @@ export default function SigningPanel({ task, onComplete }) {
               {/* PDF page image */}
               <img
                 src={pdfPages[currentPage]?.dataUrl}
-                alt={`Halaman ${currentPage + 1}`}
+                alt={`Page ${currentPage + 1}`}
                 className="w-full h-auto pointer-events-none"
                 draggable={false}
               />
@@ -500,7 +500,7 @@ export default function SigningPanel({ task, onComplete }) {
                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                     </svg>
-                    Tanda tangan
+                    Signature
                   </div>
                 </div>
               )}
@@ -516,10 +516,10 @@ export default function SigningPanel({ task, onComplete }) {
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {sigArea ? (
                   <span className="text-violet-500 dark:text-violet-400 font-medium">
-                    ✓ Area tanda tangan dipilih — Halaman {currentPage + 1}
+                    ✓ Signature area selected — Page {currentPage + 1}
                   </span>
                 ) : (
-                  "Seret pada dokumen untuk memilih area tanda tangan"
+                  "Drag on the document to select the signature area"
                 )}
               </p>
               {sigArea && (
@@ -527,7 +527,7 @@ export default function SigningPanel({ task, onComplete }) {
                   onClick={() => setSigArea(null)}
                   className="text-xs text-slate-400 hover:text-rose-500 transition-colors"
                 >
-                  Hapus area
+                  Clear area
                 </button>
               )}
             </div>
@@ -537,22 +537,22 @@ export default function SigningPanel({ task, onComplete }) {
         {/* Fallback when no PDF preview available */}
         {!pdfLoading && pdfPages.length === 0 && (
           <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20">
-            <p className="text-sm text-amber-700 dark:text-amber-400 font-medium mb-1">Preview tidak tersedia</p>
+            <p className="text-sm text-amber-700 dark:text-amber-400 font-medium mb-1">Preview Not Available</p>
             <p className="text-xs text-amber-600 dark:text-amber-500 mb-2">
               {pdfError
-                ? `Gagal memuat dokumen: ${pdfError}`
-                : "Dokumen ini bukan PDF atau belum tersedia."
+                ? `Failed to load document: ${pdfError}`
+                : "This document is not a PDF or is not yet available."
               }
             </p>
             <p className="text-xs text-amber-600 dark:text-amber-500 mb-3">
-              Tanda tangan akan ditempatkan di bagian bawah kiri halaman terakhir secara otomatis.
+              The signature will be placed in the bottom-left corner of the last page automatically.
             </p>
             {pdfError && (
               <button
                 onClick={loadPdfPreview}
                 className="text-xs font-medium text-amber-700 dark:text-amber-400 underline hover:no-underline"
               >
-                Coba lagi
+                Try again
               </button>
             )}
           </div>
@@ -572,7 +572,7 @@ export default function SigningPanel({ task, onComplete }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
           </svg>
         )}
-        {step === "initiating" ? "Memproses..." : "Mulai Tanda Tangan"}
+        {step === "initiating" ? "Processing..." : "Start Signing"}
       </button>
     </div>
   );

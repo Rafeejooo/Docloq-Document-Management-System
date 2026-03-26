@@ -14,11 +14,14 @@ let collectionReady = false;
 const getClient = () => {
   if (client) return client;
 
-  client = new QdrantClient({
-    url: uploadConfig.qdrant.url,
-  });
+  const opts = { url: uploadConfig.qdrant.url };
+  const apiKey = process.env.QDRANT_API_KEY;
+  if (apiKey) opts.apiKey = apiKey;
 
-  console.log(`[Qdrant] Client initialized → ${uploadConfig.qdrant.url}`);
+  client = new QdrantClient(opts);
+
+  const mode = apiKey ? 'Cloud (API key)' : 'Local';
+  console.log(`[Qdrant] Client initialized → ${uploadConfig.qdrant.url} [${mode}]`);
   return client;
 };
 
@@ -234,6 +237,26 @@ export const deleteDocumentVector = async (documentId) => {
     console.log(`[Qdrant] Deleted vector: ${documentId}`);
   } catch (err) {
     console.warn(`[Qdrant] Failed to delete vector ${documentId}:`, err.message);
+  }
+};
+
+/**
+ * Check if a document is indexed in Qdrant.
+ * @param {string} documentId — UUID of the document
+ * @returns {boolean}
+ */
+export const isDocumentIndexed = async (documentId) => {
+  try {
+    await ensureCollection();
+    const qdrant = getClient();
+    const results = await qdrant.retrieve(uploadConfig.qdrant.collection, {
+      ids: [documentId],
+      with_payload: false,
+      with_vector: false,
+    });
+    return results.length > 0;
+  } catch {
+    return false;
   }
 };
 

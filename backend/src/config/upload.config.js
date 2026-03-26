@@ -137,6 +137,27 @@ export const uploadConfig = {
   tempUpload: {
     expirationMinutes: 30, // Auto-delete temp files after 30 min
   },
+
+  // === Download Watermark Settings ===
+  downloadWatermark: {
+    enabled: process.env.DOWNLOAD_WATERMARK_ENABLED !== 'false',
+    // Invisible Unicode characters (non-overlapping with honeytoken ZWC chars)
+    chars: ['\u2060', '\u2061', '\u2062', '\u2063'], // Word Joiner, Function Application, Invisible Times, Invisible Separator
+    positionCount: 12, // Number of injection points spread across text
+    supportedCategories: ['pdf', 'office', 'text'],
+  },
+
+  // === Blockchain Anchoring Settings ===
+  blockchain: {
+    enabled: process.env.BLOCKCHAIN_ENABLED === 'true', // Default OFF until wallet configured
+    rpcUrl: process.env.POLYGON_RPC_URL || 'https://polygon-rpc.com',
+    chainId: parseInt(process.env.POLYGON_CHAIN_ID, 10) || 137, // 137 = Polygon Mainnet, 80002 = Amoy Testnet
+    privateKey: process.env.POLYGON_PRIVATE_KEY || '',
+    contractAddress: process.env.POLYGON_CONTRACT_ADDRESS || '',
+    confirmations: parseInt(process.env.BLOCKCHAIN_CONFIRMATIONS, 10) || 2, // Wait for N block confirmations
+    gasLimitSingle: 100000, // Gas limit for single anchor tx
+    gasLimitBatch: 150000,  // Gas limit for batch anchor tx
+  },
 };
 
 export default uploadConfig;

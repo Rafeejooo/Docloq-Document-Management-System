@@ -1,12 +1,65 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import DashboardLayout from "@/components/layout/DashboardLayout";
+import watermarkScannerService from "@/services/watermark-scanner.service";
 
 export default function OSINTTracker() {
   const [activeTab, setActiveTab] = useState("monitor");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSelectDocModal, setShowSelectDocModal] = useState(false);
   const [selectedDocToCheck, setSelectedDocToCheck] = useState(null);
+
+  // Watermark Scanner state
+  const [scanFile, setScanFile] = useState(null);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanResult, setScanResult] = useState(null);
+  const [scanHistory, setScanHistory] = useState([]);
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleScanFile = useCallback(async () => {
+    if (!scanFile) return;
+    setScanLoading(true);
+    setScanResult(null);
+    setScanHistory([]);
+    try {
+      const { data } = await watermarkScannerService.scanDocument(scanFile);
+      const result = data?.data || data;
+      setScanResult(result);
+      // If a document was identified, load download history
+      const docId = result?.downloadWatermark?.document?.id || result?.uploadHoneytoken?.documentId;
+      if (docId) {
+        try {
+          const { data: histData } = await watermarkScannerService.getHistory(docId);
+          setScanHistory(histData?.data || []);
+        } catch { /* non-critical */ }
+      }
+    } catch (err) {
+      setScanResult({ found: false, message: err?.response?.data?.message || 'Scan failed. Please try again.' });
+    } finally {
+      setScanLoading(false);
+    }
+  }, [scanFile]);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer?.files?.[0];
+    if (file) setScanFile(file);
+  }, []);
+
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback(() => setIsDragOver(false), []);
+
+  const formatScanDate = (dateStr) => {
+    if (!dateStr) return 'N/A';
+    try {
+      return new Date(dateStr).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+    } catch { return dateStr; }
+  };
 
   // Documents from user's uploads (would come from API)
   const userDocuments = [
@@ -140,6 +193,7 @@ export default function OSINTTracker() {
             { id: "monitor", label: "Monitor", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg> },
             { id: "leaks", label: `Leaks (${detectedLeaks.length})`, icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg> },
             { id: "check", label: "Check Document", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg> },
+            { id: "scan_watermark", label: "Scan Watermark", icon: <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" /></svg> },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -520,6 +574,282 @@ export default function OSINTTracker() {
                 </ul>
               </div>
             </div>
+          </motion.div>
+        )}
+
+        {/* Scan Watermark Tab */}
+        {activeTab === "scan_watermark" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-6"
+          >
+            {/* Upload Zone */}
+            <div className="rounded-xl border border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-900/50 backdrop-blur-sm p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Scan for Invisible Watermarks</h2>
+                  <p className="text-sm text-slate-400">Upload a suspected leaked document to identify the source</p>
+                </div>
+              </div>
+
+              {/* Drag-and-drop zone */}
+              <div
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                className={`border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer ${
+                  isDragOver
+                    ? "border-indigo-500 bg-indigo-500/10"
+                    : scanFile
+                    ? "border-emerald-500/50 bg-emerald-500/5"
+                    : "border-slate-200 dark:border-slate-700 hover:border-indigo-500/50"
+                }`}
+                onClick={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.accept = '.pdf,.docx,.doc,.txt,.xlsx,.xls,.pptx,.png,.jpg,.jpeg';
+                  input.onchange = (e) => {
+                    const file = e.target.files?.[0];
+                    if (file) setScanFile(file);
+                  };
+                  input.click();
+                }}
+              >
+                {scanFile ? (
+                  <div className="flex items-center justify-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
+                      <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-slate-900 dark:text-white">{scanFile.name}</p>
+                      <p className="text-xs text-slate-500">{(scanFile.size / 1024).toFixed(1)} KB</p>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setScanFile(null); setScanResult(null); setScanHistory([]); }}
+                      className="ml-4 w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400 hover:text-red-400 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-14 h-14 rounded-xl bg-slate-200 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-3">
+                      <svg className="w-7 h-7 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                      </svg>
+                    </div>
+                    <p className="text-sm font-medium text-slate-900 dark:text-white mb-1">Drop a suspected leaked document here</p>
+                    <p className="text-xs text-slate-500">PDF, DOCX, TXT, XLSX, PNG, JPG supported</p>
+                  </>
+                )}
+              </div>
+
+              {/* Scan button */}
+              <button
+                onClick={handleScanFile}
+                disabled={!scanFile || scanLoading}
+                className="mt-4 w-full px-4 py-3 rounded-xl text-sm font-medium bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-500 hover:to-purple-500 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2"
+              >
+                {scanLoading ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                    Scanning document...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                    Scan for Watermarks
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Scan Results */}
+            {scanResult && (
+              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+                {/* Download Watermark Found */}
+                {scanResult.downloadWatermark && (
+                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center">
+                        <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                      </div>
+                      <div>
+                        <h3 className="text-base font-semibold text-emerald-400">Leak Source Identified</h3>
+                        <p className="text-xs text-emerald-400/70">Per-download watermark detected</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                        <p className="text-xs text-slate-500 mb-1">Downloader</p>
+                        <p className="text-sm font-medium text-white">{scanResult.downloadWatermark.downloader?.name || 'Unknown'}</p>
+                        {scanResult.downloadWatermark.downloader?.email && (
+                          <p className="text-xs text-slate-400">{scanResult.downloadWatermark.downloader.email}</p>
+                        )}
+                      </div>
+                      <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                        <p className="text-xs text-slate-500 mb-1">Downloaded On</p>
+                        <p className="text-sm font-medium text-white">{formatScanDate(scanResult.downloadWatermark.downloadedAt)}</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                        <p className="text-xs text-slate-500 mb-1">Document</p>
+                        <p className="text-sm font-medium text-white">{scanResult.downloadWatermark.document?.name || 'Unknown'}</p>
+                      </div>
+                      <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                        <p className="text-xs text-slate-500 mb-1">Confidence</p>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-2 rounded-full bg-slate-700">
+                            <div
+                              className="h-full rounded-full bg-emerald-500"
+                              style={{ width: `${Math.round((scanResult.downloadWatermark.confidence || 0) * 100)}%` }}
+                            />
+                          </div>
+                          <span className="text-sm font-medium text-emerald-400">{Math.round((scanResult.downloadWatermark.confidence || 0) * 100)}%</span>
+                        </div>
+                      </div>
+                      {scanResult.downloadWatermark.ipAddress && (
+                        <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                          <p className="text-xs text-slate-500 mb-1">IP Address</p>
+                          <p className="text-sm font-medium text-white font-mono">{scanResult.downloadWatermark.ipAddress}</p>
+                        </div>
+                      )}
+                      <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                        <p className="text-xs text-slate-500 mb-1">Method</p>
+                        <p className="text-sm font-medium text-white">Unicode Invisible Characters</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Upload Honeytoken Found (but no download watermark) */}
+                {scanResult.uploadHoneytoken && !scanResult.downloadWatermark && (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
+                        <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                      </div>
+                      <div>
+                        <h3 className="text-base font-semibold text-amber-400">Upload Honeytoken Detected</h3>
+                        <p className="text-xs text-amber-400/70">Uploader identified, but per-download watermark not found</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                        <p className="text-xs text-slate-500 mb-1">Uploader</p>
+                        <p className="text-sm font-medium text-white">{scanResult.uploadHoneytoken.uploader?.name || 'Unknown'}</p>
+                        {scanResult.uploadHoneytoken.uploader?.email && (
+                          <p className="text-xs text-slate-400">{scanResult.uploadHoneytoken.uploader.email}</p>
+                        )}
+                      </div>
+                      <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                        <p className="text-xs text-slate-500 mb-1">Detection Method</p>
+                        <p className="text-sm font-medium text-white capitalize">{scanResult.uploadHoneytoken.method}</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-amber-400/70 mt-3">
+                      Note: Per-download watermark not found — document may pre-date the watermark system or was sanitized.
+                    </p>
+                  </div>
+                )}
+
+                {/* Both found — show honeytoken as supplementary info */}
+                {scanResult.uploadHoneytoken && scanResult.downloadWatermark && (
+                  <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                      <p className="text-sm font-medium text-amber-400">Upload Honeytoken Also Detected</p>
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Original uploader: <span className="text-white">{scanResult.uploadHoneytoken.uploader?.name || 'Unknown'}</span>
+                      {scanResult.uploadHoneytoken.uploader?.email && <span className="text-slate-500"> ({scanResult.uploadHoneytoken.uploader.email})</span>}
+                    </p>
+                  </div>
+                )}
+
+                {/* Nothing found */}
+                {!scanResult.found && (
+                  <div className="rounded-xl border border-slate-700/50 bg-slate-800/50 p-5 text-center">
+                    <div className="w-14 h-14 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center mx-auto mb-3">
+                      <svg className="w-7 h-7 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                    </div>
+                    <h3 className="text-base font-semibold text-slate-300 mb-1">No Markers Detected</h3>
+                    <p className="text-sm text-slate-500">{scanResult.message || 'Document may have been sanitized or is not from this system.'}</p>
+                  </div>
+                )}
+
+                {/* Download History Table */}
+                {scanHistory.length > 0 && (
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-900/50 backdrop-blur-sm overflow-hidden">
+                    <div className="p-4 border-b border-slate-200 dark:border-slate-700/50">
+                      <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                        <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        All Watermarked Downloads for This Document
+                      </h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-slate-100 dark:bg-slate-800/50">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">User</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Email</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Downloaded At</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">IP Address</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Watermark ID</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-700/50">
+                          {scanHistory.map((record) => (
+                            <tr key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
+                              <td className="px-4 py-3 text-sm font-medium text-slate-900 dark:text-white">{record.user}</td>
+                              <td className="px-4 py-3 text-sm text-slate-400">{record.email || 'N/A'}</td>
+                              <td className="px-4 py-3 text-sm text-slate-400">{formatScanDate(record.downloadedAt)}</td>
+                              <td className="px-4 py-3 text-sm text-slate-400 font-mono">{record.ipAddress || 'N/A'}</td>
+                              <td className="px-4 py-3">
+                                <code className="text-xs px-2 py-1 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-mono">
+                                  {record.watermarkId?.substring(0, 8)}...
+                                </code>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {/* How it works info card */}
+            {!scanResult && (
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700/50 bg-white dark:bg-slate-900/50 backdrop-blur-sm p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">How Watermark Scanning Works</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {[
+                    { step: 1, title: "Upload Document", desc: "Upload the suspected leaked document" },
+                    { step: 2, title: "Extract Text", desc: "System extracts text content from the file" },
+                    { step: 3, title: "Detect Watermarks", desc: "Scans for invisible Unicode character patterns" },
+                    { step: 4, title: "Identify Leaker", desc: "Decodes watermark to identify the downloader" },
+                  ].map((item) => (
+                    <div key={item.step} className="p-3 rounded-lg bg-slate-100 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/50">
+                      <div className="w-7 h-7 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 text-xs font-medium mb-2">{item.step}</div>
+                      <p className="text-sm font-medium text-slate-900 dark:text-white mb-0.5">{item.title}</p>
+                      <p className="text-xs text-slate-500">{item.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
 

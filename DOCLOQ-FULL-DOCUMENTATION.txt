@@ -1,0 +1,1975 @@
+================================================================================
+                    DOCLOQ DOCUMENT MANAGEMENT SYSTEM
+                        FULL DOCUMENTATION
+================================================================================
+
+Project      : DocLoq - Secure Document Management System
+Type         : Cybersecurity Capstone Project
+Stack        : React 19 + Express 5 + PostgreSQL 16 + Drizzle ORM
+AI           : OpenAI GPT-4.1-mini + Qdrant Vector DB + MongoDB Cache
+Security     : AES-256-GCM + Vault Transit + ClamAV + Honeytokens + Blockchain
+Storage      : MinIO (S3-compatible) + HashiCorp Vault
+Signing      : DocuSeal e-Signature
+Editor       : OnlyOffice Document Server
+Auth         : JWT + TOTP 2FA + Email OTP + hCaptcha
+
+================================================================================
+TABLE OF CONTENTS
+================================================================================
+
+  1.  SYSTEM ARCHITECTURE OVERVIEW
+  2.  INFRASTRUCTURE & DOCKER SERVICES
+  3.  ENVIRONMENT VARIABLES
+  4.  DATABASE SCHEMA (54 TABLES)
+  5.  DOCUMENT UPLOAD PIPELINE (15 STEPS)
+  6.  DOCUMENT DOWNLOAD FLOW (WITH PER-DOWNLOAD WATERMARKING)
+  7.  AI DOCUMENT ANALYSIS FLOW
+  8.  SECURITY FEATURES
+  9.  BACKEND SERVICES (23 SERVICES)
+  10. API ENDPOINTS (105+ ENDPOINTS)
+  11. FRONTEND FEATURES & PAGES
+  12. FRONTEND SERVICES & STATE
+  13. AUTHENTICATION & AUTHORIZATION
+  14. DEPENDENCIES
+  15. INVISIBLE DOWNLOAD WATERMARKING (LEAK IDENTIFICATION)
+  16. BLOCKCHAIN DOCUMENT ANCHORING (POLYGON)
+
+================================================================================
+1. SYSTEM ARCHITECTURE OVERVIEW
+================================================================================
+
+DocLoq is a security-first document management system designed for
+enterprise/government environments that require maximum data protection.
+
+Architecture Layers:
+--------------------
+
+  [Frontend - React 19 + Vite + TailwindCSS]
+       |
+       | HTTPS + JWT Auth
+       v
+  [Backend - Express 5 + Node.js]
+       |
+       +---> [PostgreSQL 16]     Primary database (Drizzle ORM)
+       +---> [MinIO]             S3-compatible object storage
+       +---> [Vault]             Key management (Transit engine)
+       +---> [ClamAV]            Malware scanning
+       +---> [Qdrant Cloud]      Vector database (AI semantic search)
+       +---> [MongoDB]           AI analysis result cache
+       +---> [OpenAI API]        GPT-4.1-mini + text-embedding-3-small
+       +---> [OnlyOffice]        Document editing/conversion
+       +---> [DocuSeal]          E-signature service
+       +---> [Polygon Chain]     Blockchain anchoring (ethers.js)
+
+Multi-Tenant Design:
+- Every user belongs to an organization
+- All data is scoped by organizationId
+- Separate encryption keys per document (envelope encryption)
+
+================================================================================
+2. INFRASTRUCTURE & DOCKER SERVICES
+================================================================================
+
+File: backend/docker-compose.yml
+
++------------------+---------------------+----------+---------------------------+
+| Service          | Image               | Port     | Purpose                   |
++------------------+---------------------+----------+---------------------------+
+| db               | postgres:16-alpine  | 5436     | Primary database          |
+| minio            | minio/minio         | 9000,    | S3-compatible object      |
+|                  |                     | 9001     | storage + console         |
+| minio-init       | minio/mc            | -        | Bucket initialization     |
+| vault            | hashicorp/vault:1.17| 8200     | Key management (Transit)  |
+| clamav           | clamav/clamav       | 3310     | Antivirus/malware scanner |
+| qdrant           | qdrant/qdrant:1.13  | 6333,    | Vector DB (AI search)     |
+|                  |                     | 6334     |                           |
+| mongodb          | mongo:7.0           | 27017    | AI analysis cache         |
++------------------+---------------------+----------+---------------------------+
+
+MinIO Buckets (auto-created):
+  - docloq-documents   : Encrypted document storage
+  - docloq-archive     : Archived document versions
+  - docloq-qrcodes     : QR code verification images
+
+Docker Volumes:
+  - postgres_data, minio_data, clamav_data, qdrant_data, mongodb_data
+
+Network: docloq_network (bridge)
+
+================================================================================
+3. ENVIRONMENT VARIABLES
+================================================================================
+
+File: backend/.env
+
+--- Core ---
+PORT                    Server port (default: 3000)
+NODE_ENV                Environment: development | production
+FRONTEND_URL            Frontend URL for CORS
+
+--- Database ---
+DATABASE_URL            PostgreSQL connection string
+
+--- Authentication ---
+JWT_SECRET              JWT signing secret
+HCAPTCHA_ENABLED        Enable/disable hCaptcha
+HCAPTCHA_SECRET         hCaptcha secret key
+
+--- OnlyOffice ---
+BACKEND_URL             Backend URL (for OnlyOffice callbacks)
+BACKEND_URL_DOCKER      Backend URL from Docker network
+ONLYOFFICE_URL          OnlyOffice Document Server URL
+
+--- Encryption ---
+ENCRYPTION_MASTER_KEY   AES-256 master key (64 hex chars)
+QR_SIGNING_SECRET       HMAC-SHA256 signing key for QR codes
+QR_VERIFICATION_BASE_URL  QR verification endpoint
+
+--- Malware Scanner ---
+SCANNER_ENABLED         Enable ClamAV scanning (true/false)
+CLAMAV_HOST             ClamAV host
+CLAMAV_PORT             ClamAV port (3310)
+
+--- Storage (MinIO / S3) ---
+STORAGE_PROVIDER        Storage backend: minio | local
+S3_ENDPOINT             S3/MinIO endpoint URL
+S3_ACCESS_KEY           S3 access key
+S3_SECRET_KEY           S3 secret key
+S3_DOCUMENTS_BUCKET     Document storage bucket
+S3_ARCHIVE_BUCKET       Archive bucket
+S3_QR_BUCKET            QR code images bucket
+S3_FORCE_PATH_STYLE     Path-style addressing (true for MinIO)
+S3_REGION               S3 region
+
+--- Key Management (Vault) ---
+KEY_PROVIDER            Key provider: vault | local
+VAULT_ADDR              Vault server address
+VAULT_TOKEN             Vault auth token
+VAULT_TRANSIT_KEY       Transit engine key name
+
+--- Vector Database (Qdrant) ---
+QDRANT_URL              Qdrant server/cloud URL
+QDRANT_API_KEY          Qdrant Cloud API key
+QDRANT_COLLECTION       Collection name
+
+--- AI Analysis ---
+AI_ANALYSIS_MODEL       AI model (default: gpt-4.1-mini)
+OPENAI_API_KEY          OpenAI API key
+
+--- MongoDB (AI Cache) ---
+MONGO_URI               MongoDB connection URI
+MONGO_USER              MongoDB username
+MONGO_PASSWORD          MongoDB password
+
+--- Upload Limits ---
+MAX_FILE_SIZE_MB        Maximum upload size (default: 50)
+
+--- Email (SMTP) ---
+SMTP_HOST               SMTP server host
+SMTP_PORT               SMTP port (587)
+SMTP_USER               SMTP username
+SMTP_PASS               SMTP password
+SMTP_FROM               From email address
+
+================================================================================
+4. DATABASE SCHEMA (54 TABLES)
+================================================================================
+
+ORM: Drizzle ORM with PostgreSQL
+
+--- ENUMS ---
+
+user_role:            super_admin, admin, manager, user, auditor, viewer
+permission_type:      read, read_edit, full_access
+document_status:      active, archived, revoked, expired, deleted
+verification_status:  pending, verified, failed, revoked, expired
+task_status:          pending, in_progress, completed, cancelled
+task_priority:        low, medium, high, urgent
+audit_action:         create, read, update, delete, download, share,
+                      verify, restore, archive
+share_type:           view_only, can_edit
+archive_status:       active, glacier, deep_archive, deleted
+form_instance_status: draft, active, completed, cancelled
+workflow_action:      fill, review, approve, sign
+workflow_step_status: pending, in_progress, completed, skipped
+admin_role:           super_admin, admin, support
+
+--- ORGANIZATIONS & STRUCTURE ---
+
+1. organizations
+   - id (UUID PK), name, slug (UNIQUE)
+   - subscriptionTier, hasBlockchainFeature
+   - awsRegion, s3Bucket, kmsKeyArn
+   - dataRetentionDays (default 2555), archiveAfterDays (default 365)
+   - gdprCompliant, pdpCompliant
+   - settings (JSONB), isActive, createdAt, updatedAt
+
+2. departments
+   - id (UUID PK), organizationId (FK), name, description
+   - color, createdBy, isActive, createdAt, updatedAt
+
+3. teams
+   - id (UUID PK), organizationId (FK), name, description
+   - color, createdBy, isActive, createdAt, updatedAt
+
+4. teamMembers
+   - id (UUID PK), teamId (FK), userId (FK)
+   - isTeamLead, addedBy, createdAt
+
+--- USERS & AUTHENTICATION ---
+
+5. users
+   - id (UUID PK), organizationId (FK), email (UNIQUE)
+   - passwordHash, firstName, lastName, avatarUrl, phone, position
+   - departmentId (FK), role (default 'user')
+   - isActive, isEmailVerified, twoFactorEnabled, twoFactorSecret
+   - lastLoginAt, lastLoginIp, failedLoginAttempts, lockedUntil
+   - createdAt, updatedAt
+
+6. userSessions
+   - id (UUID PK), userId (FK), token (UNIQUE), refreshToken
+   - userAgent, ipAddress, lastActivityAt, expiresAt, createdAt
+
+7. emailVerificationTokens
+   - id (UUID PK), userId (FK), token (UNIQUE), expiresAt, createdAt
+
+8. passwordResetTokens
+   - id (UUID PK), userId (FK), token (UNIQUE), expiresAt, usedAt
+
+--- FOLDERS & HIERARCHY ---
+
+9. folders
+   - id (UUID PK), organizationId (FK), name
+   - parentId (self-reference), path (materialized path)
+   - depth, sortOrder, color, icon, description
+   - createdBy, isActive, createdAt, updatedAt
+
+10. folderTags
+    - id (UUID PK), folderId (FK), tag, color, createdAt
+
+--- PERMISSIONS ---
+
+11. folderPermissions
+    - id (UUID PK), folderId (FK), teamId (FK), userId (FK)
+    - permissionType, inheritToSubfolders (default true)
+    - grantedBy, expiresAt, createdAt
+
+12. customRoles
+    - id (UUID PK), organizationId (FK), name, description
+    - color (default 'indigo'), isActive, createdBy, createdAt
+
+13. rolePermissions
+    - id (UUID PK), roleId (FK), resourceType ('folder'|'document')
+    - resourceId, permissionLevel ('none'|'viewer'|'editor'|'admin')
+
+14. userRoleAssignments
+    - id (UUID PK), userId (FK), roleId (FK)
+    - assignedBy, assignedAt
+
+--- DOCUMENTS & VERSIONING ---
+
+15. documents
+    - id (UUID PK), organizationId (FK), folderId (FK)
+    - filename, originalFilename, mimeType
+    - fileSize (BIGINT), currentVersionId, versionCount (default 1)
+    - status (default 'active'), ownerId (FK)
+    - isPublic, contentHash, ssdeepHash, simHash, expiresAt
+    - aiAccessGranted, aiAccessGrantedAt, aiAccessGrantedBy
+    - deletedAt, deletedBy, createdAt, updatedAt
+
+16. documentVersions
+    - id (UUID PK), documentId (FK), versionNumber
+    - s3Key, s3Bucket, fileSize
+    - encryptionKeyId, encryptionIv, encryptionSalt
+    - sha256Hash, bodyHash
+    - archiveStatus (default 'active'), archivedAt
+    - createdBy (FK), changeNote, createdAt
+
+17. documentPermissions
+    - id (UUID PK), documentId (FK), teamId (FK), userId (FK)
+    - permissionType, grantedBy, expiresAt, createdAt
+
+--- DOCUMENT SECURITY ---
+
+18. documentWatermarks
+    - id (UUID PK), documentId (FK), versionId (FK)
+    - watermarkType ('lsb_steganography')
+    - payloadHash, embeddingPositions (JSONB), redundancyLevel
+    - imageCount, imageDetails (JSONB), isActive, createdAt
+
+19. documentHoneytokens
+    - id (UUID PK), documentId (FK), versionId (FK)
+    - zwcToken, zwcPositions (JSONB)
+    - homoglyphToken, homoglyphPositions (JSONB)
+    - whitespaceToken, whitespacePositions (JSONB)
+    - combinedPayloadHash, isActive, createdAt
+
+20. documentQrCodes
+    - id (UUID PK), documentId (FK), versionId (FK)
+    - payloadHash, signatureHash (HMAC-SHA256)
+    - verificationUrl, shortCode (UNIQUE)
+    - qrImageS3Key, hasBlockchainProof
+    - scanCount, lastScannedAt, isActive, createdAt
+
+20b. downloadWatermarks  *** NEW — Per-Download Watermarking ***
+    - id (UUID PK), documentId (FK→documents), versionId (FK→documentVersions)
+    - downloadedBy (FK→users, ON DELETE SET NULL)
+    - watermarkId (TEXT, UNIQUE) — UUID per download event
+    - watermarkToken (TEXT) — SHA-256 of positions+payload
+    - watermarkPositions (JSONB) — array of insertion indices
+    - payloadHash (TEXT) — SHA-256 of full payload
+    - payload (JSONB) — {w: watermarkId, d: docId, u: userId, t: timestamp}
+    - documentFormat (TEXT) — 'text_direct'|'docx_xml'|'pdf_annotation'|etc.
+    - watermarkMethod (TEXT, default 'unicode_invisible')
+    - ipAddress (TEXT), userAgent (TEXT)
+    - isActive (BOOLEAN, default true), createdAt (TIMESTAMP)
+    Indexes: documentId, downloadedBy, watermarkId (unique), payloadHash
+
+21. blockchainAnchors
+    - id (UUID PK), documentId (FK), versionId (FK)
+    - blockchainNetwork ('polygon'), transactionHash (UNIQUE)
+    - blockNumber, blockTimestamp, anchoredHash
+    - pseudonymizedOrgId, merkleRoot, merkleProof (JSONB)
+    - status ('pending'|'confirmed'|'failed')
+    - confirmations, gasUsed, gasCost, createdAt, confirmedAt
+
+--- DOCUMENT SHARING ---
+
+22. documentShares
+    - id (UUID PK), documentId (FK)
+    - shareType, shareToken (UNIQUE), shareUrl
+    - allowedEmails (JSONB), requireAuth (default true)
+    - maxViews, viewCount, expiresAt
+    - createdBy (FK), isActive, createdAt
+
+23. documentShareAccess
+    - id (UUID PK), shareId (FK), accessedBy (FK)
+    - ipAddress, userAgent, accessedAt
+
+--- VERIFICATION ---
+
+24. verificationRequests
+    - id (UUID PK), inputMethod ('qr_scan'|'upload_softcopy'|
+      'upload_hardcopy'|'manual_hash')
+    - inputHash, inputQrCode, uploadedFileS3Key
+    - status, matchedDocumentId (FK), matchedVersionId (FK)
+    - isHardcopyScan, ssdeepSimilarity (%), simHashDistance
+    - chunkAnalysis (JSONB), differingChunks (JSONB)
+    - blockchainVerified, blockchainAnchorId (FK)
+    - requestedBy (FK), ipAddress, resultMessage, createdAt
+
+--- TRASH & COMPLIANCE ---
+
+25. trashItems
+    - id (UUID PK), organizationId (FK)
+    - itemType ('document'|'folder'), itemId
+    - originalFolderId, originalPath, itemMetadata (JSONB)
+    - autoDeleteAt (30 days), deletedBy (FK), deletedAt
+
+26. cryptoShredding
+    - id (UUID PK), organizationId, targetType, targetId
+    - kmsKeyIds (JSONB), status ('pending'|'completed'|'failed')
+    - reason, requestedBy (FK)
+    - affectedDocuments, affectedVersions, completedAt, createdAt
+
+--- FORMS & TEMPLATES ---
+
+27. templates
+    - id (UUID PK), organizationId (FK), name, description
+    - category, s3Key, mimeType, thumbnailUrl
+    - isSystemTemplate, isPublic, usageCount
+    - createdBy (FK), isActive, createdAt, updatedAt
+
+28. forms
+    - id (UUID PK), organizationId (FK), title, description
+    - icon, category, schema (JSONB), uiSchema (JSONB)
+    - isPublic, requireAuth, allowAnonymous
+    - maxSubmissions, submissionCount, usageCount
+    - linkedTemplateId (FK), createdBy (FK), isActive, expiresAt
+
+29. formSubmissions
+    - id (UUID PK), formId (FK)
+    - encryptedData, dataHash, generatedDocumentId (FK)
+    - submittedBy (FK), submitterEmail, ipAddress
+    - status ('submitted'|'processed'|'rejected'), createdAt
+
+30. formInstances
+    - id (UUID PK), organizationId (FK), formId (FK)
+    - name, status (default 'draft')
+    - startDate, dueDate, completedAt
+    - generatedDocumentId (FK), createdBy (FK), createdAt
+
+31. formWorkflowSteps
+    - id (UUID PK), formInstanceId (FK), stepOrder
+    - action (fill|review|approve|sign), assignedTo (FK)
+    - status, completedAt, notes, taskId (FK), createdAt
+
+--- TASKS ---
+
+32. tasks
+    - id (UUID PK), organizationId (FK)
+    - title, description, taskType (general|fill|review|approve|sign)
+    - assignedTo (FK), assignedTeam (FK)
+    - relatedDocumentId (FK), relatedFolderId (FK)
+    - relatedFormId, relatedFormInstanceId
+    - status, priority, dueDate, completedAt
+    - checklist (JSONB), createdBy (FK), createdAt
+
+33. taskComments
+    - id (UUID PK), taskId (FK), content
+    - createdBy (FK), createdAt, updatedAt
+
+--- DIGITAL SIGNATURES ---
+
+34. documentSignatures
+    - id (UUID PK), organizationId (FK)
+    - taskId (FK), documentId (FK), formInstanceId
+    - docusealSubmissionId, docusealTemplateId
+    - docusealSubmitterId, docusealSlug
+    - signerUserId (FK), signerEmail, signerName, signerRole
+    - status (pending|sent|opened|completed|declined|expired)
+    - sentAt, openedAt, completedAt, declinedAt, declineReason
+    - signedDocumentUrl, signedDocumentPath
+    - auditLogUrl, embedSrc, metadata (JSONB)
+
+--- AI CHATBOT ---
+
+35. chatSessions
+    - id (UUID PK), userId (FK), organizationId (FK)
+    - title, contextDocumentIds (JSONB), messageCount
+    - isActive, lastMessageAt, createdAt
+
+36. chatMessages
+    - id (UUID PK), sessionId (FK)
+    - role ('user'|'assistant'|'system'), content
+    - metadata (JSONB), analyzedDocuments (JSONB)
+    - qdrantPointId, createdAt
+
+37. chatCache
+    - id (UUID PK), queryHash (UNIQUE), query, response
+    - organizationId (FK), documentIds (JSONB)
+    - hitCount, lastHitAt, expiresAt, createdAt
+
+--- OSINT & LEAK DETECTION ---
+
+38. leakScans
+    - id (UUID PK), organizationId (FK), documentId (FK)
+    - scanType (manual|scheduled|honeytoken_triggered)
+    - searchQueries (JSONB), sourcesSearched (JSONB)
+    - leaksFound, status, startedAt, completedAt
+
+39. leakReports
+    - id (UUID PK), scanId (FK), documentId (FK)
+    - sourceUrl, sourceName, sourceType
+    - matchType (exact|partial|honeytoken)
+    - matchConfidence (%), honeytokenId (FK), watermarkId (FK)
+    - tracedToUserId (FK), evidenceSnapshot, evidenceS3Key
+
+40. honeytokenTriggers
+    - id (UUID PK), honeytokenId (FK), documentId (FK)
+    - triggerSource, triggerIp, triggerUserAgent
+    - decodedPayload (JSONB)
+    - investigationStatus (new|investigating|confirmed|false_positive)
+
+--- TEMPORARY UPLOADS ---
+
+41. temporaryUploads
+    - id (UUID PK), uploadSessionId (UNIQUE), userId (FK)
+    - organizationId (FK), originalFilename
+    - tempFilePath, fileSize, mimeType
+    - status (uploaded|scanning|processing|completed|failed|rejected)
+    - malwareScanStatus (pending|clean|infected)
+    - malwareScanResult (JSONB)
+    - processingStage, processingProgress (%)
+    - resultDocumentId (FK), errorMessage, isSecureDeleted
+
+--- AUDIT & SECURITY ---
+
+42. auditLogs
+    - id (UUID PK), organizationId (FK), userId (FK)
+    - action, resourceType, resourceId
+    - details (JSONB), previousState (JSONB), newState (JSONB)
+    - ipAddress, userAgent, createdAt
+
+43. securityEvents
+    - id (UUID PK), organizationId (FK), userId (FK)
+    - eventType (malware_detected|unauthorized_access|brute_force|...)
+    - severity (low|medium|high|critical)
+    - description, details (JSONB), relatedDocumentId (FK)
+    - isResolved, resolvedBy (FK), resolution
+
+--- ARCHIVE & RETENTION ---
+
+44. archiveJobs
+    - id (UUID PK), organizationId (FK)
+    - jobType (archive|restore|delete)
+    - versionIds (JSONB), awsJobId, glacierVaultArn
+    - status, totalItems, processedItems, errorMessage
+
+--- NOTIFICATIONS ---
+
+45. notifications
+    - id (UUID PK), userId (FK)
+    - type (task_assigned|document_shared|security_alert|...)
+    - title, message, relatedType, relatedId
+    - isRead, readAt, createdAt
+
+--- SUPPORT ---
+
+46. supportTickets
+    - id (UUID PK), userId (FK), organizationId (FK)
+    - subject, description, category, status, priority
+    - assignedTo, createdAt, resolvedAt
+
+47. supportMessages
+    - id (UUID PK), ticketId (FK)
+    - senderType ('user'|'support'), senderId
+    - message, attachments (JSONB), createdAt
+
+--- ADMIN ---
+
+48. adminUsers
+    - id (UUID PK), email (UNIQUE), passwordHash
+    - firstName, lastName, avatarUrl
+    - role (super_admin|admin|support), isActive
+
+49. adminSessions
+    - id (UUID PK), adminId (FK), token (UNIQUE), refreshToken
+    - userAgent, ipAddress, expiresAt, createdAt
+
+50. apiRequestLogs
+    - id (UUID PK), endpoint, method, statusCode
+    - userId (FK), organizationId (FK)
+    - ipAddress, userAgent, requestDuration (ms)
+
+51. paymentHistory
+    - id (UUID PK), organizationId (FK), userId (FK)
+    - amount (cents), currency ('IDR'), paymentMethod
+    - paymentProvider, transactionId
+    - status (pending|completed|failed|refunded)
+
+52. systemSettings
+    - id (UUID PK), key (UNIQUE), value (JSONB)
+    - description, updatedBy (FK), createdAt
+
+53. adminAuditLogs
+    - id (UUID PK), adminId (FK)
+    - action, targetType, targetId
+    - details (JSONB), ipAddress, createdAt
+
+================================================================================
+5. DOCUMENT UPLOAD PIPELINE (15 STEPS)
+================================================================================
+
+File: backend/src/services/upload-pipeline.service.js
+
+User Upload via HTTPS (React -> Express)
+       |
+       v
+[1] VALIDATE
+    - MIME type whitelist check
+    - Magic bytes verification (file-type library)
+    - File size <= 50MB
+       |
+       v
+[2] TEMP STORE
+    - Buffer saved to /storage/temp/{sessionId}{ext}
+    - Record created in temporaryUploads table (status: scanning)
+       |
+       v
+[3] CLAMAV SCAN
+    - TCP INSTREAM protocol to ClamAV container :3310
+    - 2KB chunked streaming
+    - CLEAN -> continue
+    - INFECTED -> secureWipe(tempPath) -> reject with threat name
+       |
+       v
+[4] EXTRACT TEXT
+    - PDF: pdf-parse library
+    - TXT: raw UTF-8
+    - Other: skip (no text extraction)
+       |
+       v
+[5] NORMALIZE
+    - 7-step normalization:
+      1. Lowercase
+      2. Collapse whitespace
+      3. Strip punctuation
+      4. Strip special characters
+      5. Unicode NFKD normalization
+      6. Strip diacritics
+      7. Final trim
+       |
+       v
+[6] DOCUMENT DNA
+    - SHA-256 (exact match)
+    - SimHash 64-bit (similarity detection)
+    - SSDEEP (fuzzy hash)
+    - Hash computed from normalizedText (or raw buffer if no text)
+       |
+       v
+[7] DUPLICATE CHECK
+    - Query DB for exact SHA-256 match
+    - Check SimHash Hamming distance <= 10 (~84% similar)
+    - Warning if duplicate found (upload continues)
+       |
+       v
+[8] HONEYTOKEN INJECT (text files only)
+    - Method 1: Zero-Width Characters (U+200B/C/D, U+FEFF) at 8 positions
+    - Method 2: Homoglyph substitution (Latin->Cyrillic) at 15 positions
+    - Method 3: Whitespace encoding (trailing space=0, tab=1) at 20 lines
+    - Combined payload hash stored for validation
+       |
+       v
+[9] QR CODE
+    - HMAC-SHA256 signed payload
+    - QR image generated -> stored in MinIO qr bucket
+    - 8-char short code for public verification endpoint
+       |
+       v
+[10] ENCRYPT
+     - Generate per-document key via Vault Transit (or local fallback)
+     - AES-256-GCM encryption
+     - Produces: encryptedBuffer + authTag
+     - Plaintext key exists ONLY in memory, encrypted key stored in DB
+       |
+       v
+[11] STORE TO MINIO
+     - PutObject to bucket "docloq-documents"
+     - Key: {documentId}/{timestamp}{ext}.enc
+     - Metadata sidecar: .meta.json (authTag, originalName, mimeType)
+       |
+       v
+[12] DATABASE INSERT
+     - Atomic transaction:
+       documents + documentVersions + documentHoneytokens +
+       documentQrCodes + auditLogs + update temporaryUploads
+       |
+       v
+[13] SECURE WIPE
+     - Overwrite temp file with zeros (64KB chunks) -> unlink
+     - 3-pass secure deletion
+       |
+       v
+[14] VECTOR INDEX (DEFERRED)
+     - Log: "Vector indexing deferred (requires user AI access grant)"
+     - Only indexed when user explicitly grants AI access
+       |
+       v
+[15] RETURN RESPONSE
+     - { document, version, qrCode, dna, encryption, storage, warnings }
+
+Supported MIME Types:
+  - application/pdf
+  - application/msword, application/vnd.openxmlformats-officedocument.*
+  - application/vnd.ms-excel, application/vnd.ms-powerpoint
+  - text/plain, text/csv, text/rtf
+  - image/png, image/jpeg
+  - application/vnd.oasis.opendocument.*
+
+================================================================================
+6. DOCUMENT DOWNLOAD FLOW (WITH PER-DOWNLOAD WATERMARKING)
+================================================================================
+
+GET /api/documents/:id/download
+       |
+       v
+Auth check (JWT) + Permission check (owner / team / folder permission)
+       |
+       v
+Query documentVersions -> s3Key, encryptionKeyId, encryptionIv
+       |
+       v
+MinIO GetObject -> encrypted buffer
+       |
+       v
+Read .meta.json sidecar -> authTag
+       |
+       v
+Vault Transit decryptDataKey(encryptedKey) -> plaintextKey
+  (or local fallback: decryptDocumentKey)
+       |
+       v
+decryptFile(encryptedBuffer, plaintextKey, iv, authTag) -> plaintext buffer
+       |
+       v
+*** NEW: PER-DOWNLOAD INVISIBLE WATERMARK INJECTION ***
+       |
+       +---> Generate watermarkId (UUID)
+       +---> Build payload: {w: watermarkId, d: docId, u: downloaderId, t: ISO timestamp}
+       +---> watermarkBuffer(decryptedBuffer, mimeType, watermarkFn)
+       |        |
+       |        +---> TXT: direct UTF-8 string injection
+       |        +---> DOCX: JSZip → word/document.xml → inject into <w:t> elements
+       |        +---> PDF: pdf-lib → drawText(invisible, opacity:0) on page 1
+       |        +---> Other: skip watermarking, serve original
+       |
+       +---> Invisible chars: U+2060, U+2061, U+2062, U+2063
+       |     (non-overlapping with upload honeytoken chars U+200B-FEFF)
+       |
+       +---> Fire-and-forget: INSERT into downloadWatermarks table
+       +---> Include watermarkId in audit log
+       |
+       v
+Set Content-Disposition + Content-Type headers -> stream watermarked buffer
+
+Also applies to: GET /api/documents/:id/download-as (converted downloads)
+Does NOT apply to: GET /api/documents/:id/file (OnlyOffice serving)
+
+================================================================================
+7. AI DOCUMENT ANALYSIS FLOW
+================================================================================
+
+--- AI ACCESS GRANT SYSTEM ---
+
+Security concept: Documents are BLOCKED from AI by default.
+User must explicitly grant access before AI can process them.
+
+Rationale:
+  - Data sovereignty: user controls if content is processed by AI
+  - GDPR Art 6 compliance: consent before processing
+  - Defense-in-depth: encrypted docs in MinIO not auto-exposed to AI
+
+Flow:
+
+  User Upload Document
+         |
+         v
+  [14-step pipeline: scan, honeytoken, encrypt, store MinIO, DB, etc.]
+         |
+         v
+  Document appears on AI Analysis page -> STATUS: BLOCKED (locked)
+         |
+         v
+  User clicks document -> Modal "Grant AI Access?"
+    +-- "Grant" -> decrypt -> extract text -> embed -> upsert Qdrant
+    |                         aiAccessGranted = true in DB
+    |                         v
+    |              Document STATUS: GRANTED (green)
+    |              User can send prompts for analysis
+    |
+    +-- "Keep Blocked" -> no action, document stays locked
+
+--- GRANT AI ACCESS FLOW ---
+
+POST /api/ai-analysis/documents/:id/grant
+  1. Verify user has permission for this document
+  2. Get latest document version -> s3Key, encryptionKeyId, encryptionIv
+  3. Download encrypted file from MinIO
+  4. Read .meta.json sidecar -> authTag
+  5. Decrypt with Vault/local key
+  6. Extract text (pdf-parse / raw text)
+  7. Generate embedding via OpenAI (text-embedding-3-small)
+  8. Upsert to Qdrant Cloud (with organizationId filter)
+  9. Update DB: aiAccessGranted = true
+  10. Audit log: action = 'ai_grant_access'
+
+--- ANALYZE DOCUMENT FLOW ---
+
+POST /api/ai-analysis/documents/:id/analyze
+  1. Sanitize prompt input
+  2. Detect prompt injection (15 regex patterns)
+  3. Verify aiAccessGranted = true
+  4. Check MongoDB cache (key = SHA-256(documentId + normalized_prompt))
+     - Cache HIT -> return cached result + record history
+  5. If cache MISS:
+     a. Decrypt document (download -> decrypt -> extract text)
+     b. Truncate to 15,000 chars if needed
+     c. Search Qdrant for similar documents (top 3)
+     d. Build system prompt with chart generation rules
+     e. Call OpenAI GPT-4.1-mini with structured JSON output
+     f. Parse response (summary, keyMetrics, sentiment, charts, etc.)
+     g. Cache result in MongoDB (24h TTL)
+     h. Record in analysis history (permanent)
+     i. Write audit log
+  6. Return structured analysis result
+
+--- AI RESPONSE FORMAT ---
+
+{
+  "summary":           "2-3 sentence document summary",
+  "keyMetrics":        [{ "label", "value", "icon" }],
+  "sentimentData":     { "positive", "neutral", "negative" },
+  "keyTopics":         ["topic1", "topic2", ...],
+  "insights":          [{ "type": "info|success|warning", "text" }],
+  "wordFrequency":     [{ "word", "count" }],
+  "readabilityScore":  0-100,
+  "complianceStatus":  "Verified|Needs Review|Non-Compliant",
+  "charts": [
+    {
+      "id":            "unique_chart_id",
+      "type":          "bar|line|pie|doughnut|radar|area|horizontalBar",
+      "title":         "Chart title",
+      "description":   "What the chart shows",
+      "data": {
+        "labels":      ["Label1", "Label2"],
+        "datasets": [{
+          "label":           "Dataset label",
+          "data":            [10, 20, 30],
+          "backgroundColor": ["#6366f1", "#8b5cf6"],
+          "borderColor":     "#6366f1"
+        }]
+      }
+    }
+  ]
+}
+
+--- MONGODB CACHE SCHEMA ---
+
+Collection: analysis_results (TTL-based, 24h default)
+  - cacheKey (SHA-256 hash, unique index)
+  - documentId, organizationId, userId, prompt
+  - result (Mixed), model, tokensUsed
+  - expiresAt (TTL index), hitCount, lastHitAt
+
+Collection: analysis_history (permanent)
+  - documentId, organizationId, userId, prompt
+  - resultSummary, model, tokensUsed, cached
+
+--- REVOKE AI ACCESS ---
+
+POST /api/ai-analysis/documents/:id/revoke
+  1. Delete vector from Qdrant
+  2. Invalidate all MongoDB cache entries for document
+  3. Set aiAccessGranted = false in DB
+  4. Audit log: action = 'ai_revoke_access'
+
+================================================================================
+8. SECURITY FEATURES
+================================================================================
+
+8.1 ENCRYPTION
+    - Algorithm: AES-256-GCM (authenticated encryption)
+    - Pattern: Envelope encryption
+      * Master key (Vault Transit or local) encrypts per-document keys
+      * Per-document key encrypts file content
+      * IV (Initialization Vector) unique per encryption
+      * AuthTag stored in .meta.json sidecar
+    - Key material never leaves Vault in production
+
+8.2 MALWARE SCANNING
+    - ClamAV integration via TCP INSTREAM protocol
+    - Scans uploaded files BEFORE encryption
+    - 2KB chunked streaming for memory efficiency
+    - Infected files: secure-wiped immediately
+    - Dev mode: can be disabled (SCANNER_ENABLED=false)
+
+8.3 HONEYTOKENS (Document Leak Detection)
+    - Three injection methods (invisible to reader):
+      1. Zero-Width Characters: Unicode U+200B/C/D/FEFF at 8 positions
+      2. Homoglyph Substitution: Latin->Cyrillic lookalikes at 15 positions
+      3. Whitespace Encoding: trailing space/tab on 20 lines
+    - Payload: documentId, userId, organizationId, timestamp
+    - Combined payload hash for validation
+    - Can trace leaked documents back to source user
+
+8.4 QR CODE VERIFICATION
+    - HMAC-SHA256 signed payload
+    - Contains: documentId, SHA-256 hash, organization, timestamp
+    - 8-character random short code for public verification URL
+    - Timing-safe signature comparison
+    - QR images stored in dedicated MinIO bucket
+
+8.5 DOCUMENT DNA (Hashing)
+    - SHA-256: exact match detection
+    - SimHash (64-bit): similarity detection (Hamming distance <= 10)
+    - SSDEEP: fuzzy hash for near-duplicate detection
+    - Applied to normalized text (7-step normalization)
+
+8.6 SECURE DELETION
+    - Zero-overwrite in 64KB chunks before unlinking
+    - Applied to all temporary files after processing
+    - Recursive directory wiping support
+
+8.7 CRYPTO SHREDDING (GDPR Art 17)
+    - Delete encryption key from Vault Transit
+    - Nullify encryption key reference in database
+    - Delete vector embedding from Qdrant
+    - Delete ciphertext from storage
+    - Mark document as deleted
+    - Full audit trail of shredding operation
+
+8.8 AUTHENTICATION & AUTHORIZATION
+    - JWT-based session management (3-hour idle timeout)
+    - Two-Factor Authentication (TOTP via authenticator app)
+    - Email OTP as alternative 2FA method
+    - hCaptcha integration (configurable)
+    - Role-based access control (6 roles)
+    - Custom role system with resource-level permissions
+    - Folder permission inheritance to subfolders
+    - Admin separate auth system with OTP
+
+8.9 PROMPT INJECTION DETECTION
+    - 15 regex patterns for common injection attempts
+    - Input sanitization for all AI prompts
+    - System prompt protection (never reveal internal instructions)
+        
+8.10 BLOCKCHAIN ANCHORING (Polygon)
+     - Network: Polygon (mainnet chainId 137, Amoy testnet chainId 80002)
+     - Smart Contract: DocLoqAnchor.sol (Solidity 0.8.20+)
+     - Gas-optimized: all data as bytes32/uint (no string storage)
+     - NO PII stored on-chain — only SHA-256 content hashes
+     - Organization IDs pseudonymized via keccak256()
+     - Packed structs (uint32+uint64+bool fit in 1 storage slot)
+     - Batch anchoring via Merkle root (1 transaction for N documents)
+     - Events used for historical data (cheaper than storage)
+     - Access control: owner + authorized anchors mapping
+     - Only admin/owner can manually anchor documents (user consent model)
+     - Auto-anchor-on-edit toggle per document
+     - Only admin/owner can verify document authenticity from blockchain
+     - Backend: ethers.js v6 (JsonRpcProvider + Wallet + Contract)
+     - Graceful degradation: BLOCKCHAIN_ENABLED=false until wallet configured
+
+8.11 PER-DOWNLOAD INVISIBLE WATERMARKING (Leak Identification)
+     - Purpose: Identify WHICH USER leaked a document (not just the uploader)
+     - Separate from honeytokens (8.3): honeytokens identify uploader,
+       download watermarks identify the specific downloader
+     - Every download event creates a unique watermarked copy
+     - Encoding: 4 Unicode invisible characters (U+2060-U+2063)
+       * U+2060 Word Joiner
+       * U+2061 Function Application
+       * U+2062 Invisible Times
+       * U+2063 Invisible Separator
+     - Non-overlapping with honeytoken chars (U+200B/C/D/FEFF)
+     - 2-bit-per-char encoding (same scheme as ZWC honeytokens)
+     - Payload: {watermarkId, documentId, downloaderId, timestamp}
+     - Randomized injection positions via crypto.randomInt()
+       (prevents diff-comparison watermark stripping)
+     - 12 injection points distributed across document text
+     - Format support: TXT (direct), DOCX (XML modification), PDF (invisible text)
+     - Scanner: upload suspected leaked file → extract → decode → DB lookup → identify
+     - Dual-layer detection: scans for both download watermarks AND upload honeytokens
+     - Records stored in downloadWatermarks table with IP, user agent, payload hash
+
+================================================================================
+9. BACKEND SERVICES (23 SERVICES)
+================================================================================
+
+File: backend/src/services/
+
+1.  upload-pipeline.service.js
+    - extractText(buffer, mimeType)
+    - uploadPipeline(file, userId, organizationId, folderId)
+    Main 15-step document processing orchestrator
+
+2.  encryption.service.js
+    - generateDocumentKey()
+    - decryptDocumentKey(encryptedKey)
+    - encryptFile(fileBuffer, plaintextKey, ivBase64)
+    - decryptFile(encryptedBuffer, encryptedKey, ivBase64, authTagBase64)
+    AES-256-GCM envelope encryption with Vault or local master key
+
+3.  storage.service.js
+    - uploadFile(fileBuffer, key, metadata)
+    - downloadFile(key)
+    - deleteFile(key)
+    - getFileUrl(key, expiresIn)
+    - fileExists(key)
+    - saveToTemp(fileBuffer, sessionId, ext)
+    - saveQrCode(qrBuffer, filename)
+    - initStorageDirs()
+    Storage abstraction (local filesystem or MinIO/S3)
+
+4.  minio.service.js
+    - s3Upload(bucket, key, buffer, metadata)
+    - s3Download(bucket, key)
+    - s3Delete(bucket, key)
+    - s3Exists(bucket, key)
+    - s3GetPresignedUrl(bucket, key, expiresIn)
+    - s3MoveToArchive(key)
+    - s3RestoreFromArchive(key)
+    MinIO / AWS S3 storage operations
+
+5.  vault.service.js
+    - initVault()
+    - generateDataKey(keyName)
+    - decryptDataKey(encryptedKey, keyName)
+    - encryptWithTransit(plaintext, keyName)
+    - cryptoShredKey(keyName)
+    - rotateKey(keyName)
+    - createDocumentKey(documentId)
+    - healthCheck()
+    HashiCorp Vault Transit Secrets Engine
+
+6.  scanner.service.js
+    - scanFile(filePath)
+    - scanBuffer(buffer)
+    ClamAV malware scanning via TCP INSTREAM
+
+7.  honeytoken.service.js
+    - injectHoneytokens(textContent, payload)
+    - extractHoneytokens(textContent)
+    - validateHoneytoken(extractedPayload, documentId)
+    3-method honeytoken injection & extraction
+
+8.  qrcode.service.js
+    - generateVerificationQR(documentId, sha256Hash, organizationId)
+    - verifyQRPayload(payload, signature)
+    QR code generation with HMAC-SHA256 signing
+
+9.  hash.service.js
+    - generateSHA256(input)
+    - normalizeText(rawText)
+    - generateSimHash(text)
+    - hammingDistance(a, b)
+    - generateSSDeep(input)
+    - generateDocumentDNA(normalizedText)
+    - checkDuplicate(sha256, ssdeep, simhash)
+    Document DNA: SHA-256, SimHash, SSDEEP
+
+10. secure-wipe.service.js
+    - secureWipe(filePath)
+    - wipeDirectory(dirPath)
+    Secure file deletion with zero-overwrite
+
+11. qdrant.service.js
+    - generateEmbedding(text)
+    - indexDocument(documentId, textContent, organizationId, metadata)
+    - searchDocuments(query, organizationId, limit)
+    - findSimilarDocuments(documentId, organizationId, limit)
+    - deleteDocumentVector(documentId)
+    - isDocumentIndexed(documentId)
+    - healthCheck()
+    Vector database for AI semantic search (OpenAI embeddings)
+
+12. ai-analysis.service.js
+    - getDocumentsForAnalysis(userId, organizationId, userRole, search)
+    - grantAIAccess(documentId, userId, organizationId)
+    - revokeAIAccess(documentId, userId, organizationId)
+    - analyzeDocument(documentId, prompt, userId, organizationId)
+    - getAnalysisHistory(documentId, limit)
+    - getDocumentAIStatus(documentId, organizationId)
+    AI document analysis with GPT-4.1-mini, charts, MongoDB cache
+
+13. ai-cache.service.js
+    - connectMongo()
+    - getCachedResult(documentId, prompt)
+    - setCachedResult(documentId, prompt, result, metadata, ttlHours)
+    - recordAnalysisHistory(documentId, prompt, metadata)
+    - getAnalysisHistory(documentId, limit)
+    - invalidateDocumentCache(documentId)
+    - cacheHealthCheck()
+    MongoDB caching for AI analysis results (24h TTL)
+
+14. chatbot.service.js
+    - detectPromptInjection(message)
+    - sanitizeInput(input)
+    - checkRateLimit(userId)
+    - getDocumentsForUser(userId, userRole, organizationId, search)
+    - getUsersForRole(userRole, organizationId)
+    - getTasksForUser(userId, userRole, organizationId, search, opts)
+    - getOrCreateSession(userId, organizationId)
+    - getSessionHistory(sessionId, limit)
+    - saveMessage(sessionId, role, content, metadata)
+    - processMessage({message, userId, userRole, organizationId, userName})
+    - logChatInteraction(userId, organizationId, intent)
+    - getSuggestionsForRole(userRole)
+    DoKi chatbot: intent classification, LLM integration, security
+
+15. chatbot-knowledge.service.js
+    - DOCLOQ_FEATURES, DOCLOQ_ROLES, DOCLOQ_COMPLIANCE
+    - findRelevantFeature(message)
+    - findFAQMatch(message)
+    - formatFeatureResponse(feature)
+    - formatRolesResponse()
+    Static knowledge base for DoKi chatbot
+
+16. email.service.js
+    - generateOTP()
+    - sendOTPEmail(email, otp, userName)
+    - verifyEmailConnection()
+    Email delivery service (Nodemailer/SMTP)
+
+17. conversion.service.js
+    - createBlankDocx()
+    - convertDocument(fileUrl, fromType, outputType, key)
+    - downloadFromUrl(url)
+    Document conversion via OnlyOffice API
+
+18. archive.service.js
+    - archiveVersion(versionId, userId)
+    - restoreVersion(versionId, userId)
+    - cryptoShred(documentId, userId, options)
+    - archiveOldVersions(olderThanDays, systemUserId)
+    Archive, restore, and crypto shredding (GDPR)
+
+19. docuseal.service.js
+    - createSubmissionFromPDF(pdfBuffer, documentName, signer, options)
+    - createSubmissionFromTemplate(templateId, signer, options)
+    - getSubmission(submissionId)
+    - getSubmissionDocuments(submissionId)
+    - getSubmitter(submitterId)
+    - listSubmitters(submissionId)
+    - createTemplateFromPDF(pdfBuffer, name, options)
+    - listTemplates(options)
+    - getTemplate(templateId)
+    - downloadSignedDocument(url, savePath)
+    DocuSeal e-signature API wrapper
+
+20. download-watermark.service.js  *** NEW ***
+    - injectDownloadWatermark(textContent, payload)
+      Injects invisible U+2060-U+2063 chars into text at random positions
+      Returns: { modifiedText, watermarkToken, positions }
+    - extractDownloadWatermark(textContent)
+      Scans text for invisible sequences, decodes payload
+      Returns: { payload, confidence, positions }
+    - hashPayload(payload)
+      SHA-256 hash for DB storage
+    Per-download invisible watermark injection & extraction
+
+21. document-rewriter.service.js  *** NEW ***
+    - watermarkBuffer(buffer, mimeType, watermarkFn)
+      Format-aware watermark injection into document buffers
+      Strategies:
+        TXT  → direct UTF-8 string manipulation
+        DOCX → JSZip: unzip → modify word/document.xml <w:t> nodes → re-zip
+        PDF  → pdf-lib: invisible text annotation (opacity:0) + metadata keyword
+        XLSX/PPTX → metadata-only (custom XML part in ZIP archive)
+      Returns: { buffer, method, success, watermarkToken, positions }
+
+22. ocr.service.js
+    - OCR text extraction service
+    Optical character recognition for image-based documents
+
+23. blockchain.service.js  *** NEW ***
+    - initBlockchain()
+      Connect to Polygon RPC, load wallet from env, instantiate contract
+    - anchorDocument(documentId, versionId, contentHash, organizationId, versionNumber)
+      Anchor single document hash to Polygon, insert into blockchainAnchors table
+    - updateAnchor(documentId, newContentHash, newVersionNumber)
+      Re-anchor document after edit (for auto-anchor-on-edit feature)
+    - verifyDocument(documentId, contentHash)
+      View call to smart contract (no gas), verify hash matches on-chain record
+    - anchorBatch(docs)
+      Merkle root batch anchoring: 1 transaction for N documents
+      Generates individual merkle proofs per document
+    - getBlockchainStats()
+      Wallet balance, total anchored, pending txs, gas totals from DB
+    - getTransactionHistory(limit, offset)
+      Paginated transaction history from blockchainAnchors table
+    Helpers: toAnchorId(), pseudonymizeOrgId(), hashToBytes32()
+    Merkle tree: computeMerkleRoot(), computeMerkleProof()
+    Background tx confirmation tracking: confirmTransaction()
+
+================================================================================
+10. API ENDPOINTS (95+ ENDPOINTS)
+================================================================================
+
+Base URL: /api
+Server: Express 5 on port 3000
+
+--- AUTHENTICATION (/api/auth) ---
+
+POST   /api/auth/login              Login with email/password
+POST   /api/auth/complete-login     Complete 2FA login flow
+POST   /api/auth/register           Register new user
+POST   /api/auth/refresh-token      Refresh JWT token
+POST   /api/auth/logout             [Auth] Logout user
+GET    /api/auth/me                 [Auth] Get current user info
+POST   /api/auth/heartbeat          [Auth] Keep session alive
+
+--- TWO-FACTOR AUTH (/api/totp) ---
+
+POST   /api/totp/verify-login       Verify TOTP code during login
+POST   /api/totp/send-email-otp     Send OTP via email
+POST   /api/totp/verify-email-otp   Verify email OTP
+GET    /api/totp/status             [Auth] Get TOTP status
+POST   /api/totp/generate           [Auth] Generate TOTP secret
+POST   /api/totp/enable             [Auth] Enable TOTP
+POST   /api/totp/disable            [Auth] Disable TOTP
+
+--- USERS (/api/users) --- [Auth + Admin/Super Admin]
+
+GET    /api/users                   List organization users
+GET    /api/users/:id               Get user by ID
+POST   /api/users                   Create new user
+PUT    /api/users/:id               Update user (full)
+PATCH  /api/users/:id               Update user (partial)
+DELETE /api/users/:id               Delete user
+POST   /api/users/:id/reset-password  Reset user password
+PATCH  /api/users/:id/toggle-status   Toggle user active status
+
+--- DOCUMENTS (/api/documents) ---
+
+GET    /api/documents               List all documents
+GET    /api/documents/verify        Verify document by QR short code
+GET    /api/documents/:id           Get document metadata
+GET    /api/documents/:id/file      Serve document file (OnlyOffice)
+POST   /api/documents/upload        Upload document (full pipeline)
+POST   /api/documents/upload-simple Simple upload (legacy)
+GET    /api/documents/:id/versions  Get version history
+GET    /api/documents/:id/download  Download decrypted document
+GET    /api/documents/:id/download-as  Convert & download (format=pdf|docx|xlsx)
+POST   /api/documents/:id/verify    Verify document signature
+DELETE /api/documents/:id           Delete document (soft delete)
+GET    /api/documents/:id/onlyoffice-config  Get OnlyOffice config
+POST   /api/documents/:id/callback  OnlyOffice save callback
+POST   /api/documents/:id/force-save  Manual trigger document save
+
+--- FOLDERS (/api/folders) ---
+
+GET    /api/folders                 List all folders (flat structure)
+POST   /api/folders                 Create new folder
+POST   /api/folders/move-document   Move document to folder
+POST   /api/folders/move-folder     Move folder to new parent
+GET    /api/folders/:id             Get folder + contents
+PUT    /api/folders/:id             Update folder (rename, color)
+DELETE /api/folders/:id             Soft-delete folder + descendants
+
+--- FORMS (/api/forms) ---
+
+GET    /api/forms/templates                   List form templates
+POST   /api/forms/templates                   Create template (JSON schema)
+POST   /api/forms/templates/create-blank      Create blank DOCX template
+POST   /api/forms/templates/upload-file       Upload file as template
+GET    /api/forms/templates/:id               Get template
+GET    /api/forms/templates/:id/document      Get template doc + OnlyOffice
+PUT    /api/forms/templates/:id               Update template
+DELETE /api/forms/templates/:id               Delete template
+GET    /api/forms/instances                   List form instances
+POST   /api/forms/instances                   Create instance from template
+GET    /api/forms/instances/:id               Get form instance
+PUT    /api/forms/instances/:id               Update instance
+DELETE /api/forms/instances/:id               Delete instance
+PUT    /api/forms/workflow-steps/:id          Update workflow step status
+GET    /api/forms/users                       Get org users (for assignment)
+
+--- TASKS (/api/tasks) --- [Auth Required]
+
+GET    /api/tasks                   List tasks (?status=pending&priority=high)
+POST   /api/tasks                   Create task
+GET    /api/tasks/:id               Get task with comments
+PUT    /api/tasks/:id               Update task
+PUT    /api/tasks/:id/complete      Complete task (sync workflow)
+PUT    /api/tasks/:id/submit        Submit workflow action
+DELETE /api/tasks/:id               Delete task
+POST   /api/tasks/:id/comments      Add comment to task
+GET    /api/tasks/:id/document-config  Get OnlyOffice config for task doc
+
+--- SIGNING (/api/signing) ---
+
+POST   /api/signing/webhook                   DocuSeal webhook (external)
+GET    /api/signing/:signatureId/file         Serve signed PDF
+POST   /api/signing/request                   [Auth] Create signing request
+POST   /api/signing/remove-bg                 [Auth] Remove signature bg
+GET    /api/signing/:taskId/status            [Auth] Get signing status
+POST   /api/signing/:taskId/check             [Auth] Manual poll DocuSeal
+GET    /api/signing/:signatureId/documents    [Auth] Get signed documents
+
+--- AI ANALYSIS (/api/ai-analysis) --- [Auth Required]
+
+GET    /api/ai-analysis/documents             List docs with AI status
+POST   /api/ai-analysis/documents/:id/grant   Grant AI access
+POST   /api/ai-analysis/documents/:id/revoke  Revoke AI access
+POST   /api/ai-analysis/documents/:id/analyze Analyze with AI prompt
+GET    /api/ai-analysis/documents/:id/history Get analysis history
+GET    /api/ai-analysis/documents/:id/status  Check AI access status
+
+--- CHATBOT (/api/chatbot) --- [Auth Required]
+
+POST   /api/chatbot/message         Send message to DoKi
+GET    /api/chatbot/history         Get chat history
+DELETE /api/chatbot/history         Clear chat history
+GET    /api/chatbot/suggestions     Get role-based suggestions
+
+--- DASHBOARD (/api/dashboard) --- [Auth Required]
+
+GET    /api/dashboard/stats         Get user dashboard statistics
+
+--- DEPARTMENTS (/api/departments) --- [Auth Required]
+
+GET    /api/departments             List departments
+GET    /api/departments/:id         [Admin] Get department details
+GET    /api/departments/:id/members [Admin] Get department members
+POST   /api/departments             [Admin] Create department
+PUT    /api/departments/:id         [Admin] Update department
+DELETE /api/departments/:id         [Admin] Delete department
+
+--- ROLES (/api/roles) ---
+
+GET    /api/roles/my-permissions            [Auth] Get my permissions
+GET    /api/roles                           [Admin] List all roles
+GET    /api/roles/:id                       [Admin] Get role details
+POST   /api/roles                           [Admin] Create role
+PUT    /api/roles/:id                       [Admin] Update role
+DELETE /api/roles/:id                       [Admin] Delete role
+POST   /api/roles/:id/assign               [Admin] Assign users to role
+DELETE /api/roles/:id/users/:userId         [Admin] Remove user from role
+GET    /api/roles/user/:userId/permissions  [Admin] Get user permissions
+
+--- TRASH (/api/trash) ---
+
+GET    /api/trash                   List deleted items
+POST   /api/trash/:id/restore       Restore item from trash
+DELETE /api/trash/:id               Permanently delete item
+DELETE /api/trash                   Empty entire trash
+
+--- ADMIN (/api/admin) ---
+
+POST   /api/admin/login             Admin login
+POST   /api/admin/verify-otp        Verify admin OTP
+POST   /api/admin/resend-otp        Resend admin OTP
+POST   /api/admin/logout            [AdminAuth] Logout
+GET    /api/admin/me                [AdminAuth] Get admin info
+GET    /api/admin/dashboard/stats   [AdminAuth] Dashboard statistics
+GET    /api/admin/users             [AdminAuth] All platform users
+GET    /api/admin/organizations     [AdminAuth] All organizations
+GET    /api/admin/payments          [AdminAuth] Payment history
+GET    /api/admin/activity          [AdminAuth] Recent activity
+GET    /api/admin/audit-logs        [AdminAuth] Audit logs
+PATCH  /api/admin/users/:userId/status  [AdminAuth] Update user status
+
+--- WATERMARK SCANNER (/api/watermark-scanner) --- [Auth + Admin/Manager/Auditor]
+
+POST   /api/watermark-scanner/scan                    Scan uploaded file for watermarks
+GET    /api/watermark-scanner/history/:documentId     Get watermark download history
+GET    /api/watermark-scanner/details/:watermarkId    Get specific watermark details
+
+--- NOTIFICATIONS (/api/notifications) --- [Auth Required]
+
+GET    /api/notifications            List user notifications
+PATCH  /api/notifications/:id/read   Mark notification as read
+POST   /api/notifications/read-all   Mark all as read
+
+--- BLOCKCHAIN (/api/blockchain) --- [Auth + Admin/Manager]
+
+POST   /api/blockchain/anchor/:documentId       Anchor document hash to Polygon
+PUT    /api/blockchain/anchor/:documentId       Re-anchor (update after edit)
+POST   /api/blockchain/verify/:documentId       Verify document against on-chain hash
+GET    /api/blockchain/anchor/:documentId       Get anchor info for document
+PATCH  /api/blockchain/auto-anchor/:documentId  Toggle auto-anchor-on-edit
+POST   /api/blockchain/anchor-batch             Batch anchor via Merkle root
+GET    /api/blockchain/stats                    [Admin] Blockchain dashboard stats
+GET    /api/blockchain/transactions             [Admin] Paginated transaction history
+PUT    /api/blockchain/wallet                   [Admin] Wallet config status
+
+--- HEALTH ---
+
+GET    /                            Root health check
+GET    /api/health                  API health check
+
+================================================================================
+11. FRONTEND FEATURES & PAGES
+================================================================================
+
+Framework: React 19 + Vite + TailwindCSS + Framer Motion
+State: Zustand
+Routing: React Router v7
+
+--- PUBLIC PAGES ---
+
+/                  Landing Page
+                   - Hero section with animated text
+                   - Feature showcase cards
+                   - Call-to-action buttons
+                   - AOS scroll animations
+
+/contact           Contact Page
+                   - Contact form (name, email, company, phone, subject)
+                   - Company contact info
+                   - FAQ section
+
+/login             User Login
+                   - Email/password input
+                   - hCaptcha integration
+                   - Remember me checkbox
+                   - Dev bypass (Ctrl+Shift+D)
+
+/verify-otp        OTP Verification
+                   - 6-digit code input with auto-focus
+                   - Authenticator app or Email OTP
+                   - Auto-submit when all digits filled
+                   - Resend with 60s countdown
+
+--- DASHBOARD PAGES (Protected) ---
+
+/dashboard         Main Dashboard
+                   - Stats cards (Documents, Tasks, Folders, Storage,
+                     Upload, Verification, AI Analysis, OSINT)
+                   - Recent activity feed with timestamps
+                   - Search/filter functionality
+
+/documents         Document Management
+                   - File type filtering (PDF, Word, Excel, PPT, Image)
+                   - List/grid view toggle
+                   - Upload documents (drag & drop)
+                   - OnlyOffice integration for preview/edit
+                   - Breadcrumb navigation
+                   - Document actions (view, edit, delete, share)
+
+/folders           Folder Hierarchy
+                   - Tree structure visualization
+                   - Expandable/collapsible nodes
+                   - Folder statistics (depth, count, empty)
+                   - Drag-and-drop support
+                   - Create, rename, delete folders
+
+/tasks             Task Management
+                   - Task types: Sign, Fill, Review, Approve, General
+                   - Priority levels: Urgent, High, Medium, Low
+                   - Status: Pending, In Progress, Completed, Cancelled
+                   - Workflow progress visualization
+                   - OnlyOffice editor for task documents
+                   - SigningPanel for e-signatures
+                   - Filter by status, priority, type
+                   - Comments on tasks
+
+/forms             Forms Management
+                   - Form templates with categories
+                   - Workflow sequence: Fill -> Review -> Approve -> Sign
+                   - OnlyOffice preview
+                   - Create blank, upload, or JSON schema templates
+                   - Form instances with workflow tracking
+
+/verification      Document Verification
+                   - Soft verification (hash-based)
+                   - Hard verification (blockchain)
+                   - QR code scanner
+                   - Results: document name, upload date, TX hash
+
+/ai-analysis       AI Document Analysis
+                   - Document list with AI access status
+                   - Grant/revoke AI access modal
+                   - Prompt input for custom analysis
+                   - Analysis results:
+                     * Summary
+                     * Key metrics (4 cards)
+                     * Sentiment analysis (bar chart)
+                     * Readability score (circular gauge)
+                     * Dynamic charts (Bar, Line, Pie, Doughnut, Radar)
+                     * Key topics (tag cloud)
+                     * Word frequency bars
+                     * Insights (info, success, warning)
+                     * Compliance status badge
+                     * Similar documents (Qdrant)
+                   - Prompt suggestions
+                   - Prompt history
+
+/chatbot           DoKi Chatbot (Full Page)
+                   - Chat interface with message history
+                   - Markdown rendering
+                   - Structured data (documents, users, tasks)
+                   - Typing indicator animation
+                   - Suggestion chips
+
+/settings          User Settings
+                   - Profile tab: edit name, email, phone, department
+                   - 2FA tab: enable/disable TOTP, QR code setup
+                   - Users tab (admin): add, edit, delete users
+                   - Departments tab: CRUD departments
+                   - Logout confirmation
+
+/trash             Trash/Recycle Bin
+                   - Deleted items with timestamps
+                   - Auto-delete countdown (30 days)
+                   - Restore, permanent delete, empty trash
+
+/osint-tracker     OSINT Leak Tracker
+                   - Stats: Tracked Docs, Active Leaks, Honeytokens
+                   - Tabs: Monitor, Leaks, Check Document, Scan Watermark
+                   - Monitored sources: Pastebin, GitHub, Dark Web, Cloud
+                   - *** NEW: Scan Watermark Tab ***
+                     * Drag-and-drop file upload zone
+                     * Scans for per-download watermarks (U+2060-U+2063)
+                     * Scans for upload honeytokens (U+200B-FEFF)
+                     * Results: Leak Source Identified (green card)
+                       - Downloader name, email, download timestamp
+                       - Document name, confidence %, IP address, method
+                     * Fallback: Upload Honeytoken Detected (amber card)
+                     * Not found: No Markers Detected (slate card)
+                     * Download history table for identified document
+                     * "How it works" 4-step info panel
+                   - Leak severity levels
+                   - Honeytoken details
+
+/roles             Role Management (Admin Only)
+                   - Permission matrix for documents/folders
+                   - Levels: No Access, Viewer, Editor, Admin
+                   - Visual color-coded indicators
+                   - Bulk permission assignment
+
+--- ADMIN PAGES ---
+
+/login2            Admin Login
+                   - Email/password + OTP
+                   - Particles animation background
+
+/admin/dashboard   Admin Dashboard
+                   - 3D Globe visualization
+                   - System statistics
+                   - User management overview
+                   - Document storage metrics
+
+/admin/blockchain  Blockchain Settings
+                   - Wallet configuration
+                   - Network: Polygon
+                   - Transaction history
+                   - Blockchain node animations
+
+/admin/ai          AI Management
+                   - AI Playground for testing prompts
+                   - Model selection
+                   - Stream response handling
+                   - Neural network visualization
+
+--- FLOATING WIDGET ---
+
+DoKi Chatbot Widget
+  - Floating FAB button (bottom-right)
+  - Expandable chat interface
+  - Suggestion chips
+  - Markdown + structured data rendering
+
+--- SHARED UI COMPONENTS ---
+
+  Button, Card, Input
+  ContainerScrollAnimation, DisplayCards
+  HeroShutterText, InteractiveRobotSpline
+  RotatingGlobe, ScrollExpandHero
+  ShiningText, SparklesCore, TextGenerateEffect
+  OnlyOfficeEditor, NotFound, AccessDenied
+
+================================================================================
+12. FRONTEND SERVICES & STATE
+================================================================================
+
+File: frontend/src/services/
+
+api.js                 Base Axios client configuration
+auth.service.js        Login, logout, 2FA, token management
+admin.service.js       Admin operations, blockchain, stats
+document.service.js    Document CRUD, upload, download
+folder.service.js      Folder management
+form.service.js        Form template + instance operations
+task.service.js        Task CRUD, comments, workflow
+trash.service.js       Trash/recycle bin operations
+totp.service.js        TOTP/2FA operations
+user.service.js        User profile and data
+chatbot.service.js     DoKi chatbot interactions
+dashboard.service.js   Dashboard data fetching
+role.service.js        Role and permission management
+signing.service.js     Document signing operations
+department.service.js  Department management
+ai-analysis.service.js AI analysis features
+notification.service.js Notification management
+watermark-scanner.service.js  *** NEW *** Watermark leak detection scanner
+blockchain.service.js  *** NEW *** Document blockchain anchoring & verification
+
+State Management: Zustand
+  - auth.store.js      User, token, 2FA status, login state
+
+Providers:
+  - AuthProvider.jsx   Authentication context
+  - ThemeProvider.jsx   Light/dark theme
+
+Custom Hooks:
+  - useDebounce.js     Debounce for search inputs
+  - useIdleTimeout.js  Session idle timeout
+
+Route Guards:
+  - RequirePermission  Role-based access control wrapper
+
+================================================================================
+13. AUTHENTICATION & AUTHORIZATION
+================================================================================
+
+--- AUTHENTICATION FLOW ---
+
+1. User submits email + password (+ hCaptcha if enabled)
+2. Server verifies credentials
+3. If 2FA enabled:
+   a. Return { requires2FA: true, userId }
+   b. User enters TOTP code (authenticator) or email OTP
+   c. Server verifies code
+4. JWT token issued (stored in cookie + localStorage)
+5. Session created in userSessions table
+6. 3-hour idle timeout enforced
+
+--- MIDDLEWARE ---
+
+authenticate         Verify JWT, enforce idle timeout, attach req.user
+authorize(roles)     Role-based access (e.g., ['admin', 'super_admin'])
+optionalAuth         Allow unauthenticated access, attach user if valid
+authenticateAdmin    Verify admin JWT + admin session
+requireSuperAdmin    Enforce super_admin role
+
+--- PERMISSION SYSTEM ---
+
+getUserPermissionLevel(userId, resourceType, resourceId, organizationId)
+  -> Returns: 'none' | 'viewer' | 'editor' | 'admin'
+
+Permission cascade:
+  - Super admin/admin: full access always
+  - Custom roles: resource-level permissions
+  - Folder permissions: inherit to subfolders + contained documents
+  - Document permissions: direct assignment
+
+requireDocumentPermission(minLevel)  Enforce on document routes
+requireFolderPermission(minLevel)    Enforce on folder routes
+
+--- ROLES ---
+
+Built-in roles: super_admin, admin, manager, user, auditor, viewer
+Custom roles: organization-level, with per-resource permissions
+
+================================================================================
+14. DEPENDENCIES
+================================================================================
+
+--- BACKEND (package.json) ---
+
+Runtime:
+  express               ^5.2.1      Web framework
+  cors                  ^2.8.6      Cross-origin resource sharing
+  helmet                ^8.1.0      Security headers
+  cookie-parser         ^1.4.7      Cookie parsing
+  dotenv                ^17.2.3     Environment variables
+  jsonwebtoken          ^9.0.3      JWT authentication
+  bcryptjs              ^3.0.3      Password hashing
+  multer                ^2.0.2      File upload handling
+  uuid                  ^13.0.0     UUID generation
+  drizzle-orm           ^0.44.2     TypeScript ORM
+  pg                    ^8.17.2     PostgreSQL driver
+  mongoose              ^9.3.0      MongoDB ODM
+  @aws-sdk/client-s3    ^3.1009.0   S3/MinIO storage
+  @aws-sdk/s3-request-presigner ^3.1009.0  Presigned URLs
+  @qdrant/js-client-rest ^1.17.0    Vector database client
+  openai                ^6.27.0     OpenAI API (GPT, embeddings)
+  node-vault            ^0.11.1     HashiCorp Vault client
+  nodemailer            ^7.0.13     Email sending
+  pdf-parse             ^2.2.2      PDF text extraction
+  qrcode                ^1.5.4      QR code generation
+  sharp                 ^0.34.5     Image processing
+  file-type             ^20.5.0     MIME type detection
+  otplib                ^13.1.1     TOTP 2FA library
+  archiver              ^7.0.1      ZIP archive creation
+  jszip                 ^3.10.1     DOCX (ZIP) manipulation for watermark injection
+  pdf-lib               ^1.17.1     PDF modification for invisible watermark text
+  ethers                ^6.x        Ethereum/Polygon blockchain interaction (smart contracts)
+
+Dev:
+  drizzle-kit           ^0.30.5     Schema migrations
+
+--- FRONTEND (package.json) ---
+
+Runtime:
+  react                 ^19.2.0     UI framework
+  react-dom             ^19.2.0     React DOM
+  react-router-dom      ^7.11.0     Client-side routing
+  axios                 ^1.13.2     HTTP client
+  zustand               ^5.0.10     State management
+  framer-motion         ^12.23.26   Animations
+  chart.js              ^4.5.1      Chart rendering
+  react-chartjs-2       ^5.3.1      React Chart.js wrapper
+  @docuseal/react       ^1.0.71     E-signature UI
+  @hcaptcha/react-hcaptcha ^2.0.2   CAPTCHA
+  @dnd-kit/core         ^6.3.1      Drag and drop
+  @dnd-kit/sortable     ^10.0.0     Sortable DnD
+  @react-three/drei     ^10.7.7     3D helpers
+  @react-three/fiber    ^9.5.0      React Three.js
+  @splinetool/react-spline ^4.1.0   3D design tool
+  @tsparticles/react    ^3.0.0      Particle effects
+  three                 ^0.182.0    3D rendering
+  cobe                  ^0.6.5      Interactive globe
+  d3                    ^7.9.0      Data visualization
+  pdfjs-dist            ^5.5.207    PDF rendering
+  aos                   ^2.3.4      Scroll animations
+
+Dev:
+  vite                  ^7.2.4      Build tool
+  tailwindcss           ^4.1.18     CSS framework
+  @tailwindcss/vite     ^4.1.18     Vite plugin
+
+================================================================================
+15. INVISIBLE DOWNLOAD WATERMARKING (LEAK IDENTIFICATION)
+================================================================================
+
+--- PROBLEM ---
+
+DocLoq already has upload-time honeytokens (Section 8.3) that encode the
+UPLOADER's identity into every document. However, when 5 users download the
+same document, they all receive identical copies. If a document leaks, the
+honeytoken can only identify who uploaded it — not who leaked it.
+
+--- SOLUTION ---
+
+Per-download invisible watermarking injects a UNIQUE watermark into every
+downloaded copy, encoding the DOWNLOADER's identity. Each download event
+produces a distinctly watermarked file. A scanner tool allows admins to
+upload a suspected leaked document and identify the specific leaker.
+
+--- ARCHITECTURE ---
+
+    UPLOAD TIME (existing):              DOWNLOAD TIME (new):
+    honeytoken.service.js                download-watermark.service.js
+    Chars: U+200B, U+200C, U+200D, FEFF Chars: U+2060, U+2061, U+2062, U+2063
+    Payload: {uploader}                  Payload: {downloader, watermarkId}
+    Same for all copies                  Unique per download event
+    Stored: documentHoneytokens table    Stored: downloadWatermarks table
+
+--- ENCODING SCHEME ---
+
+Characters (2-bit encoding, same approach as ZWC honeytokens):
+  00 → U+2060 (Word Joiner)
+  01 → U+2061 (Function Application)
+  10 → U+2062 (Invisible Times)
+  11 → U+2063 (Invisible Separator)
+
+These characters are:
+  - Invisible in all document viewers (Word, PDF readers, browsers)
+  - Non-overlapping with existing honeytoken characters
+  - Preserved through copy-paste operations
+  - Part of the Unicode standard (General Punctuation block)
+
+Payload format: JSON → 8 bits per character → 2-bit pairs → invisible chars
+  { "w": "watermarkId-uuid", "d": "docId", "u": "userId", "t": "ISO-timestamp" }
+
+--- INJECTION PROCESS ---
+
+1. Generate watermarkId (UUID) for this download event
+2. Build payload: {w, d, u, t}
+3. Encode payload → bits → invisible character string
+4. Split into 12 chunks (configurable positionCount)
+5. Generate random insertion positions via crypto.randomInt()
+   (truly random — makes diff-comparison stripping impractical)
+6. Insert chunks at positions throughout document text
+7. Rewrite document buffer with watermarked text:
+   - TXT: direct string replacement, re-encode UTF-8
+   - DOCX: unzip → modify word/document.xml → inject into first <w:t>
+           element with xml:space="preserve" → re-zip
+   - PDF: pdf-lib drawText(invisible, x:0, y:0, size:1, opacity:0)
+          on first page + embed in PDF keywords metadata
+   - XLSX/PPTX: inject via custom XML part in ZIP archive
+8. Store watermark record in downloadWatermarks table (fire-and-forget)
+9. Include watermarkId in audit log
+10. Stream watermarked buffer to user
+
+--- EXTRACTION / SCANNING PROCESS ---
+
+1. Admin uploads suspected leaked document to scanner
+2. Extract text from document (same extractText() as upload pipeline)
+3. Scan for download watermarks: regex /[\u2060-\u2063]+/g
+4. Scan for upload honeytokens: regex /[\u200B\u200C\u200D\uFEFF]+/g
+5. Decode invisible chars → bits → JSON → payload
+6. Validate payload structure (watermarkId, docId, userId, timestamp)
+7. Calculate confidence score (0-1) based on payload completeness
+8. DB lookup: watermarkId → downloadWatermarks → JOIN users
+9. Return results:
+   - Download watermark found: downloader name, email, timestamp, IP, confidence
+   - Upload honeytoken found: uploader name, method, confidence
+   - Nothing found: "document may have been sanitized or is not from this system"
+
+--- FILES ---
+
+Backend:
+  backend/src/services/download-watermark.service.js   Inject/extract watermarks
+  backend/src/services/document-rewriter.service.js    Format-specific buffer rewriting
+  backend/src/controllers/watermark-scanner.controller.js  Scanner API endpoints
+  backend/src/routes/watermark-scanner.routes.js       Route definitions
+  backend/src/config/upload.config.js                  downloadWatermark config section
+  backend/src/db/schema.js                             downloadWatermarks table
+
+Frontend:
+  frontend/src/services/watermark-scanner.service.js   API client
+  frontend/src/features/osint-tracker/OSINTTracker.jsx Scan Watermark tab
+
+--- API ENDPOINTS ---
+
+POST   /api/watermark-scanner/scan                    [Admin+] Upload & scan file
+GET    /api/watermark-scanner/history/:documentId     [Admin+] Download history
+GET    /api/watermark-scanner/details/:watermarkId    [Admin+] Watermark record details
+
+--- CONFIGURATION ---
+
+Environment variables:
+  DOWNLOAD_WATERMARK_ENABLED=true|false  (default: true)
+
+Config (upload.config.js → downloadWatermark):
+  enabled: true                          Toggle watermarking on/off
+  chars: [U+2060, U+2061, U+2062, U+2063]  Invisible encoding characters
+  positionCount: 12                      Number of injection points
+  supportedCategories: [pdf, office, text]  File types to watermark
+
+--- ANTI-STRIPPING MEASURES ---
+
+1. Randomized positions: Each download uses crypto.randomInt() for positions,
+   so comparing two copies doesn't reveal a consistent pattern to strip.
+2. Dual layer: Upload honeytokens (3 methods) survive independently of
+   download watermarks — stripping one layer still leaves the other.
+3. Multiple injection points (12 by default): Partial text extraction or
+   truncation still captures enough watermark fragments to decode.
+4. Different encoding per format: PDF uses text annotation + metadata,
+   DOCX uses XML text nodes — format conversion may preserve at least one.
+
+--- PERFORMANCE ---
+
+Estimated overhead per download:
+  - Text extraction: ~100ms
+  - Watermark injection: ~5ms
+  - DOCX re-zip: ~100ms / PDF modification: ~150ms
+  - DB insert (fire-and-forget): ~10ms
+  Total: ~200-350ms (within 500ms budget)
+
+================================================================================
+16. BLOCKCHAIN DOCUMENT ANCHORING (POLYGON)
+================================================================================
+
+Purpose: Provide immutable proof of document authenticity and integrity
+by anchoring document hashes to the Polygon blockchain.
+
+--- SMART CONTRACT ---
+
+File: backend/contracts/DocLoqAnchor.sol
+ABI:  backend/contracts/DocLoqAnchor.json
+
+Contract: DocLoqAnchor (Solidity 0.8.20+)
+
+Storage (gas-optimized — all bytes32/uint, no strings):
+  - mapping(bytes32 => DocumentAnchor) anchors
+    * documentHash (bytes32)    SHA-256 hash of document content
+    * pseudoOrgId  (bytes32)    keccak256 of organization UUID
+    * versionNumber (uint32)    Document version at time of anchoring
+    * timestamp     (uint64)    Block timestamp
+    * exists        (bool)      Existence flag
+  - mapping(bytes32 => MerkleAnchor) merkleAnchors
+    * merkleRoot    (bytes32)   Root hash of batch
+    * documentCount (uint32)    Number of documents in batch
+    * timestamp     (uint64)    Block timestamp
+    * exists        (bool)      Existence flag
+
+Access Control:
+  - owner: deployer address
+  - mapping(address => bool) authorizedAnchors
+  - onlyOwner: for authorize/revoke functions
+  - onlyAuthorized: for anchoring operations
+
+Functions:
+  authorizeAnchor(address)    Owner adds backend wallet as authorized
+  revokeAnchor(address)       Owner removes authorization
+  anchorDocument(bytes32 anchorId, bytes32 docHash, bytes32 pseudoOrgId, uint32 version)
+  updateAnchor(bytes32 anchorId, bytes32 newHash, uint32 newVersion)
+  anchorBatch(bytes32 merkleRoot, uint32 docCount)
+  verifyDocument(bytes32 anchorId, bytes32 docHash) view → (bool, uint64)
+  verifyBatch(bytes32 merkleRoot) view → (bool, uint64, uint32)
+  getAnchor(bytes32 anchorId) view → full anchor data
+  transferOwnership(address newOwner)
+
+Events:
+  DocumentAnchored(bytes32 indexed anchorId, bytes32 docHash, uint64 timestamp)
+  AnchorUpdated(bytes32 indexed anchorId, bytes32 newHash, uint32 newVersion)
+  BatchAnchored(bytes32 indexed merkleRoot, uint32 docCount, uint64 timestamp)
+  AnchorAuthorized(address indexed account)
+  AnchorRevoked(address indexed account)
+  OwnershipTransferred(address indexed prev, address indexed next)
+
+Gas Optimizations:
+  1. All data stored as bytes32/uint (no string storage)
+  2. Packed struct: uint32 + uint64 + bool fit in single 32-byte slot
+  3. Batch anchoring via Merkle root (1 tx for N documents)
+  4. Events for historical data (cheaper than on-chain storage)
+  5. View functions for verification (zero gas cost)
+
+Data Protection (GDPR/Privacy):
+  - NO PII stored on-chain (no names, emails, filenames)
+  - Organization IDs pseudonymized: keccak256(orgUUID)
+  - Only document content hashes stored (SHA-256, irreversible)
+  - All identifiable data stays in PostgreSQL
+  - Document-to-anchor mapping only in off-chain database
+
+--- ANCHORING FLOW ---
+
+  1. Admin clicks "Anchor to Polygon" on document detail modal
+  2. Backend validates: document exists, has contentHash, user has admin role
+  3. Generate anchorId = keccak256(documentId)
+  4. Pseudonymize orgId = keccak256(organizationId)
+  5. Call contract.anchorDocument(anchorId, hash, pseudoOrgId, version)
+  6. Wait for transaction confirmation (configurable, default 1)
+  7. Insert record into blockchainAnchors table
+  8. Update documents.blockchainAnchored = true
+  9. Return { txHash, blockNumber, gasUsed } to frontend
+
+--- VERIFICATION FLOW ---
+
+  1. Admin clicks "Verify Integrity" on anchored document
+  2. Backend generates anchorId from documentId
+  3. Call contract.verifyDocument(anchorId, currentContentHash) — view (no gas)
+  4. Return { verified: bool, onChainHash, timestamp }
+  5. Frontend shows green (match) or amber (mismatch) result
+
+--- AUTO-ANCHOR ON EDIT ---
+
+  1. Admin toggles "Auto-anchor on edit" switch in document modal
+  2. Sets documents.autoAnchorOnEdit = true in database
+  3. When document is saved via OnlyOffice callback:
+     a. Upload pipeline processes new content
+     b. If autoAnchorOnEdit=true AND BLOCKCHAIN_ENABLED=true:
+        - Fire-and-forget call to blockchain.updateAnchor()
+        - Re-anchors with new content hash and version number
+  4. Keeps on-chain record synchronized with document edits
+
+--- BATCH ANCHORING ---
+
+  1. Admin selects multiple documents and uses "Batch Anchor"
+  2. Backend builds Merkle tree from document content hashes
+  3. Single transaction: contract.anchorBatch(merkleRoot, docCount)
+  4. Individual Merkle proofs stored per document in blockchainAnchors
+  5. Verification: reconstruct proof path to verify leaf against root
+  6. Massive gas savings: 1 tx for 100+ documents
+
+--- CONFIGURATION ---
+
+Environment Variables:
+  POLYGON_RPC_URL=https://polygon-rpc.com    (or Amoy testnet RPC)
+  POLYGON_PRIVATE_KEY=                        (wallet private key)
+  POLYGON_CONTRACT_ADDRESS=                   (deployed contract address)
+  POLYGON_CHAIN_ID=137                        (137=mainnet, 80002=Amoy)
+  BLOCKCHAIN_ENABLED=false                    (default off until configured)
+
+Config: backend/src/config/upload.config.js → blockchain section
+  enabled, rpcUrl, chainId, privateKey, contractAddress
+  confirmations (default 1), gasLimits: { anchor: 100000, batch: 500000 }
+
+--- FILES ---
+
+New:
+  backend/contracts/DocLoqAnchor.sol           Solidity smart contract
+  backend/contracts/DocLoqAnchor.json          Contract ABI for ethers.js
+  backend/src/services/blockchain.service.js   Blockchain interaction layer
+  backend/src/controllers/blockchain.controller.js  API endpoints
+  backend/src/routes/blockchain.routes.js      Route definitions
+  frontend/src/services/blockchain.service.js  Frontend API client
+
+Modified:
+  backend/src/db/schema.js                    + blockchainAnchored, blockchainAnchorId,
+                                                autoAnchorOnEdit on documents table
+  backend/src/config/upload.config.js          + blockchain config section
+  backend/src/routes/index.js                  + /blockchain routes
+  backend/src/index.js                         + initBlockchain() at startup
+  backend/src/controllers/document.controller.js  + auto-anchor hook in save callback
+  frontend/src/services/admin.service.js       Updated blockchain API URLs
+  frontend/src/features/documents/Documents.jsx  + blockchain anchor UI in detail modal
+
+--- FRONTEND UI ---
+
+Document Detail Modal (Documents.jsx):
+  - "Blockchain Anchoring" expandable section (admin/manager only)
+  - Shows anchor status, txHash, block number, network, gas used
+  - "Anchor to Polygon" button (for unanchored documents)
+  - "Verify Integrity" button (for anchored documents)
+  - "Re-anchor" button (for manual re-anchoring)
+  - "Auto-anchor on edit" toggle switch
+  - Result messages: green (verified), amber (mismatch), red (error)
+  - Blockchain badge indicator in grid and list views for anchored docs
+
+Admin BlockchainSettings Page (existing):
+  - Blockchain statistics overview (total anchored, pending, gas used)
+  - Transaction history table with pagination
+  - Wallet configuration panel
+  - Network settings (Polygon mainnet/Amoy testnet)
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================
+
+Document generated for DocLoq Document Management System
+Cybersecurity Capstone Project
