@@ -51,12 +51,12 @@ export const uploadConfig = {
   thumbnailsDir: path.join(process.env.STORAGE_LOCAL_PATH || path.join(process.cwd(), 'storage'), 'thumbnails'),
 
   // === Storage Provider ===
-  storageProvider: process.env.STORAGE_PROVIDER || 'local', // local | minio
+  storageProvider: process.env.STORAGE_PROVIDER || 'local', // local | minio | r2
 
-  // === S3 / MinIO Settings ===
+  // === S3 / R2 / MinIO Settings ===
   s3: {
     endpoint: process.env.S3_ENDPOINT || 'http://localhost:9000',
-    region: process.env.S3_REGION || 'us-east-1',
+    region: process.env.S3_REGION || 'auto',
     accessKey: process.env.S3_ACCESS_KEY || '',
     secretKey: process.env.S3_SECRET_KEY || '',
     documentsBucket: process.env.S3_DOCUMENTS_BUCKET || 'docloq-documents',

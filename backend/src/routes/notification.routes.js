@@ -2,6 +2,7 @@
 
 import { Router } from 'express';
 import { authenticate } from '../middlewares/auth.middleware.js';
+import { validateUUID } from '../middlewares/validate.middleware.js';
 import { list, unreadCount, read, readAll, remove } from '../controllers/notification.controller.js';
 
 const router = Router();
@@ -18,9 +19,9 @@ router.get('/unread-count', unreadCount);
 router.patch('/read-all', readAll);
 
 // Mark single as read
-router.patch('/:id/read', read);
+router.patch('/:id/read', validateUUID('id'), read);
 
 // Delete notification
-router.delete('/:id', remove);
+router.delete('/:id', validateUUID('id'), remove);
 
 export default router;

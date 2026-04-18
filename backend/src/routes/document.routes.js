@@ -20,6 +20,7 @@ import {
   verifyByShortCode,
 } from '../controllers/document.controller.js';
 import { optionalAuth, authenticate } from '../middlewares/auth.middleware.js';
+import { validateUUID } from '../middlewares/validate.middleware.js';
 
 const router = Router();
 
@@ -68,21 +69,21 @@ const upload = multer({
 // === Public / optional-auth routes ===
 router.get('/', optionalAuth, getAllDocuments);
 router.get('/verify', verifyByShortCode);              // Public QR code verification by short code
-router.get('/:id', optionalAuth, getDocument);
-router.get('/:id/file', optionalAuth, serveDocument);   // Auth via user JWT or OnlyOffice signed token
+router.get('/:id', optionalAuth, validateUUID('id'), getDocument);
+router.get('/:id/file', optionalAuth, validateUUID('id'), serveDocument);   // Auth via user JWT or OnlyOffice signed token
 
 // === Authenticated routes ===
-router.post('/upload', optionalAuth, upload.single('file'), uploadDocument);                  // Full pipeline
-router.post('/upload-simple', optionalAuth, upload.single('file'), uploadDocumentSimple);     // Legacy simple upload
-router.get('/:id/versions', optionalAuth, getDocumentVersions);
-router.get('/:id/download', optionalAuth, downloadDocumentDecrypted);                         // Decrypt + download
-router.get('/:id/download-as', optionalAuth, downloadDocumentConverted);                       // Convert + download (format=pdf|docx|xlsx|png|jpg)
-router.post('/:id/verify', optionalAuth, upload.single('file'), verifyDocument);              // Verify document
-router.delete('/:id', optionalAuth, deleteDocument);
+router.post('/upload', authenticate, upload.single('file'), uploadDocument);                  // Full pipeline — auth required
+router.post('/upload-simple', authenticate, upload.single('file'), uploadDocumentSimple);     // Legacy simple upload — auth required
+router.get('/:id/versions', optionalAuth, validateUUID('id'), getDocumentVersions);
+router.get('/:id/download', optionalAuth, validateUUID('id'), downloadDocumentDecrypted);                         // Decrypt + download
+router.get('/:id/download-as', optionalAuth, validateUUID('id'), downloadDocumentConverted);                       // Convert + download (format=pdf|docx|xlsx|png|jpg)
+router.post('/:id/verify', optionalAuth, validateUUID('id'), upload.single('file'), verifyDocument);              // Verify document
+router.delete('/:id', authenticate, validateUUID('id'), deleteDocument);
 
 // === OnlyOffice specific routes ===
-router.get('/:id/onlyoffice-config', optionalAuth, getOnlyOfficeConfig);
-router.post('/:id/callback', onlyOfficeCallback);      // Auth via OnlyOffice signed token (oo_token query param)
-router.post('/:id/force-save', optionalAuth, forceSaveDocument);  // Manual save trigger
+router.get('/:id/onlyoffice-config', optionalAuth, validateUUID('id'), getOnlyOfficeConfig);
+router.post('/:id/callback', validateUUID('id'), onlyOfficeCallback);      // Auth via OnlyOffice signed token (oo_token query param)
+router.post('/:id/force-save', optionalAuth, validateUUID('id'), forceSaveDocument);  // Manual save trigger
 
 export default router;

@@ -81,8 +81,8 @@ export const authenticate = async (req, res, next) => {
       .then(() => {})
       .catch(() => {});
 
-    // Attach user info to request
-    req.user = decoded;
+    // Attach user info to request — normalise id/userId so controllers can use either
+    req.user = { ...decoded, id: decoded.userId };
     req.sessionId = session.id;
 
     next();
@@ -131,7 +131,7 @@ export const optionalAuth = async (req, res, next) => {
 
     try {
       const decoded = jwt.verify(token, authConfig.jwt.secret);
-      req.user = decoded;
+      req.user = { ...decoded, id: decoded.userId };
     } catch (err) {
       // Token invalid, continue without user
     }

@@ -1,0 +1,11 @@
+node_modules
+.env
+.env.*
+storage/
+*.md
+contracts/
+test-*.js
+.git
+.gitignore
+docker-compose*.yml
+vault/

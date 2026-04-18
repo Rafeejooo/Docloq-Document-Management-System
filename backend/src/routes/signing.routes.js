@@ -11,12 +11,13 @@ import {
   removeSignatureBackground,
 } from '../controllers/signing.controller.js';
 import { authenticate } from '../middlewares/auth.middleware.js';
+import { validateUUID } from '../middlewares/validate.middleware.js';
 
 const router = Router();
 
 // ── Public routes (no auth — called by external services) ──
 router.post('/webhook', handleWebhook);
-router.get('/:signatureId/file', serveSignedDocumentFile); // OnlyOffice calls this to load signed PDFs
+router.get('/:signatureId/file', validateUUID('signatureId'), serveSignedDocumentFile); // OnlyOffice calls this to load signed PDFs
 
 // ── All other routes require authentication ──
 router.use(authenticate);
@@ -29,8 +30,8 @@ router.use(authenticate);
 
 router.post('/request', createSigningRequest);
 router.post('/remove-bg', removeSignatureBackground);
-router.get('/:taskId/status', getSigningStatus);
-router.post('/:taskId/check', manualCheckStatus);
-router.get('/:signatureId/documents', getSignedDocuments);
+router.get('/:taskId/status', validateUUID('taskId'), getSigningStatus);
+router.post('/:taskId/check', validateUUID('taskId'), manualCheckStatus);
+router.get('/:signatureId/documents', validateUUID('signatureId'), getSignedDocuments);
 
 export default router;

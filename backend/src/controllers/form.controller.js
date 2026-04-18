@@ -27,16 +27,10 @@ const ensureUploadDir = async () => {
 };
 
 // ──────────────────────────────────────────────
-// Helper: resolve orgId (dev fallback)
+// Helper: resolve orgId from authenticated request
 // ──────────────────────────────────────────────
-async function resolveOrgId(req) {
-  let orgId = req.user?.organizationId;
-  if (!orgId) {
-    const { organizations } = await import('../db/schema.js');
-    const [firstOrg] = await db.select().from(organizations).limit(1);
-    if (firstOrg) orgId = firstOrg.id;
-  }
-  return orgId;
+function resolveOrgId(req) {
+  return req.user?.organizationId || null;
 }
 
 // ══════════════════════════════════════════════

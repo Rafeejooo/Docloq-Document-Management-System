@@ -281,14 +281,7 @@ export const updateWalletHandler = async (req, res) => {
     return res.json({
       success: true,
       data: {
-        message: 'Wallet configuration is managed via environment variables. Update POLYGON_PRIVATE_KEY, POLYGON_RPC_URL, and POLYGON_CONTRACT_ADDRESS in your .env file.',
-        currentStatus: {
-          enabled: isReady(),
-          chainId: uploadConfig.blockchain.chainId,
-          network: uploadConfig.blockchain.chainId === 137 ? 'Polygon Mainnet' : 'Polygon Amoy Testnet',
-          rpcUrl: uploadConfig.blockchain.rpcUrl,
-          contractAddress: uploadConfig.blockchain.contractAddress || 'Not configured',
-        },
+        message: 'Wallet configuration is managed via environment variables.',
       },
     });
   } catch (error) {

@@ -10,8 +10,13 @@ import {
   moveDocumentToFolder,
   moveFolder,
 } from '../controllers/folder.controller.js';
+import { authenticate } from '../middlewares/auth.middleware.js';
+import { validateUUID } from '../middlewares/validate.middleware.js';
 
 const router = Router();
+
+// All folder routes require authentication
+router.use(authenticate);
 
 // GET    /api/folders              — all folders (flat, frontend builds tree)
 // POST   /api/folders              — create folder
@@ -25,8 +30,8 @@ router.get('/', getAllFolders);
 router.post('/', createFolder);
 router.post('/move-document', moveDocumentToFolder);
 router.post('/move-folder', moveFolder);
-router.get('/:id', getFolder);
-router.put('/:id', updateFolder);
-router.delete('/:id', deleteFolder);
+router.get('/:id', validateUUID('id'), getFolder);
+router.put('/:id', validateUUID('id'), updateFolder);
+router.delete('/:id', validateUUID('id'), deleteFolder);
 
 export default router;

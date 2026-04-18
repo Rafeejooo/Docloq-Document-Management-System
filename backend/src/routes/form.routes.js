@@ -19,8 +19,13 @@ import {
   updateWorkflowStep,
   getOrgUsers,
 } from '../controllers/form.controller.js';
+import { authenticate } from '../middlewares/auth.middleware.js';
+import { validateUUID } from '../middlewares/validate.middleware.js';
 
 const router = Router();
+
+// All form routes require authentication
+router.use(authenticate);
 
 // Multer config for template file uploads
 const upload = multer({
@@ -53,10 +58,10 @@ router.get('/templates', getFormTemplates);
 router.post('/templates', createFormTemplate);
 router.post('/templates/create-blank', createBlankTemplate);
 router.post('/templates/upload-file', upload.single('file'), uploadExistingTemplate);
-router.get('/templates/:id', getFormTemplate);
-router.get('/templates/:id/document', getTemplateDocument);
-router.put('/templates/:id', updateFormTemplate);
-router.delete('/templates/:id', deleteFormTemplate);
+router.get('/templates/:id', validateUUID('id'), getFormTemplate);
+router.get('/templates/:id/document', validateUUID('id'), getTemplateDocument);
+router.put('/templates/:id', validateUUID('id'), updateFormTemplate);
+router.delete('/templates/:id', validateUUID('id'), deleteFormTemplate);
 
 // ── Form Instances (created from templates) ───
 // GET    /api/forms/instances          — list instances
@@ -67,14 +72,14 @@ router.delete('/templates/:id', deleteFormTemplate);
 
 router.get('/instances', getFormInstances);
 router.post('/instances', createFormInstance);
-router.get('/instances/:id', getFormInstance);
-router.put('/instances/:id', updateFormInstance);
-router.delete('/instances/:id', deleteFormInstance);
+router.get('/instances/:id', validateUUID('id'), getFormInstance);
+router.put('/instances/:id', validateUUID('id'), updateFormInstance);
+router.delete('/instances/:id', validateUUID('id'), deleteFormInstance);
 
 // ── Workflow Steps ────────────────────────────
 // PUT    /api/forms/workflow-steps/:id — update step status
 
-router.put('/workflow-steps/:id', updateWorkflowStep);
+router.put('/workflow-steps/:id', validateUUID('id'), updateWorkflowStep);
 
 // ── Users (for assignment dropdowns) ──────────
 // GET    /api/forms/users              — org users list

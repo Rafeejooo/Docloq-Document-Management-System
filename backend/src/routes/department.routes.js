@@ -10,6 +10,7 @@ import {
   deleteDepartment,
 } from '../controllers/department.controller.js';
 import { authenticate, authorize } from '../middlewares/auth.middleware.js';
+import { validateUUID } from '../middlewares/validate.middleware.js';
 
 const router = Router();
 
@@ -19,10 +20,10 @@ router.use(authenticate);
 router.get('/', getDepartments);
 
 // Admin-only CRUD
-router.get('/:id', authorize(['admin', 'super_admin']), getDepartmentById);
-router.get('/:id/members', authorize(['admin', 'super_admin']), getDepartmentMembers);
+router.get('/:id', authorize(['admin', 'super_admin']), validateUUID('id'), getDepartmentById);
+router.get('/:id/members', authorize(['admin', 'super_admin']), validateUUID('id'), getDepartmentMembers);
 router.post('/', authorize(['admin', 'super_admin']), createDepartment);
-router.put('/:id', authorize(['admin', 'super_admin']), updateDepartment);
-router.delete('/:id', authorize(['admin', 'super_admin']), deleteDepartment);
+router.put('/:id', authorize(['admin', 'super_admin']), validateUUID('id'), updateDepartment);
+router.delete('/:id', authorize(['admin', 'super_admin']), validateUUID('id'), deleteDepartment);
 
 export default router;

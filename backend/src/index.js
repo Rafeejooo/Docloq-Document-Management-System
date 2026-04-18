@@ -4,7 +4,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import rateLimit from 'express-rate-limit';
+import { RateLimiterRedis, RateLimiterMemory } from 'rate-limiter-flexible';
+import Redis from 'ioredis';
 import path from 'path';
 import 'dotenv/config';
 
@@ -14,6 +15,11 @@ import { initBlockchain } from './services/blockchain.service.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Trust proxy when behind Cloudflare / reverse proxy (needed for correct req.ip in rate limiter)
+if (process.env.TRUST_PROXY === 'true' || process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 
 // CORS Configuration
 const allowedOrigins = [
@@ -50,23 +56,45 @@ app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Global rate limiting — 200 requests per 15-minute window per IP
-app.use(rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 200,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, message: 'Too many requests, please try again later' },
-}));
+// ── Rate Limiters: Redis-backed (fallback to in-memory if Redis unreachable) ──
+let rateLimiterStore;
+try {
+  const redisClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+    enableOfflineQueue: false,
+    maxRetriesPerRequest: 1,
+    lazyConnect: false,
+  });
+  redisClient.on('error', (err) => {
+    // Swallow — rate limiter will degrade gracefully via insuranceLimiter
+    if (err.code !== 'ECONNREFUSED') console.warn('[Redis]', err.message);
+  });
+  rateLimiterStore = redisClient;
+  console.log('[DocLoq] Rate limiter backed by Redis');
+} catch (err) {
+  console.warn('[DocLoq] Redis unavailable, rate limiter falling back to in-memory:', err.message);
+}
 
-// Strict rate limiting on auth endpoints — 15 attempts per 15 minutes
-app.use('/api/auth', rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 15,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { success: false, message: 'Too many authentication attempts, please try again later' },
-}));
+const insuranceLimiter = new RateLimiterMemory({ points: 200, duration: 900 });
+
+const globalLimiter = rateLimiterStore
+  ? new RateLimiterRedis({ storeClient: rateLimiterStore, keyPrefix: 'rl_global', points: 200, duration: 15 * 60, insuranceLimiter })
+  : new RateLimiterMemory({ keyPrefix: 'rl_global', points: 200, duration: 15 * 60 });
+
+const authLimiter = rateLimiterStore
+  ? new RateLimiterRedis({ storeClient: rateLimiterStore, keyPrefix: 'rl_auth', points: 15, duration: 15 * 60, insuranceLimiter })
+  : new RateLimiterMemory({ keyPrefix: 'rl_auth', points: 15, duration: 15 * 60 });
+
+const limiterMiddleware = (limiter, message) => (req, res, next) => {
+  limiter.consume(req.ip)
+    .then(() => next())
+    .catch(() => res.status(429).json({ success: false, message }));
+};
+
+// Global rate limiting — 200 requests per 15 minutes per IP
+app.use(limiterMiddleware(globalLimiter, 'Too many requests, please try again later'));
+
+// Strict auth rate limiting — 15 requests per 15 minutes per IP
+app.use('/api/auth', limiterMiddleware(authLimiter, 'Too many authentication attempts, please try again later'));
 
 // Request Logger (Development)
 if (process.env.NODE_ENV !== 'production') {

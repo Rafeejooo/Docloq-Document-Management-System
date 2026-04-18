@@ -1,6 +1,6 @@
-// MinIO / S3 Storage Provider
-// Uses @aws-sdk/client-s3 — compatible with both MinIO and AWS S3.
-// Switching from MinIO to AWS S3 requires only changing the endpoint URL.
+// S3-Compatible Storage Provider (Cloudflare R2 / MinIO / AWS S3)
+// Uses @aws-sdk/client-s3 — compatible with R2, MinIO, and AWS S3.
+// Switching providers requires only changing the endpoint URL and credentials.
 
 import {
   S3Client,
@@ -17,7 +17,7 @@ let s3Client = null;
 
 /**
  * Get or create the S3 client singleton.
- * Works identically against MinIO and AWS S3.
+ * Works identically against Cloudflare R2, MinIO, and AWS S3.
  */
 const getClient = () => {
   if (s3Client) return s3Client;
@@ -31,10 +31,10 @@ const getClient = () => {
       accessKeyId: accessKey,
       secretAccessKey: secretKey,
     },
-    forcePathStyle, // Required for MinIO; ignored by AWS S3
+    forcePathStyle, // Required for MinIO and R2
   });
 
-  console.log(`[MinIO] S3 client initialized → ${endpoint}`);
+  console.log(`[S3] Client initialized → ${endpoint}`);
   return s3Client;
 };
 
@@ -146,7 +146,9 @@ export const s3GetPresignedUrl = async (bucket, key, expiresIn = 3600) => {
     Key: key,
   });
 
-  return getSignedUrl(client, command, { expiresIn });
+  // R2 max presigned URL expiry is 7 days (604800s)
+  const clampedExpiry = Math.min(expiresIn, 604800);
+  return getSignedUrl(client, command, { expiresIn: clampedExpiry });
 };
 
 /**
@@ -163,7 +165,7 @@ export const s3MoveToArchive = async (key) => {
   await client.send(new CopyObjectCommand({
     Bucket: archiveBucket,
     Key: key,
-    CopySource: `${documentsBucket}/${key}`,
+    CopySource: `/${documentsBucket}/${key}`,
   }));
 
   // Delete from documents bucket
@@ -172,7 +174,7 @@ export const s3MoveToArchive = async (key) => {
     Key: key,
   }));
 
-  console.log(`[MinIO] Archived: ${documentsBucket}/${key} → ${archiveBucket}/${key}`);
+  console.log(`[S3] Archived: ${documentsBucket}/${key} → ${archiveBucket}/${key}`);
   return { archivedKey: key };
 };
 
@@ -188,7 +190,7 @@ export const s3RestoreFromArchive = async (key) => {
   await client.send(new CopyObjectCommand({
     Bucket: documentsBucket,
     Key: key,
-    CopySource: `${archiveBucket}/${key}`,
+    CopySource: `/${archiveBucket}/${key}`,
   }));
 
   await client.send(new DeleteObjectCommand({
@@ -196,6 +198,6 @@ export const s3RestoreFromArchive = async (key) => {
     Key: key,
   }));
 
-  console.log(`[MinIO] Restored: ${archiveBucket}/${key} → ${documentsBucket}/${key}`);
+  console.log(`[S3] Restored: ${archiveBucket}/${key} → ${documentsBucket}/${key}`);
   return { restoredKey: key };
 };

@@ -199,27 +199,15 @@ export const uploadDocument = async (req, res) => {
       });
     }
 
-    // Resolve user + org (from JWT middleware or fallback for testing)
-    let userId = req.user?.id;
-    let organizationId = req.user?.organizationId;
+    // Resolve user + org from JWT middleware
+    const userId = req.user?.id;
+    const organizationId = req.user?.organizationId;
     const folderId = req.body?.folderId || null;
 
     if (!userId || !organizationId) {
-      try {
-        const { organizations, users } = await import('../db/schema.js');
-        const [firstOrg] = await db.select().from(organizations).limit(1);
-        const [firstUser] = await db.select().from(users).limit(1);
-        if (firstOrg) organizationId = firstOrg.id;
-        if (firstUser) userId = firstUser.id;
-      } catch (e) {
-        console.warn('Could not resolve org/user:', e.message);
-      }
-    }
-
-    if (!userId || !organizationId) {
-      return res.status(400).json({
+      return res.status(401).json({
         success: false,
-        message: 'No organization or user found. Please run db:seed first or authenticate.',
+        message: 'Authentication required',
       });
     }
 
@@ -290,25 +278,13 @@ export const uploadDocumentSimple = async (req, res) => {
       }
     }
 
-    // Resolve user + org
-    let userId = req.user?.id;
-    let organizationId = req.user?.organizationId;
+    // Resolve user + org from JWT middleware
+    const userId = req.user?.id;
+    const organizationId = req.user?.organizationId;
     const folderId = req.body?.folderId || null;
 
     if (!userId || !organizationId) {
-      try {
-        const { organizations, users } = await import('../db/schema.js');
-        const [firstOrg] = await db.select().from(organizations).limit(1);
-        const [firstUser] = await db.select().from(users).limit(1);
-        if (firstOrg) organizationId = firstOrg.id;
-        if (firstUser) userId = firstUser.id;
-      } catch (e) {
-        console.warn('Could not resolve org/user:', e.message);
-      }
-    }
-
-    if (!userId || !organizationId) {
-      return res.status(400).json({ success: false, message: 'No organization or user found.' });
+      return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
     // Run the FULL 14-step security pipeline (encryption, hashing, scan, honeytokens, QR)

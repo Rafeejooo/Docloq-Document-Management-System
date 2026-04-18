@@ -26,7 +26,7 @@ export const getDashboardStats = async (req, res) => {
     const isAdminUser = userRole === 'super_admin' || userRole === 'admin';
 
     if (!orgId) {
-      return res.status(400).json({ success: false, message: 'No organization found' });
+      return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
     // ── 1. Document stats ─────────────────────────────────────

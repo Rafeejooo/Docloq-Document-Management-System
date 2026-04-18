@@ -1,7 +1,8 @@
 // Storage Abstraction Layer
-// Supports two providers:
+// Supports S3-compatible providers and local filesystem:
 //   - "local"  → files on disk (development default)
-//   - "minio"  → MinIO / AWS S3 via @aws-sdk/client-s3
+//   - "minio"  → MinIO via @aws-sdk/client-s3
+//   - "r2"     → Cloudflare R2 via @aws-sdk/client-s3
 //
 // All public functions have the same signature regardless of provider.
 // Switching provider requires only changing STORAGE_PROVIDER env var.
@@ -15,9 +16,10 @@ import {
   s3Delete,
   s3Exists,
   s3GetPresignedUrl,
-} from './minio.service.js';
+} from './s3.service.js';
 
-const provider = uploadConfig.storageProvider; // 'local' | 'minio'
+const provider = uploadConfig.storageProvider; // 'local' | 'minio' | 'r2'
+const isS3Provider = provider === 'minio' || provider === 'r2';
 
 // ============================================================
 // LocalStorageProvider — saves files to local disk
@@ -84,7 +86,7 @@ const localExists = async (key) => {
 };
 
 // ============================================================
-// MinIO / S3 Provider — delegates to minio.service.js
+// S3 Provider (R2 / MinIO) — delegates to s3.service.js
 // ============================================================
 
 const minioUpload = async (fileBuffer, key, metadata = {}) => {
@@ -129,7 +131,7 @@ const minioExists = async (key) => {
  * @returns {{ key: string, bucket: string, size: number }}
  */
 export const uploadFile = async (fileBuffer, key, metadata = {}) => {
-  if (provider === 'minio') return minioUpload(fileBuffer, key, metadata);
+  if (isS3Provider) return minioUpload(fileBuffer, key, metadata);
   return localUpload(fileBuffer, key, metadata);
 };
 
@@ -139,7 +141,7 @@ export const uploadFile = async (fileBuffer, key, metadata = {}) => {
  * @returns {Buffer}
  */
 export const downloadFile = async (key) => {
-  if (provider === 'minio') return minioDownload(key);
+  if (isS3Provider) return minioDownload(key);
   return localDownload(key);
 };
 
@@ -149,7 +151,7 @@ export const downloadFile = async (key) => {
  * @returns {boolean}
  */
 export const deleteFile = async (key) => {
-  if (provider === 'minio') return minioDelete(key);
+  if (isS3Provider) return minioDelete(key);
   return localDelete(key);
 };
 
@@ -162,7 +164,7 @@ export const deleteFile = async (key) => {
  * @returns {string|Promise<string>}
  */
 export const getFileUrl = (key, expiresIn = 3600) => {
-  if (provider === 'minio') return minioGetFileUrl(key, expiresIn);
+  if (isS3Provider) return minioGetFileUrl(key, expiresIn);
   return localGetFileUrl(key);
 };
 
@@ -172,7 +174,7 @@ export const getFileUrl = (key, expiresIn = 3600) => {
  * @returns {boolean}
  */
 export const fileExists = async (key) => {
-  if (provider === 'minio') return minioExists(key);
+  if (isS3Provider) return minioExists(key);
   return localExists(key);
 };
 
@@ -206,7 +208,7 @@ export const saveToTemp = async (fileBuffer, sessionId, ext) => {
  * @returns {string} — storage key for the QR image
  */
 export const saveQrCode = async (qrBuffer, filename) => {
-  if (provider === 'minio') {
+  if (isS3Provider) {
     await s3Upload(uploadConfig.s3.qrBucket, filename, qrBuffer, {
       contentType: 'image/png',
     });

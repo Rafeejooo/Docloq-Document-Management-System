@@ -1,7 +1,7 @@
 // Archive & Crypto Shredding Service
 //
 // Handles document lifecycle:
-//   - Archive: move old versions to archive bucket (MinIO) or archive dir (local)
+//   - Archive: move old versions to archive bucket (R2/MinIO) or archive dir (local)
 //   - Restore: move archived versions back to active storage
 //   - Crypto Shred: GDPR Art 17 — destroy encryption keys, making data permanently unrecoverable
 //
@@ -12,7 +12,9 @@ import { eq, and, lt } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { documents, documentVersions, auditLogs } from '../db/schema.js';
 import uploadConfig from '../config/upload.config.js';
-import { s3MoveToArchive, s3RestoreFromArchive, s3Delete } from './minio.service.js';
+import { s3MoveToArchive, s3RestoreFromArchive, s3Delete } from './s3.service.js';
+
+const isS3Provider = isS3Provider || uploadConfig.storageProvider === 'r2';
 import { deleteDocumentVector } from './qdrant.service.js';
 
 const keyProvider = uploadConfig.keyProvider;
@@ -44,7 +46,7 @@ export const archiveVersion = async (versionId, userId) => {
 
   const storageKey = version.s3Key;
 
-  if (uploadConfig.storageProvider === 'minio') {
+  if (isS3Provider) {
     await s3MoveToArchive(storageKey);
   }
   // For local storage, we just update the status (no physical move)
@@ -54,7 +56,7 @@ export const archiveVersion = async (versionId, userId) => {
     .update(documentVersions)
     .set({
       archiveStatus: 'archived',
-      s3Bucket: uploadConfig.storageProvider === 'minio'
+      s3Bucket: isS3Provider
         ? uploadConfig.s3.archiveBucket
         : 'local-archive',
     })
@@ -91,7 +93,7 @@ export const restoreVersion = async (versionId, userId) => {
   if (!version) throw new Error(`Version not found: ${versionId}`);
   if (version.archiveStatus !== 'archived') throw new Error('Version is not archived');
 
-  if (uploadConfig.storageProvider === 'minio') {
+  if (isS3Provider) {
     await s3RestoreFromArchive(version.s3Key);
   }
 
@@ -99,7 +101,7 @@ export const restoreVersion = async (versionId, userId) => {
     .update(documentVersions)
     .set({
       archiveStatus: 'active',
-      s3Bucket: uploadConfig.storageProvider === 'minio'
+      s3Bucket: isS3Provider
         ? uploadConfig.s3.documentsBucket
         : 'local',
     })
@@ -176,7 +178,7 @@ export const cryptoShred = async (documentId, userId, { deleteCiphertext = true 
   }
 
   // Step 4: Optionally delete the ciphertext files
-  if (deleteCiphertext && uploadConfig.storageProvider === 'minio') {
+  if (deleteCiphertext && isS3Provider) {
     for (const version of versions) {
       try {
         // Delete from whichever bucket the version is in

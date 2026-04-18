@@ -2,6 +2,7 @@
 
 import { Router } from 'express';
 import { authenticate } from '../middlewares/auth.middleware.js';
+import { validateUUID } from '../middlewares/validate.middleware.js';
 import {
   listDocuments,
   grant,
@@ -25,21 +26,21 @@ router.get('/quota', quota);
 router.get('/documents', listDocuments);
 
 // Grant AI access (decrypt + embed + index)
-router.post('/documents/:id/grant', grant);
+router.post('/documents/:id/grant', validateUUID('id'), grant);
 
 // Revoke AI access (delete vector)
-router.post('/documents/:id/revoke', revoke);
+router.post('/documents/:id/revoke', validateUUID('id'), revoke);
 
 // Analyze document with AI prompt + page selection
-router.post('/documents/:id/analyze', analyze);
+router.post('/documents/:id/analyze', validateUUID('id'), analyze);
 
 // Get page info for page selector (requires AI access)
-router.get('/documents/:id/page-info', pageInfo);
+router.get('/documents/:id/page-info', validateUUID('id'), pageInfo);
 
 // Analysis history
-router.get('/documents/:id/history', history);
+router.get('/documents/:id/history', validateUUID('id'), history);
 
 // Check document AI status
-router.get('/documents/:id/status', status);
+router.get('/documents/:id/status', validateUUID('id'), status);
 
 export default router;

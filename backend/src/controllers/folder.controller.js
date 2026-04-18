@@ -10,17 +10,10 @@ import { getAllUserPermissions } from '../middlewares/permission.middleware.js';
 // ──────────────────────────────────────────────
 export const getAllFolders = async (req, res) => {
   try {
-    let orgId = req.user?.organizationId;
-
-    // Dev fallback
-    if (!orgId) {
-      const { organizations } = await import('../db/schema.js');
-      const [firstOrg] = await db.select().from(organizations).limit(1);
-      if (firstOrg) orgId = firstOrg.id;
-    }
+    const orgId = req.user?.organizationId;
 
     if (!orgId) {
-      return res.status(400).json({ success: false, message: 'No organization found' });
+      return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
     const allFolders = await db
@@ -120,20 +113,11 @@ export const createFolder = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Folder name is required' });
     }
 
-    let orgId = req.user?.organizationId;
-    let userId = req.user?.id;
+    const orgId = req.user?.organizationId;
+    const userId = req.user?.id;
 
-    // Dev fallback
     if (!orgId || !userId) {
-      const { organizations, users } = await import('../db/schema.js');
-      const [firstOrg] = await db.select().from(organizations).limit(1);
-      const [firstUser] = await db.select().from(users).limit(1);
-      if (firstOrg) orgId = firstOrg.id;
-      if (firstUser) userId = firstUser.id;
-    }
-
-    if (!orgId) {
-      return res.status(400).json({ success: false, message: 'No organization found' });
+      return res.status(401).json({ success: false, message: 'Authentication required' });
     }
 
     // Build materialized path
@@ -327,6 +311,14 @@ export const moveFolder = async (req, res) => {
 
     if (!folderId) {
       return res.status(400).json({ success: false, message: 'folderId is required' });
+    }
+
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(folderId)) {
+      return res.status(400).json({ success: false, message: 'Invalid folderId format' });
+    }
+    if (newParentId && !UUID_RE.test(newParentId)) {
+      return res.status(400).json({ success: false, message: 'Invalid newParentId format' });
     }
 
     // prevent moving a folder into itself

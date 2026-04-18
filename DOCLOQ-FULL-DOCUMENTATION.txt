@@ -8,7 +8,7 @@ Type         : Cybersecurity Capstone Project
 Stack        : React 19 + Express 5 + PostgreSQL 16 + Drizzle ORM
 AI           : OpenAI GPT-4.1-mini + Qdrant Vector DB + MongoDB Cache
 Security     : AES-256-GCM + Vault Transit + ClamAV + Honeytokens + Blockchain
-Storage      : MinIO (S3-compatible) + HashiCorp Vault
+Storage      : Cloudflare R2 (S3-compatible) + HashiCorp Vault (HA-ready)
 Signing      : DocuSeal e-Signature
 Editor       : OnlyOffice Document Server
 Auth         : JWT + TOTP 2FA + Email OTP + hCaptcha
@@ -33,6 +33,8 @@ TABLE OF CONTENTS
   14. DEPENDENCIES
   15. INVISIBLE DOWNLOAD WATERMARKING (LEAK IDENTIFICATION)
   16. BLOCKCHAIN DOCUMENT ANCHORING (POLYGON)
+  17. INFRASTRUCTURE MIGRATION: MINIO -> CLOUDFLARE R2 + VAULT HA
+  18. DOCKER SWARM VPS DEPLOYMENT
 
 ================================================================================
 1. SYSTEM ARCHITECTURE OVERVIEW
@@ -51,8 +53,8 @@ Architecture Layers:
   [Backend - Express 5 + Node.js]
        |
        +---> [PostgreSQL 16]     Primary database (Drizzle ORM)
-       +---> [MinIO]             S3-compatible object storage
-       +---> [Vault]             Key management (Transit engine)
+       +---> [Cloudflare R2]      S3-compatible cloud object storage
+       +---> [Vault HA]          Key management (Transit engine, Raft HA)
        +---> [ClamAV]            Malware scanning
        +---> [Qdrant Cloud]      Vector database (AI semantic search)
        +---> [MongoDB]           AI analysis result cache
@@ -70,15 +72,13 @@ Multi-Tenant Design:
 2. INFRASTRUCTURE & DOCKER SERVICES
 ================================================================================
 
-File: backend/docker-compose.yml
+Development: backend/docker-compose.yml
+Production:  backend/docker-compose.prod.yml (overlay)
 
 +------------------+---------------------+----------+---------------------------+
 | Service          | Image               | Port     | Purpose                   |
 +------------------+---------------------+----------+---------------------------+
 | db               | postgres:16-alpine  | 5436     | Primary database          |
-| minio            | minio/minio         | 9000,    | S3-compatible object      |
-|                  |                     | 9001     | storage + console         |
-| minio-init       | minio/mc            | -        | Bucket initialization     |
 | vault            | hashicorp/vault:1.17| 8200     | Key management (Transit)  |
 | clamav           | clamav/clamav       | 3310     | Antivirus/malware scanner |
 | qdrant           | qdrant/qdrant:1.13  | 6333,    | Vector DB (AI search)     |
@@ -86,13 +86,29 @@ File: backend/docker-compose.yml
 | mongodb          | mongo:7.0           | 27017    | AI analysis cache         |
 +------------------+---------------------+----------+---------------------------+
 
-MinIO Buckets (auto-created):
+Production overlay (docker-compose.prod.yml) adds:
++------------------+---------------------+----------+---------------------------+
+| vault-1          | hashicorp/vault:1.17| 8200     | Vault HA leader (Raft)    |
+| vault-2          | hashicorp/vault:1.17| -        | Vault HA follower         |
+| vault-3          | hashicorp/vault:1.17| -        | Vault HA follower         |
+| cloudflared      | cloudflare/         | -        | Cloudflare Tunnel ingress |
+|                  | cloudflared:latest  |          |                           |
++------------------+---------------------+----------+---------------------------+
+
+Object Storage: Cloudflare R2 (cloud-hosted, S3-compatible)
   - docloq-documents   : Encrypted document storage
   - docloq-archive     : Archived document versions
   - docloq-qrcodes     : QR code verification images
 
-Docker Volumes:
-  - postgres_data, minio_data, clamav_data, qdrant_data, mongodb_data
+  Note: R2 replaces the previous MinIO self-hosted setup. The S3 API
+  client (@aws-sdk/client-s3) works identically with R2. Storage
+  provider is set via STORAGE_PROVIDER=r2 in .env.
+
+Docker Volumes (dev):
+  - postgres_data, clamav_data, qdrant_data, mongodb_data
+
+Docker Volumes (prod, adds):
+  - vault_data_1, vault_data_2, vault_data_3
 
 Network: docloq_network (bridge)
 
@@ -130,16 +146,21 @@ SCANNER_ENABLED         Enable ClamAV scanning (true/false)
 CLAMAV_HOST             ClamAV host
 CLAMAV_PORT             ClamAV port (3310)
 
---- Storage (MinIO / S3) ---
-STORAGE_PROVIDER        Storage backend: minio | local
-S3_ENDPOINT             S3/MinIO endpoint URL
-S3_ACCESS_KEY           S3 access key
-S3_SECRET_KEY           S3 secret key
-S3_DOCUMENTS_BUCKET     Document storage bucket
-S3_ARCHIVE_BUCKET       Archive bucket
-S3_QR_BUCKET            QR code images bucket
-S3_FORCE_PATH_STYLE     Path-style addressing (true for MinIO)
-S3_REGION               S3 region
+--- Storage (Cloudflare R2 / S3-compatible) ---
+STORAGE_PROVIDER        Storage backend: r2 | minio | local
+S3_ENDPOINT             S3 endpoint URL (R2: https://<ACCOUNT_ID>.r2.cloudflarestorage.com)
+S3_ACCESS_KEY           S3/R2 access key ID
+S3_SECRET_KEY           S3/R2 secret access key
+S3_DOCUMENTS_BUCKET     Document storage bucket (docloq-documents)
+S3_ARCHIVE_BUCKET       Archive bucket (docloq-archive)
+S3_QR_BUCKET            QR code images bucket (docloq-qrcodes)
+S3_FORCE_PATH_STYLE     Path-style addressing (true for R2 and MinIO)
+S3_REGION               S3 region (R2 uses "auto")
+
+--- Cloudflare (Production) ---
+CLOUDFLARE_TUNNEL_TOKEN Cloudflare Tunnel token (from Zero Trust dashboard)
+CLOUDFLARE_ACCOUNT_ID   Cloudflare account ID
+TRUST_PROXY             Enable trust proxy for Cloudflare (true in production)
 
 --- Key Management (Vault) ---
 KEY_PROVIDER            Key provider: vault | local
@@ -623,7 +644,7 @@ User Upload via HTTPS (React -> Express)
        v
 [9] QR CODE
     - HMAC-SHA256 signed payload
-    - QR image generated -> stored in MinIO qr bucket
+    - QR image generated -> stored in R2 qr bucket
     - 8-char short code for public verification endpoint
        |
        v
@@ -680,7 +701,7 @@ Auth check (JWT) + Permission check (owner / team / folder permission)
 Query documentVersions -> s3Key, encryptionKeyId, encryptionIv
        |
        v
-MinIO GetObject -> encrypted buffer
+R2/S3 GetObject -> encrypted buffer
        |
        v
 Read .meta.json sidecar -> authTag
@@ -728,14 +749,14 @@ User must explicitly grant access before AI can process them.
 Rationale:
   - Data sovereignty: user controls if content is processed by AI
   - GDPR Art 6 compliance: consent before processing
-  - Defense-in-depth: encrypted docs in MinIO not auto-exposed to AI
+  - Defense-in-depth: encrypted docs in R2 not auto-exposed to AI
 
 Flow:
 
   User Upload Document
          |
          v
-  [14-step pipeline: scan, honeytoken, encrypt, store MinIO, DB, etc.]
+  [14-step pipeline: scan, honeytoken, encrypt, store R2/S3, DB, etc.]
          |
          v
   Document appears on AI Analysis page -> STATUS: BLOCKED (locked)
@@ -755,7 +776,7 @@ Flow:
 POST /api/ai-analysis/documents/:id/grant
   1. Verify user has permission for this document
   2. Get latest document version -> s3Key, encryptionKeyId, encryptionIv
-  3. Download encrypted file from MinIO
+  3. Download encrypted file from R2/S3
   4. Read .meta.json sidecar -> authTag
   5. Decrypt with Vault/local key
   6. Extract text (pdf-parse / raw text)
@@ -868,7 +889,7 @@ POST /api/ai-analysis/documents/:id/revoke
     - Contains: documentId, SHA-256 hash, organization, timestamp
     - 8-character random short code for public verification URL
     - Timing-safe signature comparison
-    - QR images stored in dedicated MinIO bucket
+    - QR images stored in dedicated R2 bucket
 
 8.5 DOCUMENT DNA (Hashing)
     - SHA-256: exact match detection
@@ -968,9 +989,9 @@ File: backend/src/services/
     - saveToTemp(fileBuffer, sessionId, ext)
     - saveQrCode(qrBuffer, filename)
     - initStorageDirs()
-    Storage abstraction (local filesystem or MinIO/S3)
+    Storage abstraction (local filesystem or R2/MinIO/S3)
 
-4.  minio.service.js
+4.  s3.service.js (formerly minio.service.js)
     - s3Upload(bucket, key, buffer, metadata)
     - s3Download(bucket, key)
     - s3Delete(bucket, key)
@@ -978,7 +999,7 @@ File: backend/src/services/
     - s3GetPresignedUrl(bucket, key, expiresIn)
     - s3MoveToArchive(key)
     - s3RestoreFromArchive(key)
-    MinIO / AWS S3 storage operations
+    S3-compatible storage operations (Cloudflare R2 / MinIO / AWS S3)
 
 5.  vault.service.js
     - initVault()
@@ -1163,6 +1184,9 @@ Server: Express 5 on port 3000
 POST   /api/auth/login              Login with email/password
 POST   /api/auth/complete-login     Complete 2FA login flow
 POST   /api/auth/register           Register new user
+                                    Body: { email, password, firstName, lastName, companyName? }
+                                    Note: Use 'companyName' (not 'orgName') to create an org.
+                                          First user of an org gets 'admin' role automatically.
 POST   /api/auth/refresh-token      Refresh JWT token
 POST   /api/auth/logout             [Auth] Logout user
 GET    /api/auth/me                 [Auth] Get current user info
@@ -1190,9 +1214,14 @@ POST   /api/users/:id/reset-password  Reset user password
 PATCH  /api/users/:id/toggle-status   Toggle user active status
 
 --- DOCUMENTS (/api/documents) ---
+  Note: Document routes use optionalAuth. Unauthenticated requests can list/read
+        documents but are filtered to public documents only. Authenticated users
+        see documents scoped to their organization + permission level.
+        GET /api/documents/verify is fully PUBLIC (no auth needed) — for QR scan
+        verification by anyone (e.g. printing on a hardcopy document).
 
 GET    /api/documents               List all documents
-GET    /api/documents/verify        Verify document by QR short code
+GET    /api/documents/verify        Verify document by QR short code  [PUBLIC]
 GET    /api/documents/:id           Get document metadata
 GET    /api/documents/:id/file      Serve document file (OnlyOffice)
 POST   /api/documents/upload        Upload document (full pipeline)
@@ -1319,7 +1348,9 @@ GET    /api/admin/activity          [AdminAuth] Recent activity
 GET    /api/admin/audit-logs        [AdminAuth] Audit logs
 PATCH  /api/admin/users/:userId/status  [AdminAuth] Update user status
 
---- WATERMARK SCANNER (/api/watermark-scanner) --- [Auth + Admin/Manager/Auditor]
+--- WATERMARK SCANNER (/api/watermark-scanner) --- [Auth + super_admin/admin/manager/auditor ONLY]
+  Note: By design, regular 'user' and 'viewer' roles cannot access these endpoints.
+        Only admin-level roles can scan for leaks and view download histories.
 
 POST   /api/watermark-scanner/scan                    Scan uploaded file for watermarks
 GET    /api/watermark-scanner/history/:documentId     Get watermark download history
@@ -1329,7 +1360,7 @@ GET    /api/watermark-scanner/details/:watermarkId    Get specific watermark det
 
 GET    /api/notifications            List user notifications
 PATCH  /api/notifications/:id/read   Mark notification as read
-POST   /api/notifications/read-all   Mark all as read
+PATCH  /api/notifications/read-all   Mark all as read
 
 --- BLOCKCHAIN (/api/blockchain) --- [Auth + Admin/Manager]
 
@@ -1631,7 +1662,7 @@ Runtime:
   drizzle-orm           ^0.44.2     TypeScript ORM
   pg                    ^8.17.2     PostgreSQL driver
   mongoose              ^9.3.0      MongoDB ODM
-  @aws-sdk/client-s3    ^3.1009.0   S3/MinIO storage
+  @aws-sdk/client-s3    ^3.1009.0   S3/R2/MinIO storage
   @aws-sdk/s3-request-presigner ^3.1009.0  Presigned URLs
   @qdrant/js-client-rest ^1.17.0    Vector database client
   openai                ^6.27.0     OpenAI API (GPT, embeddings)
@@ -1968,8 +1999,509 @@ Admin BlockchainSettings Page (existing):
   - Network settings (Polygon mainnet/Amoy testnet)
 
 ================================================================================
+17. INFRASTRUCTURE MIGRATION: MINIO -> CLOUDFLARE R2 + VAULT HA
+================================================================================
+
+Migration Date: April 2026
+
+--- OVERVIEW ---
+
+DocLoq migrated from self-hosted MinIO to Cloudflare R2 for object storage,
+and added HashiCorp Vault HA (Raft storage backend) for production key
+management. Cloudflare Tunnel replaces traditional port exposure for secure
+ingress in production.
+
+--- STORAGE MIGRATION (MinIO -> Cloudflare R2) ---
+
+What changed:
+  1. minio.service.js renamed to s3.service.js
+     - Updated log prefixes from [MinIO] to [S3]
+     - Fixed CopySource format for R2 compatibility (leading slash required)
+     - Capped presigned URL expiry to R2 max of 7 days (604800s)
+
+  2. storage.service.js updated
+     - Import path changed from ./minio.service.js to ./s3.service.js
+     - Provider checks now use isS3Provider helper (supports both 'minio' and 'r2')
+
+  3. archive.service.js updated
+     - Same import path and provider check updates
+
+  4. upload.config.js updated
+     - STORAGE_PROVIDER now accepts: local | minio | r2
+     - Default S3_REGION changed from 'us-east-1' to 'auto' (R2 uses 'auto')
+
+  5. docker-compose.yml updated
+     - Removed minio and minio-init services
+     - Removed minio_data volume
+     - R2 is a cloud service, no local container needed
+
+  6. .env updated
+     - STORAGE_PROVIDER=r2
+     - S3_ENDPOINT=https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+     - S3_REGION=auto
+
+What did NOT change:
+  - All S3 operations still use @aws-sdk/client-s3 (R2 is S3-compatible)
+  - Envelope encryption flow is completely unchanged
+  - The 15-step upload pipeline is unchanged
+  - Frontend has zero changes (no direct S3 access)
+  - Database schema unchanged (s3Key, s3Bucket fields still used)
+
+R2 Buckets:
+  - docloq-documents   : Encrypted document ciphertext + .meta.json sidecars
+  - docloq-archive     : Archived document versions (GDPR retention)
+  - docloq-qrcodes     : QR code verification PNG images
+
+--- VAULT HIGH AVAILABILITY (Raft Storage Backend) ---
+
+Production: 3-node Vault cluster with Raft integrated storage.
+Development: Single dev-mode Vault (unchanged, in-memory).
+
+Config files: backend/vault/config/vault-{1,2,3}.hcl
+
+Raft HA features:
+  - Automatic leader election among 3 nodes
+  - Auto retry_join for cluster formation
+  - No external Consul dependency
+  - TLS disabled at Vault level (terminated at Cloudflare Tunnel)
+
+Initialization (one-time):
+  vault operator init -key-shares=3 -key-threshold=2
+  # Unseal each node with 2 of 3 keys
+  # Enable Transit engine + create docloq-master key
+
+Backup:
+  vault operator raft snapshot save /backups/vault-YYYYMMDD.snap
+
+Docker Compose (production overlay):
+  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+--- CLOUDFLARE SERVICES ---
+
+1. Cloudflare Tunnel (cloudflared)
+   - Secure ingress without public port exposure
+   - Routes api.docloq.site -> backend:3000
+   - Configured in docker-compose.prod.yml
+
+2. Cloudflare WAF (recommended)
+   - Rate limiting: login 5 req/min, general 100 req/min per IP
+   - OWASP Core Ruleset enabled
+   - Content-Length limit > 55MB blocked
+
+3. Cloudflare DDoS Protection
+   - Automatic L3/L4 DDoS protection
+   - Bot Fight Mode for frontend
+
+4. Trust Proxy
+   - backend/src/index.js: app.set('trust proxy', 1) in production
+   - Ensures express-rate-limit reads real client IP from CF-Connecting-IP
+
+--- FILES CHANGED ---
+
+Renamed:
+  backend/src/services/minio.service.js -> backend/src/services/s3.service.js
+
+Modified:
+  backend/src/services/s3.service.js         CopySource fix, log prefixes, presigned URL cap
+  backend/src/services/storage.service.js    Import path, isS3Provider helper
+  backend/src/services/archive.service.js    Import path, isS3Provider checks
+  backend/src/config/upload.config.js        R2 region default, provider comment
+  backend/docker-compose.yml                 Removed MinIO services
+  backend/src/index.js                       Trust proxy for Cloudflare
+  backend/.env.example                       Full R2 + Vault HA + Cloudflare config
+
+New:
+  backend/vault/config/vault-1.hcl           Vault HA node 1 config (Raft)
+  backend/vault/config/vault-2.hcl           Vault HA node 2 config (Raft)
+  backend/vault/config/vault-3.hcl           Vault HA node 3 config (Raft)
+  backend/docker-compose.prod.yml            Production overlay (Vault HA + cloudflared)
+
+================================================================================
+18. DOCKER SWARM VPS DEPLOYMENT
+================================================================================
+
+DocLoq is fully containerized and orchestrated via Docker Swarm on a single VPS.
+All services run as Docker containers with automatic restart, health checks,
+rolling updates, and zero-downtime deployments.
+
+18.1 RECOMMENDED VPS SPECS
+--------------------------
+
+  CPU    : 4 vCPUs minimum (8 recommended — ClamAV + OnlyOffice are heavy)
+  RAM    : 16 GB minimum
+  Disk   : 100 GB SSD
+  OS     : Ubuntu 24.04 LTS
+  Total peak RAM: ~11 GB across 14 services
+
+18.2 ARCHITECTURE OVERVIEW
+--------------------------
+
+  Internet
+     |
+  [Cloudflare Edge — TLS termination, DDoS, CDN]
+     |
+  [cloudflared tunnel — outbound-only connection]
+     |
+  [Docker Swarm Overlay Network]
+     |
+     +---> frontend (Nginx, 2 replicas)
+     +---> backend (Node.js, 2 replicas)
+     +---> db (PostgreSQL 16)
+     +---> mongodb (Mongo 7.0)
+     +---> vault-1, vault-2, vault-3 (HA Raft cluster)
+     +---> clamav (virus scanning)
+     +---> qdrant (vector search)
+     +---> onlyoffice (document editor)
+     +---> docuseal (e-signing)
+     +---> gitea + gitea-db (Git server)
+     +---> cloudflared (tunnel ingress)
+
+  Total: 14 services in a single Docker Swarm stack
+
+18.3 SERVICE INVENTORY
+----------------------
+
+  Service       | Image                       | Replicas | Mem Limit | Purpose
+  --------------|-----------------------------|---------:|----------:|--------
+  backend       | docloq-backend:latest       |        2 |      1 GB | API server
+  frontend      | docloq-frontend:latest      |        2 |    128 MB | Nginx SPA
+  db            | postgres:16-alpine          |        1 |      1 GB | App database
+  mongodb       | mongo:7.0                   |        1 |    512 MB | AI cache
+  vault-1       | hashicorp/vault:1.17        |        1 |    512 MB | Key mgmt (leader)
+  vault-2       | hashicorp/vault:1.17        |        1 |    512 MB | Key mgmt (follower)
+  vault-3       | hashicorp/vault:1.17        |        1 |    512 MB | Key mgmt (follower)
+  clamav        | clamav/clamav:stable        |        1 |      2 GB | Virus scanner
+  qdrant        | qdrant/qdrant:v1.13.1       |        1 |      1 GB | Vector DB
+  onlyoffice    | onlyoffice/documentserver   |        1 |      3 GB | Doc editor
+  docuseal      | docuseal/docuseal:latest    |        1 |    512 MB | E-signing
+  gitea         | gitea/gitea:latest          |        1 |    512 MB | Git server
+  gitea-db      | postgres:16-alpine          |        1 |    256 MB | Gitea database
+  cloudflared   | cloudflare/cloudflared      |        1 |    128 MB | Tunnel ingress
+
+18.4 VPS INITIAL SETUP
+-----------------------
+
+  Step 1: Create deploy user + SSH hardening
+    adduser deploy && usermod -aG sudo deploy
+    # /etc/ssh/sshd_config: Port 2222, PermitRootLogin no, PasswordAuthentication no
+
+  Step 2: Firewall (UFW)
+    ufw default deny incoming
+    ufw default allow outgoing
+    ufw allow 2222/tcp    # SSH only — NO 80/443 needed (Cloudflare Tunnel)
+    ufw enable
+
+  Step 3: Swap space (4 GB)
+    fallocate -l 4G /swapfile
+    chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
+    echo '/swapfile none swap sw 0 0' >> /etc/fstab
+
+  Step 4: Install Docker + Init Swarm
+    curl -fsSL https://get.docker.com | sh
+    usermod -aG docker deploy
+    docker swarm init --advertise-addr <VPS_PUBLIC_IP>
+
+  Step 5: Directory structure
+    /opt/docloq/
+    ├── repo/          Git clone of the project
+    ├── secrets/       Secret source files (deleted after setup)
+    ├── backups/       Backup output
+    └── scripts/       Maintenance scripts
+
+18.5 DOCKER IMAGES
+------------------
+
+  Backend (backend/Dockerfile):
+    - Multi-stage build on node:22-alpine
+    - Stage 1 (deps): Install production npm dependencies
+      * python3, make, g++ for native modules
+      * Sharp uses prebuilt binaries (no vips-dev needed)
+    - Stage 2 (runtime): Copy node_modules, app source, entrypoint
+      * Runs as non-root user "docloq"
+      * Uses tini as PID 1 init process
+      * Health check: curl http://localhost:3000/
+    - Final size: ~1.26 GB
+
+  Frontend (frontend/Dockerfile):
+    - Multi-stage build
+    - Stage 1: npm ci + vite build (with VITE_* build args)
+    - Stage 2: nginx:1.27-alpine serving static dist/
+      * SPA fallback (try_files -> /index.html)
+      * Static asset caching (1 year, immutable)
+      * Gzip compression
+      * /health endpoint for Swarm health checks
+    - Final size: ~84 MB
+
+18.6 ENTRYPOINT & SECRETS
+--------------------------
+
+  Backend uses entrypoint.sh to load Docker Swarm secrets at runtime:
+
+    1. Reads all files from /run/secrets/
+    2. Exports each as uppercase environment variable
+       (e.g., /run/secrets/db_password -> DB_PASSWORD)
+    3. Optionally runs database migrations (RUN_MIGRATIONS=true)
+    4. Executes the CMD (node src/index.js)
+
+  Docker Swarm Secrets (13 total):
+    db_password, jwt_secret, encryption_master_key, vault_token,
+    s3_access_key, s3_secret_key, openai_api_key, mongo_password,
+    mail_password, qr_signing_secret, docuseal_api_key,
+    cloudflare_tunnel_token, gitea_db_password
+
+  Created via: echo "value" | docker secret create secret_name -
+  Or from files: docker secret create secret_name /opt/docloq/secrets/secret_name
+
+18.7 CLOUDFLARE TUNNEL ROUTING
+-------------------------------
+
+  Single tunnel, multiple public hostname routes:
+
+    Public Hostname        -> Internal Service
+    docloq.site            -> http://frontend:80
+    api.docloq.site        -> http://backend:3000
+    git.docloq.site        -> http://gitea:3000
+    office.docloq.site     -> http://onlyoffice:80
+    sign.docloq.site       -> http://docuseal:3000
+
+  All internal traffic is HTTP (TLS terminated at Cloudflare edge).
+  No ports exposed on VPS — cloudflared connects outbound only.
+
+18.8 SWARM ORCHESTRATION
+-------------------------
+
+  Rolling Updates (backend + frontend):
+    parallelism: 1
+    delay: 30s
+    failure_action: rollback
+    order: start-first          (new container starts before old stops)
+
+  Restart Policy (all services):
+    condition: any
+    delay: 5s
+    max_attempts: 5
+    window: 120s
+
+  Health Checks (all services):
+    - backend:    curl http://localhost:3000/
+    - frontend:   wget http://localhost/health
+    - db:         pg_isready -U docloq
+    - mongodb:    mongosh --eval db.adminCommand('ping')
+    - qdrant:     wget http://localhost:6333/healthz
+    - onlyoffice: curl http://localhost/healthcheck
+    - clamav:     clamdcheck
+    - gitea:      wget http://localhost:3000/api/v1/version
+
+  Placement Constraints:
+    Stateful services (db, mongodb, qdrant, vault-1) pinned to manager node
+
+18.9 GITEA GIT SERVER
+----------------------
+
+  Purpose: Self-hosted Git at git.docloq.site for team code management
+  Access:  HTTPS-only through Cloudflare Tunnel (no SSH)
+
+  Configuration:
+    - Dedicated PostgreSQL database (gitea-db service)
+    - Registration disabled (GITEA__service__DISABLE_REGISTRATION=true)
+    - Signin required to view repos (GITEA__service__REQUIRE_SIGNIN_VIEW=true)
+    - SSH disabled (all Git operations via HTTPS through tunnel)
+
+  Note: Gitea does NOT support native HA clustering. Single replica with
+  Swarm auto-restart provides sufficient uptime for small teams. Nightly
+  backups of gitea_data volume + gitea-db PostgreSQL ensure recoverability.
+
+18.10 DEPLOYMENT WORKFLOW
+--------------------------
+
+  scripts/deploy.sh supports these modes:
+
+    ./scripts/deploy.sh --init      Full first-time setup:
+                                      1. Create Docker secrets from files
+                                      2. Create Docker configs (Vault HCL)
+                                      3. Build backend + frontend images
+                                      4. Deploy stack
+
+    ./scripts/deploy.sh --build     Rebuild images + redeploy
+
+    ./scripts/deploy.sh --secrets   Create/update secrets + configs only
+
+    ./scripts/deploy.sh             Deploy/update stack only (no rebuild)
+
+  Post-init steps:
+    1. Initialize Vault:  vault operator init
+    2. Unseal all 3 nodes (2 keys each)
+    3. Enable Transit:    vault secrets enable transit
+    4. Create key:        vault write transit/keys/docloq-master type=aes256-gcm96
+    5. Configure Cloudflare Tunnel routes in Zero Trust dashboard
+    6. Set up backup cron
+
+18.11 BACKUP STRATEGY
+----------------------
+
+  scripts/backup.sh runs via cron at 03:00 daily:
+    0 3 * * * /opt/docloq/scripts/backup.sh >> /opt/docloq/backups/backup.log 2>&1
+
+  What gets backed up:
+    1. PostgreSQL (app database)     -> pg_app_YYYYMMDD_HHMM.sql.gz
+    2. PostgreSQL (Gitea database)   -> pg_gitea_YYYYMMDD_HHMM.sql.gz
+    3. Vault Raft snapshot           -> vault_YYYYMMDD_HHMM.snap
+    4. MongoDB (AI cache)            -> mongo_YYYYMMDD_HHMM.archive.gz
+
+  Retention: 7 days (automatic cleanup of older backups)
+  Documents: Stored in Cloudflare R2 (cloud-managed, not backed up locally)
+
+18.12 DATABASE MIGRATIONS
+--------------------------
+
+  Drizzle ORM migrations run via entrypoint.sh on container startup:
+
+    - Only the first backend replica has RUN_MIGRATIONS=true
+    - Runs: npx drizzle-kit migrate
+    - Second replica starts without migration (prevents race conditions)
+    - Migration files stored in drizzle/ directory, committed to Git
+
+18.13 LOGGING
+-------------
+
+  All services use json-file driver with rotation:
+    max-size: 10 MB per log file
+    max-file: 3 files per service
+
+  View logs:
+    docker service logs docloq_backend --follow
+    docker service logs docloq_frontend --follow --tail 100
+
+18.14 NETWORK
+-------------
+
+  Single overlay network: docloq_overlay
+    - driver: overlay
+    - attachable: true
+    - All 14 services connected
+    - Internal DNS: services reachable by name (e.g., http://db:5432)
+
+  No ports published on host — all external access via Cloudflare Tunnel.
+
+18.15 VOLUMES (13 NAMED VOLUMES)
+---------------------------------
+
+  postgres_data     PostgreSQL app database
+  mongodb_data      MongoDB AI cache
+  vault_data_1      Vault node 1 Raft storage
+  vault_data_2      Vault node 2 Raft storage
+  vault_data_3      Vault node 3 Raft storage
+  clamav_data       ClamAV virus definitions
+  qdrant_data       Qdrant vector storage
+  onlyoffice_data   OnlyOffice document data
+  onlyoffice_logs   OnlyOffice logs
+  onlyoffice_lib    OnlyOffice libraries
+  docuseal_data     DocuSeal signing data
+  gitea_data        Gitea repository data
+  gitea_db_data     Gitea PostgreSQL data
+
+--- FILES CREATED ---
+
+  backend/Dockerfile              Multi-stage Node.js 22 Alpine build
+  backend/entrypoint.sh           Secret loading + optional migration
+  backend/.dockerignore           Exclude .env, node_modules, storage/
+  frontend/Dockerfile             Multi-stage Vite build -> Nginx serve
+  frontend/nginx.conf             SPA routing, caching, gzip, health check
+  frontend/.dockerignore          Exclude node_modules, dist
+  docker-stack.yml                Unified Docker Swarm stack (14 services)
+  scripts/deploy.sh               Build + deploy helper (--init, --build, --secrets)
+  scripts/backup.sh               Daily backup cron (PostgreSQL, Vault, MongoDB)
+
+================================================================================
+19. API KEY STATUS & SERVICE HEALTH (Verified 2026-04-18)
+================================================================================
+
+All external services and API keys verified working:
+
++----------------------+----------+----------------------------------------+
+| Service              | Status   | Notes                                  |
++----------------------+----------+----------------------------------------+
+| PostgreSQL 16        | WORKING  | Port 5436, via Docker                  |
+| Cloudflare R2        | WORKING  | Buckets: documents, archive, qrcodes   |
+| HashiCorp Vault      | WORKING  | v1.17.6, Transit key: docloq-master    |
+|                      |          | Type: aes256-gcm96, dev mode           |
+| ClamAV               | WORKING  | Port 3310, SCANNER_ENABLED=true        |
+| Qdrant               | WORKING  | Port 6333, collection: docloq_documents|
+| MongoDB              | WORKING  | Port 27017, AI analysis cache          |
+| OpenAI API           | WORKING  | gpt-4.1-mini, text-embedding-3-small   |
+|                      |          | AI analysis, chatbot (DoKi)            |
+| DocuSeal             | CONFIGURED| API key set, full test needs PDF flow  |
+| OnlyOffice           | WORKING  | Port 8082, document edit/convert       |
++----------------------+----------+----------------------------------------+
+
+Upload Pipeline (15 steps) verified end-to-end:
+  ClamAV scan → honeytoken inject → QR generate → AES-256-GCM encrypt →
+  Vault key wrap → R2 store → DB insert → secure temp wipe
+
+Download Pipeline verified:
+  R2 fetch → Vault decrypt → per-download invisible watermark inject → stream
+
+AI Grant+Analyze Pipeline verified:
+  decrypt → text extract → OpenAI embed → Qdrant upsert →
+  GPT-4.1-mini analyze → MongoDB cache → structured JSON response
+
+================================================================================
+20. KNOWN ISSUES & BUG FIXES (2026-04-18)
+================================================================================
+
+--- FIXED ---
+
+FIX-001: req.user.id undefined in optionalAuth middleware
+  File:  backend/src/middlewares/auth.middleware.js
+  Root:  JWT payload stores userId but controllers read req.user?.id.
+         optionalAuth skips session-table check, so id was never normalized.
+  Fix:   Both authenticate and optionalAuth now do:
+           req.user = { ...decoded, id: decoded.userId }
+  Impact: Fixed org mismatch in upload, AI analysis, download watermark.
+           Documents now correctly scoped to uploading user's organization.
+
+FIX-002: POST /api/folders/move-folder → HTTP 500 on invalid UUID
+  File:  backend/src/controllers/folder.controller.js
+  Root:  folderId and newParentId passed directly to Postgres without UUID format validation.
+  Fix:   UUID regex check before DB query; returns HTTP 400 with clear message.
+
+FIX-003: GET /api/signing/:taskId/status → HTTP 500 on non-UUID taskId
+  File:  backend/src/controllers/signing.controller.js
+  Root:  taskId passed directly to Postgres WHERE clause without UUID validation.
+  Fix:   UUID regex check before DB query; returns HTTP 400 with clear message.
+
+FIX-004: Chatbot crash (HTTP 500) when user has no organizationId
+  File:  backend/src/services/chatbot.service.js
+  Root:  getOrCreateSession() passed null organizationId to DB INSERT which has
+         NOT NULL constraint on chat_sessions.organization_id.
+  Fix:   Early null check throws descriptive error before attempting INSERT.
+
+--- DOCUMENTATION CORRECTIONS ---
+
+DOC-001: POST /api/auth/register — field name for org creation
+  Correct field: companyName  (NOT orgName)
+  Body: { email, password, firstName, lastName, companyName? }
+  First user of an org is automatically assigned 'admin' role.
+
+DOC-002: PATCH /api/notifications/read-all (NOT POST)
+  Route: router.patch('/read-all', readAll)  — HTTP method is PATCH.
+
+DOC-003: Watermark Scanner is admin-only by design
+  Roles allowed: super_admin, admin, manager, auditor
+  Roles blocked:  user, viewer
+  Rationale: Leak detection and download history are sensitive security
+             operations restricted to administrative personnel only.
+
+DOC-004: Document Verification (QR) is public by design
+  GET /api/documents/verify?code=XXXXXX — no auth required.
+  Rationale: QR codes are printed on physical documents and must be
+             scannable by anyone (recipients, auditors, courts) without
+             requiring a DocLoq account.
+
+================================================================================
 END OF DOCUMENTATION
 ================================================================================
 
 Document generated for DocLoq Document Management System
 Cybersecurity Capstone Project
+Last updated: 2026-04-18

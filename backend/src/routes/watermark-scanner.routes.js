@@ -3,6 +3,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { authenticate, authorize } from '../middlewares/auth.middleware.js';
+import { validateUUID } from '../middlewares/validate.middleware.js';
 import {
   scanForWatermark,
   getWatermarkHistory,
@@ -25,9 +26,9 @@ router.use(authorize(['super_admin', 'admin', 'manager', 'auditor']));
 router.post('/scan', upload.single('file'), scanForWatermark);
 
 // Get watermark download history for a document
-router.get('/history/:documentId', getWatermarkHistory);
+router.get('/history/:documentId', validateUUID('documentId'), getWatermarkHistory);
 
 // Get specific watermark details
-router.get('/details/:watermarkId', getWatermarkDetails);
+router.get('/details/:watermarkId', validateUUID('watermarkId'), getWatermarkDetails);
 
 export default router;

@@ -20,51 +20,10 @@ services:
     restart: always
 
   # ============================================================
-  # Object Storage — MinIO (S3-compatible)
+  # Object Storage — Cloudflare R2 (no local container needed)
+  # Configure via S3_ENDPOINT, S3_ACCESS_KEY, S3_SECRET_KEY in .env
+  # Buckets: docloq-documents, docloq-archive, docloq-qrcodes
   # ============================================================
-  minio:
-    image: minio/minio:RELEASE.2025-01-20T14-49-07Z
-    container_name: docloq_minio
-    ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # Console UI
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-docloq-admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-docloq-secret-key-change-me}
-    command: server /data --console-address ":9001"
-    volumes:
-      - minio_data:/data
-    networks:
-      - docloq_network
-    restart: always
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
-
-  # MinIO bucket initialization (one-shot)
-  minio-init:
-    image: minio/mc:latest
-    container_name: docloq_minio_init
-    depends_on:
-      minio:
-        condition: service_healthy
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-docloq-admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-docloq-secret-key-change-me}
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set docloq http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
-      mc mb --ignore-existing docloq/docloq-documents;
-      mc mb --ignore-existing docloq/docloq-archive;
-      mc mb --ignore-existing docloq/docloq-qrcodes;
-      echo 'Buckets created successfully';
-      exit 0;
-      "
-    networks:
-      - docloq_network
 
   # ============================================================
   # Key Management — HashiCorp Vault (Transit Engine)
@@ -113,6 +72,25 @@ services:
     restart: always
 
   # ============================================================
+  # Rate Limiter Store — Redis (persistent rate limiting)
+  # ============================================================
+  redis:
+    image: redis:7-alpine
+    container_name: docloq_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - docloq_network
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ============================================================
   # Cache Database — MongoDB (AI Analysis Cache)
   # ============================================================
   mongodb:
@@ -154,10 +132,10 @@ services:
 
 volumes:
   postgres_data:
-  minio_data:
   clamav_data:
   qdrant_data:
   mongodb_data:
+  redis_data:
 
 networks:
   docloq_network:

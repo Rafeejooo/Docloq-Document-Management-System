@@ -12,6 +12,7 @@ import {
   getUserPermissions,
 } from '../controllers/role.controller.js';
 import { authenticate, authorize } from '../middlewares/auth.middleware.js';
+import { validateUUID } from '../middlewares/validate.middleware.js';
 
 const router = Router();
 
@@ -23,16 +24,16 @@ router.get('/my-permissions', getUserPermissions);
 
 // Role CRUD (Admin/Super Admin only)
 router.get('/', authorize(['admin', 'super_admin']), getRoles);
-router.get('/:id', authorize(['admin', 'super_admin']), getRole);
+router.get('/:id', authorize(['admin', 'super_admin']), validateUUID('id'), getRole);
 router.post('/', authorize(['admin', 'super_admin']), createRole);
-router.put('/:id', authorize(['admin', 'super_admin']), updateRole);
-router.delete('/:id', authorize(['admin', 'super_admin']), deleteRole);
+router.put('/:id', authorize(['admin', 'super_admin']), validateUUID('id'), updateRole);
+router.delete('/:id', authorize(['admin', 'super_admin']), validateUUID('id'), deleteRole);
 
 // User assignment (Admin/Super Admin only)
-router.post('/:id/assign', authorize(['admin', 'super_admin']), assignUsersToRole);
-router.delete('/:id/users/:userId', authorize(['admin', 'super_admin']), removeUserFromRole);
+router.post('/:id/assign', authorize(['admin', 'super_admin']), validateUUID('id'), assignUsersToRole);
+router.delete('/:id/users/:userId', authorize(['admin', 'super_admin']), validateUUID('id', 'userId'), removeUserFromRole);
 
 // Get specific user's permissions (Admin/Super Admin only)
-router.get('/user/:userId/permissions', authorize(['admin', 'super_admin']), getUserPermissions);
+router.get('/user/:userId/permissions', authorize(['admin', 'super_admin']), validateUUID('userId'), getUserPermissions);
 
 export default router;

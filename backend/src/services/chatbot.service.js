@@ -262,6 +262,10 @@ export const getTasksForUser = async (userId, userRole, organizationId, search =
 // ──────────────────────────────────────────────
 
 export const getOrCreateSession = async (userId, organizationId) => {
+  if (!organizationId) {
+    throw new Error('User has no organization. Please contact your administrator.');
+  }
+
   // Find active session
   const [existing] = await db
     .select()
